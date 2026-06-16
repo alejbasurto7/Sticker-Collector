@@ -26,6 +26,7 @@ export default function TradeView() {
 
   const [historyOpen, setHistoryOpen] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [qrError, setQrError] = useState('');
   const [scanError, setScanError] = useState('');
   const [scannedText, setScannedText] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -54,11 +55,14 @@ export default function TradeView() {
       }
       return;
     }
+    setQrError('');
     QRCode.toCanvas(canvas, text, {
       width: 240,
       margin: 2,
       color: { dark: '#000000', light: '#ffffff' },
-    }).catch(() => {});
+    }).catch((err: Error) => {
+      setQrError(`Could not generate QR: ${err.message}`);
+    });
   }, [counts]);
 
   // Stop camera stream when scanning closes.
@@ -172,6 +176,7 @@ export default function TradeView() {
         )}
       </div>
 
+      {qrError && <p className="trade-scan-error">{qrError}</p>}
       {scanError && <p className="trade-scan-error">{scanError}</p>}
 
       {/* Instructions */}

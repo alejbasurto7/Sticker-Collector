@@ -3,7 +3,8 @@ import { album } from '../data/sampleAlbum';
 
 /**
  * Build export text from the user's counts in the same format that parseExport() consumes.
- * This text is encoded into the Trade QR code so another collector can scan it.
+ * Emojis are intentionally omitted to keep the text ASCII-only and the QR code compact —
+ * resolveStickerId() has a number-only fallback for all pages including FWC intros.
  */
 export function buildExportText(counts: Counts): string {
   const needLines: string[] = [];
@@ -21,14 +22,15 @@ export function buildExportText(counts: Counts): string {
         needNums.push(sticker.number);
       } else if (count > 1) {
         const extras = count - 1;
-        swapNums.push(extras > 1 ? `${sticker.number} (×${extras})` : sticker.number);
+        swapNums.push(extras > 1 ? `${sticker.number} (x${extras})` : sticker.number);
       }
     }
 
+    // No emoji — code alone is enough for resolveStickerId() to match
     if (needNums.length > 0)
-      needLines.push(`${page.code} ${page.emoji}: ${needNums.join(', ')}`);
+      needLines.push(`${page.code}: ${needNums.join(', ')}`);
     if (swapNums.length > 0)
-      swapLines.push(`${page.code} ${page.emoji}: ${swapNums.join(', ')}`);
+      swapLines.push(`${page.code}: ${swapNums.join(', ')}`);
   }
 
   const parts: string[] = [];
