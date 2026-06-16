@@ -18,10 +18,10 @@ export default function StickerChips({ ids, selected, onToggle, conflicts, readO
   return (
     <div>
       {groups.map(({ page, stickers }) => (
-        <div key={page.id}>
-          <div className="chip-group-title">
+        <div key={page.id} className="chip-group-row">
+          <span className="chip-group-title">
             {page.emoji} {page.code}
-          </div>
+          </span>
           <div className="chip-grid">
             {stickers.map((s) => {
               const isSel = selected.has(s.id);

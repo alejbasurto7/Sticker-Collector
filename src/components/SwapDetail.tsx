@@ -53,7 +53,10 @@ export default function SwapDetail({ swap, onClose }: Props) {
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2>{swap.name}</h2>
-          <span className={`pill ${swap.status}`}>{swap.status}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span className={`pill ${swap.status}`}>{swap.status}</span>
+            <button className="modal-close-btn" onClick={onClose} aria-label="Close">✕</button>
+          </div>
         </div>
         <p className="modal-sub">
           {isOpen
