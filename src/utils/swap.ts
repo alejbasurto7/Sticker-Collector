@@ -41,7 +41,7 @@ export interface ConflictSets {
   receiving: Set<string>;
 }
 
-export function computeConflicts(swaps: Swap[]): ConflictSets {
+export function computeConflicts(swaps: Swap[], minCount = 2): ConflictSets {
   const giveCounts = new Map<string, number>();
   const recvCounts = new Map<string, number>();
 
@@ -53,8 +53,8 @@ export function computeConflicts(swaps: Swap[]): ConflictSets {
 
   const giving = new Set<string>();
   const receiving = new Set<string>();
-  for (const [id, n] of giveCounts) if (n > 1) giving.add(id);
-  for (const [id, n] of recvCounts) if (n > 1) receiving.add(id);
+  for (const [id, n] of giveCounts) if (n >= minCount) giving.add(id);
+  for (const [id, n] of recvCounts) if (n >= minCount) receiving.add(id);
 
   return { giving, receiving };
 }

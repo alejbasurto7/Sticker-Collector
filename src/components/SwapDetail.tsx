@@ -20,8 +20,9 @@ export default function SwapDetail({ swap, onClose }: Props) {
   const isOpen = swap.status === 'open';
 
   // Conflicts ignoring this swap's own contribution, so we see clashes with OTHERS.
+  // minCount=1 because we already excluded this swap — appearing once in another swap is enough.
   const conflicts = useMemo(
-    () => computeConflicts(swaps.filter((s) => s.id !== swap.id)),
+    () => computeConflicts(swaps.filter((s) => s.id !== swap.id), 1),
     [swaps, swap.id],
   );
   const giveConflicts = new Set(swap.giving.filter((id) => conflicts.giving.has(id)));
