@@ -8,7 +8,7 @@ interface Props {
 
 const TABS: { key: Tab; icon: string; label: string }[] = [
   { key: 'album', icon: '📖', label: 'Album' },
-  { key: 'swaps', icon: '🔄', label: 'Swaps' },
+  { key: 'swaps', icon: '🔄', label: 'Swap Analysis' },
   { key: 'stats', icon: '📊', label: 'Stats' },
 ];
 
