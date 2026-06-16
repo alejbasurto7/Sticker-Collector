@@ -561,6 +561,20 @@ button {
   margin: 0 0 4px;
   font-size: 18px;
 }
+.modal-close-btn {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 18px;
+  line-height: 1;
+  padding: 2px 6px;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+.modal-close-btn:hover {
+  background: var(--bg-elev-2);
+  color: var(--text);
+}
 .modal .modal-sub {
   color: var(--text-dim);
   font-size: 13px;
@@ -711,11 +725,23 @@ textarea {
   right: -7px;
   font-size: 12px;
 }
+.chip-group-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 10px;
+}
 .chip-group-title {
   font-size: 12px;
   font-weight: 800;
   color: var(--text-dim);
-  margin: 14px 0 2px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding-top: 6px;
+}
+.chip-group-row .chip-grid {
+  flex: 1;
+  margin-top: 0;
 }
 
 .toolbar {
