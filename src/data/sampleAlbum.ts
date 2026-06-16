@@ -22,13 +22,13 @@ interface IntroDef {
 }
 
 const INTRO_PAGES: IntroDef[] = [
-  { id: 'FWC-trophy', code: 'FWC', emoji: '🏆', title: 'World Cup', numbers: ['00', '1', '2', '3', '4'] },
-  { id: 'FWC-world', code: 'FWC', emoji: '🌎', title: 'Host Cities', numbers: ['5', '6', '7', '8'] },
+  { id: 'FWC-trophy', code: 'FWC', emoji: '🏆', title: 'Specials', numbers: ['00', '1', '2', '3', '4'] },
+  { id: 'FWC-world', code: 'FWC', emoji: '🌎', title: 'Ball and Countries', numbers: ['5', '6', '7', '8'] },
   {
     id: 'FWC-scroll',
     code: 'FWC',
     emoji: '📜',
-    title: 'Legends',
+    title: 'History',
     numbers: ['9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19'],
   },
 ];
