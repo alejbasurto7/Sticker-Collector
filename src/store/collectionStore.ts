@@ -29,6 +29,7 @@ interface CollectionState {
   updateSwap: (id: string, patch: { giving?: string[]; receiving?: string[]; name?: string }) => void;
   closeSwap: (id: string, settled: { givenIds: string[]; receivedIds: string[] }) => void;
   deleteSwap: (id: string) => void;
+  undoLastTrade: () => void;
 }
 
 const clampCount = (n: number) => (n < 0 ? 0 : n);
@@ -117,6 +118,18 @@ export const useCollection = create<CollectionState>()(
         }),
 
       deleteSwap: (id) => set((s) => ({ swaps: s.swaps.filter((sw) => sw.id !== id) })),
+
+      undoLastTrade: () =>
+        set((s) => {
+          const last = [...s.swaps]
+            .filter((sw) => sw.status === 'closed')
+            .sort((a, b) => (b.closedAt ?? 0) - (a.closedAt ?? 0))[0];
+          if (!last) return s;
+          const counts = { ...s.counts };
+          for (const id of last.giving) counts[id] = clampCount((counts[id] ?? 0) + 1);
+          for (const id of last.receiving) counts[id] = clampCount((counts[id] ?? 0) - 1);
+          return { counts, swaps: s.swaps.filter((sw) => sw.id !== last.id) };
+        }),
     }),
     {
       name: 'figuritas-collection-v1',

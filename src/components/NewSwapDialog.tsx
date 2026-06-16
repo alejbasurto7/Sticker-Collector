@@ -6,6 +6,7 @@ import StickerChips from './StickerChips';
 
 interface Props {
   onClose: () => void;
+  initialText?: string;
 }
 
 const SAMPLE = `Figuritas App - List
@@ -15,13 +16,13 @@ BRA 🇧🇷: 3, 4, 5
 To Swap
 MEX 🇲🇽: 7, 8`;
 
-export default function NewSwapDialog({ onClose }: Props) {
+export default function NewSwapDialog({ onClose, initialText }: Props) {
   const counts = useCollection((s) => s.counts);
   const swaps = useCollection((s) => s.swaps);
   const createSwap = useCollection((s) => s.createSwap);
 
   const [name, setName] = useState('');
-  const [text, setText] = useState('');
+  const [text, setText] = useState(initialText ?? '');
   const [parsed, setParsed] = useState<ReturnType<typeof parseExport> | null>(null);
   const [give, setGive] = useState<Set<string>>(new Set());
   const [get, setGet] = useState<Set<string>>(new Set());
