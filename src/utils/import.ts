@@ -39,13 +39,25 @@ function classifyHeader(line: string): Section {
  * ignored. Each content line maps its numbers to sticker ids via the album.
  */
 export function parseExport(text: string): ParsedList {
+  // Chat apps (WhatsApp, Telegram, SMS) often strip newlines when copying.
+  // Re-insert line breaks before section keywords and before every "CODE :"
+  // sticker-entry token so each line is classified independently.
+  const normalized = text
+    // Pass 1: newline before section-header keywords appearing mid-line.
+    .replace(
+      /[^\S\r\n]+(?=(?:I[ \t]+need|To[ \t]+swap|swaps?|necesito|me[ \t]+faltan|faltan|busco|cambio|repe|tengo|doy)(?:[ \t]|$))/gi,
+      '\n',
+    )
+    // Pass 2: newline before sticker-entry tokens (e.g. "FWC :" or "MEX :").
+    .replace(/[^\S\r\n]+(?=[A-Z]{2,5}\s*:)/g, '\n');
+
   const needs: string[] = [];
   const swaps: string[] = [];
   const swapQty: Record<string, number> = {};
   const unmatched: string[] = [];
   let section: Section = null;
 
-  for (const rawLine of text.split(/\r?\n/)) {
+  for (const rawLine of normalized.split(/\r?\n/)) {
     const line = rawLine.trim();
     if (!line) continue;
     if (SKIP_LINES.includes(line.toLowerCase())) continue;

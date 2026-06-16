@@ -121,5 +121,19 @@ const expectedSwapsTotal = Object.values(full.swapQty).reduce((a, b) => a + b, 0
 assert(fullStats.swapsTotal === expectedSwapsTotal, `swapsTotal = sum of spares (${expectedSwapsTotal}, got ${fullStats.swapsTotal})`);
 assert(fullStats.missing === full.needs.length, `missing == needs (${full.needs.length}, got ${fullStats.missing})`);
 
+// --- Single-line export (WhatsApp / SMS strips newlines) ---
+// Reproduces the bug where "I need FWC : 00, 2, 3" on one line meant section
+// was never detected and every sticker was silently skipped.
+const SINGLE_LINE = 'Figuritas App - List Usa Mex Can 26 I need FWC : 00, 2, 3 FWC : 7 MEX : 5, 7, 8, 10 Swaps FWC : 1 FWC : 11, 14, 18 MEX : 12, 20';
+console.log('Single-line export (no newlines)');
+const sl = parseExport(SINGLE_LINE);
+assert(sl.needs.includes('FWC-trophy-00'), 'FWC 00 need parsed from single-line');
+assert(sl.needs.includes('FWC-world-7'), 'FWC 7 need parsed from single-line');
+assert(sl.needs.includes('MEX-5') && sl.needs.includes('MEX-10'), 'MEX needs parsed from single-line');
+assert(sl.swaps.includes('FWC-trophy-1'), 'FWC 1 swap parsed from single-line');
+assert(sl.swaps.includes('FWC-scroll-11') && sl.swaps.includes('FWC-scroll-18'), 'FWC scroll swaps parsed');
+assert(sl.swaps.includes('MEX-12') && sl.swaps.includes('MEX-20'), 'MEX swaps parsed from single-line');
+assert(sl.needs.length > 0 && sl.swaps.length > 0, 'both sections non-empty');
+
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);
