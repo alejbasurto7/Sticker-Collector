@@ -7,10 +7,11 @@ import SwapDetail from './SwapDetail';
 
 export default function SwapsView() {
   const swaps = useCollection((s) => s.swaps);
+  const counts = useCollection((s) => s.counts);
   const [creating, setCreating] = useState(false);
   const [openSwap, setOpenSwap] = useState<Swap | null>(null);
 
-  const conflicts = useMemo(() => computeConflicts(swaps), [swaps]);
+  const conflicts = useMemo(() => computeConflicts(swaps, counts), [swaps, counts]);
 
   const swapConflictCount = (s: Swap) => {
     if (s.status !== 'open') return 0;

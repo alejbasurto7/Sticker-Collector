@@ -12,6 +12,17 @@ export interface PageProgress {
   complete: boolean;
 }
 
+export type StickerType = 'hologram' | 'regular' | 'team';
+
+export interface TypeProgress {
+  type: StickerType;
+  label: string;
+  emoji: string;
+  total: number;
+  owned: number;
+  pct: number;
+}
+
 export interface Stats {
   totalStickers: number;
   ownedUnique: number;
@@ -22,7 +33,18 @@ export interface Stats {
   pagesCompleted: number;
   pagesTotal: number;
   pages: PageProgress[];
+  byType: TypeProgress[];
   mostDuplicated: { id: string; number: string; code: string; emoji: string; extra: number } | null;
+}
+
+/** The team photo sticker is always #13 on every national-team page. */
+const TEAM_STICKER_NUMBER = '13';
+
+/** Classify a sticker into one of the three progress categories. */
+export function stickerType(sticker: { number: string; special: boolean }, pageType: string): StickerType {
+  if (pageType === 'team' && sticker.number === TEAM_STICKER_NUMBER) return 'team';
+  if (sticker.special) return 'hologram';
+  return 'regular';
 }
 
 export function countOf(counts: Counts, id: string): number {
@@ -57,6 +79,28 @@ export function computeStats(counts: Counts): Stats {
     };
   });
 
+  // Progress grouped by sticker type (Holograms / Regular / Team).
+  const pageTypeById = Object.fromEntries(album.pages.map((p) => [p.id, p.type]));
+  const typeOrder: { type: StickerType; label: string; emoji: string }[] = [
+    { type: 'hologram', label: 'Holograms', emoji: '✨' },
+    { type: 'regular', label: 'Regular', emoji: '🟦' },
+    { type: 'team', label: 'Team', emoji: '👕' },
+  ];
+  const typeAcc: Record<StickerType, { owned: number; total: number }> = {
+    hologram: { owned: 0, total: 0 },
+    regular: { owned: 0, total: 0 },
+    team: { owned: 0, total: 0 },
+  };
+  for (const s of album.stickers) {
+    const t = stickerType(s, pageTypeById[s.pageId] ?? '');
+    typeAcc[t].total++;
+    if ((counts[s.id] ?? 0) >= 1) typeAcc[t].owned++;
+  }
+  const byType: TypeProgress[] = typeOrder.map(({ type, label, emoji }) => {
+    const { owned, total } = typeAcc[type];
+    return { type, label, emoji, total, owned, pct: total ? owned / total : 0 };
+  });
+
   // Most duplicated sticker.
   let mostDuplicated: Stats['mostDuplicated'] = null;
   for (const s of album.stickers) {
@@ -77,6 +121,7 @@ export function computeStats(counts: Counts): Stats {
     pagesCompleted: pages.filter((p) => p.complete).length,
     pagesTotal: pages.length,
     pages,
+    byType,
     mostDuplicated,
   };
 }

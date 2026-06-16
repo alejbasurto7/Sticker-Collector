@@ -10,7 +10,9 @@ interface CollectionState {
   counts: Counts;
   swaps: Swap[];
   edition: Edition;
+  albumName: string;
   setEdition: (edition: Edition) => void;
+  setAlbumName: (name: string) => void;
 
   // Collection actions
   addOne: (id: string) => void;
@@ -45,11 +47,14 @@ export const useCollection = create<CollectionState>()(
       counts: {},
       swaps: [],
       edition: DEFAULT_EDITION,
+      albumName: 'Usa Mex Can 26',
 
       setEdition: (edition) => {
         applyEdition(edition);
         set({ edition });
       },
+
+      setAlbumName: (name) => set({ albumName: name.trim() || 'Usa Mex Can 26' }),
 
       addOne: (id) =>
         set((s) => ({ counts: { ...s.counts, [id]: clampCount((s.counts[id] ?? 0) + 1) } })),

@@ -12,33 +12,60 @@ interface Props {
 
 export default function SwapDetail({ swap, onClose }: Props) {
   const swaps = useCollection((s) => s.swaps);
-  const updateSwap = useCollection((s) => s.updateSwap);
+  const counts = useCollection((s) => s.counts);
   const deleteSwap = useCollection((s) => s.deleteSwap);
   const [closing, setClosing] = useState(false);
+  const [deselectedGiving, setDeselectedGiving] = useState(new Set<string>());
+  const [deselectedReceiving, setDeselectedReceiving] = useState(new Set<string>());
 
   const isOpen = swap.status === 'open';
 
-  // Conflicts ignoring this swap's own contribution, so we see clashes with OTHERS.
-  const conflicts = useMemo(
-    () => computeConflicts(swaps.filter((s) => s.id !== swap.id)),
-    [swaps, swap.id],
-  );
-  const giveConflicts = new Set(swap.giving.filter((id) => conflicts.giving.has(id)));
-  const recvConflicts = new Set(swap.receiving.filter((id) => conflicts.receiving.has(id)));
+  const conflicts = useMemo(() => computeConflicts(swaps, counts), [swaps, counts]);
+
+  // Build per-sticker tooltip maps for conflicted chips.
+  const giveConflicts = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const id of swap.giving) {
+      if (conflicts.giving.has(id)) {
+        const spares = Math.max(0, (counts[id] ?? 0) - 1);
+        const n = conflicts.giveSwapCounts.get(id) ?? 0;
+        map.set(id, `Promised in ${n} swap${n !== 1 ? 's' : ''} · ${spares} spare${spares !== 1 ? 's' : ''} available`);
+      }
+    }
+    return map;
+  }, [swap.giving, conflicts, counts]);
+
+  const recvConflicts = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const id of swap.receiving) {
+      if (conflicts.receiving.has(id)) {
+        const n = conflicts.recvSwapCounts.get(id) ?? 0;
+        map.set(id, `Missing sticker expected from ${n} swap${n !== 1 ? 's' : ''} · you only need one`);
+      }
+    }
+    return map;
+  }, [swap.receiving, conflicts]);
+
   const conflictCount = giveConflicts.size + recvConflicts.size;
 
-  const giving = new Set(swap.giving);
-  const receiving = new Set(swap.receiving);
+  const giving = new Set(swap.giving.filter((id) => !deselectedGiving.has(id)));
+  const receiving = new Set(swap.receiving.filter((id) => !deselectedReceiving.has(id)));
 
   const toggleGiving = (id: string) => {
-    const next = new Set(giving);
-    if (next.has(id)) next.delete(id);
-    updateSwap(swap.id, { giving: [...next] });
+    setDeselectedGiving((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
   const toggleReceiving = (id: string) => {
-    const next = new Set(receiving);
-    if (next.has(id)) next.delete(id);
-    updateSwap(swap.id, { receiving: [...next] });
+    setDeselectedReceiving((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
   const remove = () => {
@@ -53,11 +80,14 @@ export default function SwapDetail({ swap, onClose }: Props) {
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2>{swap.name}</h2>
-          <span className={`pill ${swap.status}`}>{swap.status}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span className={`pill ${swap.status}`}>{swap.status}</span>
+            <button className="modal-close-btn" onClick={onClose} aria-label="Close">✕</button>
+          </div>
         </div>
         <p className="modal-sub">
           {isOpen
-            ? 'Tap a sticker to drop it from this swap.'
+            ? 'Tap a sticker to unselect it. Tap again to add it back.'
             : 'This swap is concluded. Counts were updated when it closed.'}
         </p>
 
@@ -68,7 +98,7 @@ export default function SwapDetail({ swap, onClose }: Props) {
           </div>
         )}
 
-        <div className="section-title">You give ({swap.giving.length})</div>
+        <div className="section-title">You give ({giving.size})</div>
         <StickerChips
           ids={swap.giving}
           selected={giving}
@@ -77,7 +107,7 @@ export default function SwapDetail({ swap, onClose }: Props) {
           readOnly={!isOpen}
         />
 
-        <div className="section-title">You get ({swap.receiving.length})</div>
+        <div className="section-title">You get ({receiving.size})</div>
         <StickerChips
           ids={swap.receiving}
           selected={receiving}
@@ -90,14 +120,12 @@ export default function SwapDetail({ swap, onClose }: Props) {
           <button className="btn danger" onClick={remove}>
             Delete
           </button>
+          <button className="btn" onClick={onClose}>
+            Close
+          </button>
           {isOpen && (
             <button className="btn primary full" onClick={() => setClosing(true)}>
               ✓ Conclude swap
-            </button>
-          )}
-          {!isOpen && (
-            <button className="btn full" onClick={onClose}>
-              Close
             </button>
           )}
         </div>

@@ -7,7 +7,6 @@ import ProgressBar from './components/ProgressBar';
 import AlbumView from './components/AlbumView';
 import SwapsView from './components/SwapsView';
 import StatsView from './components/StatsView';
-import TradeView from './components/TradeView';
 import EditionDialog from './components/EditionDialog';
 
 export default function App() {
@@ -16,6 +15,7 @@ export default function App() {
   const counts = useCollection((s) => s.counts);
   const swaps = useCollection((s) => s.swaps);
   const edition = useCollection((s) => s.edition);
+  const albumName = useCollection((s) => s.albumName);
 
   // edition is a dep so totals recompute when the album layout changes.
   const stats = useMemo(() => computeStats(counts), [counts, edition]);
@@ -25,8 +25,8 @@ export default function App() {
     <div className="app">
       <header className="app-header">
         <div className="header-top">
-          <h1>{album.name}</h1>
-          <button className="icon-btn" onClick={() => setEditionOpen(true)} aria-label="Album edition">
+          <h1>{albumName}</h1>
+          <button className="icon-btn" onClick={() => setEditionOpen(true)} aria-label="Settings">
             ⚙️
           </button>
         </div>
@@ -46,8 +46,7 @@ export default function App() {
       <main className="content" key={edition}>
         {tab === 'album' && <AlbumView />}
         {tab === 'swaps' && <SwapsView />}
-        {tab === 'trade' && <TradeView />}
-        {tab === 'stats' && <StatsView />}
+{tab === 'stats' && <StatsView />}
       </main>
 
       <TabBar active={tab} onChange={setTab} openSwaps={openSwaps} />

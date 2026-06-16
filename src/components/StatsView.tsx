@@ -3,6 +3,7 @@ import { useCollection } from '../store/collectionStore';
 import { computeStats, computeSkills } from '../utils/stats';
 import { shareNodeAsImage } from '../utils/share';
 import ProgressRing from './ProgressRing';
+import ProgressBar from './ProgressBar';
 import BarChart from './BarChart';
 import CollectorSkills from './CollectorSkills';
 import ShareCard from './ShareCard';
@@ -103,6 +104,18 @@ export default function StatsView() {
 
       <div className="section-title">Collector Skills</div>
       <CollectorSkills skills={skills} />
+
+      <div className="section-title">Progress by type</div>
+      <div className="card type-progress">
+        {stats.byType.map((t) => (
+          <ProgressBar
+            key={t.type}
+            label={`${t.emoji} ${t.label}`}
+            value={`${t.owned}/${t.total} · ${Math.round(t.pct * 100)}%`}
+            pct={t.pct}
+          />
+        ))}
+      </div>
 
       <div className="section-title">Progress by page</div>
       <div className="card">
