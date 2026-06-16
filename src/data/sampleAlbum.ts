@@ -128,6 +128,23 @@ function buildAlbum(): Album {
     });
   }
 
+  // Coca-Cola extras section (14 stickers), shown after the teams.
+  const ccIds: string[] = [];
+  for (let n = 1; n <= 14; n++) {
+    const number = String(n);
+    const id = `CC-${number}`;
+    stickers.push({ id, number, pageId: 'CC', special: false });
+    ccIds.push(id);
+  }
+  pages.push({
+    id: 'CC',
+    code: 'CC',
+    emoji: '🥤',
+    title: 'Coca-Cola',
+    type: 'extra',
+    stickerIds: ccIds,
+  });
+
   return { id: 'usa-mex-can-26', name: 'Usa Mex Can 26', pages, stickers };
 }
 

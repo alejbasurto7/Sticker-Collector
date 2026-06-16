@@ -5,9 +5,14 @@ export interface ParsedList {
   needs: string[];
   /** Sticker ids the collector has as duplicates (available to swap). */
   swaps: string[];
+  /** Spare copies per swap sticker id, e.g. "2 (×3)" -> 3. Defaults to 1. */
+  swapQty: Record<string, number>;
   /** Raw tokens that could not be matched to a sticker. */
   unmatched: string[];
 }
+
+// Matches a quantity suffix like "(×2)", "(x3)" or "( × 2 )".
+const QTY_RE = /\(\s*[x×]\s*(\d+)\s*\)/i;
 
 type Section = 'needs' | 'swaps' | null;
 
@@ -36,6 +41,7 @@ function classifyHeader(line: string): Section {
 export function parseExport(text: string): ParsedList {
   const needs: string[] = [];
   const swaps: string[] = [];
+  const swapQty: Record<string, number> = {};
   const unmatched: string[] = [];
   let section: Section = null;
 
@@ -55,14 +61,26 @@ export function parseExport(text: string): ParsedList {
       if (!section) continue; // numbers before any section header → ignore
 
       for (const piece of match[2].split(',')) {
-        const number = piece.trim();
-        if (!number) continue;
+        const token = piece.trim();
+        if (!token) continue;
+        // Split an optional "(×N)" spare-count suffix off the sticker number.
+        const qtyMatch = token.match(QTY_RE);
+        const qty = qtyMatch ? Math.max(parseInt(qtyMatch[1], 10), 1) : 1;
+        const number = token.replace(QTY_RE, '').trim();
+        // Sticker numbers are always digits (e.g. "00", "7"). Anything else is
+        // stray prose (like the trailing "Download the app" URL) — skip silently.
+        if (!/^\d+$/.test(number)) continue;
         const id = resolveStickerId(code, emoji, number);
         if (!id) {
           unmatched.push(`${code} ${number}`.trim());
           continue;
         }
-        (section === 'needs' ? needs : swaps).push(id);
+        if (section === 'needs') {
+          needs.push(id);
+        } else {
+          swaps.push(id);
+          swapQty[id] = qty;
+        }
       }
       continue;
     }
@@ -75,6 +93,7 @@ export function parseExport(text: string): ParsedList {
   return {
     needs: [...new Set(needs)],
     swaps: [...new Set(swaps)],
+    swapQty,
     unmatched,
   };
 }
@@ -89,7 +108,8 @@ export function parsedToCounts(parsed: ParsedList, allStickerIds: string[]): Rec
   const counts: Record<string, number> = {};
   for (const id of allStickerIds) {
     if (needSet.has(id)) counts[id] = 0;
-    else if (swapSet.has(id)) counts[id] = 2;
+    // Owned (1) plus the listed spare copies.
+    else if (swapSet.has(id)) counts[id] = 1 + (parsed.swapQty[id] ?? 1);
     else counts[id] = 1;
   }
   return counts;

@@ -17,11 +17,13 @@ function assert(cond: boolean, msg: string) {
 // --- Album shape ---
 console.log('Album structure');
 assert(album.name === 'Usa Mex Can 26', 'album name correct');
-assert(album.pages.length === 51, `51 pages (got ${album.pages.length})`);
-assert(album.stickers.length === 980, `980 stickers (got ${album.stickers.length})`);
+assert(album.pages.length === 52, `52 pages (got ${album.pages.length})`);
+assert(album.stickers.length === 994, `994 stickers (got ${album.stickers.length})`);
 const teamPages = album.pages.filter((p) => p.type === 'team');
 assert(teamPages.length === 48, `48 team pages (got ${teamPages.length})`);
 assert(teamPages.every((p) => p.stickerIds.length === 20), 'each team has 20 stickers');
+const cc = album.pages.find((p) => p.code === 'CC');
+assert(!!cc && cc.stickerIds.length === 14, 'CC extras page with 14 stickers');
 
 // --- Real export parse ---
 const REAL = `Figuritas App - List
@@ -47,7 +49,8 @@ assert(counts['MEX-5'] === 0, 'needed sticker -> 0');
 assert(counts['MEX-6'] === 1, 'unlisted sticker -> owned 1');
 const stats = computeStats(counts);
 assert(stats.missing === 28, `28 missing (got ${stats.missing})`);
-assert(stats.ownedUnique === 980 - 28, `owned ${980 - 28} (got ${stats.ownedUnique})`);
+const totalIds = album.stickers.length;
+assert(stats.ownedUnique === totalIds - 28, `owned ${totalIds - 28} (got ${stats.ownedUnique})`);
 
 // --- Export with To Swap section ---
 console.log('Parse needs + swaps sections');
@@ -79,6 +82,36 @@ const swaps: Swap[] = [
 const conf = computeConflicts(swaps);
 assert(conf.giving.has('BRA-3'), 'BRA-3 promised in 2 open swaps -> conflict');
 assert(!conf.receiving.has('ARG-10'), 'ARG-10 only received once -> no conflict');
+
+// --- FULL real export (needs + swaps with quantities + CC) ---
+const FULL = `Figuritas App - List
+Usa Mex Can 26
+I need
+FWC 🌎: 5, 6, 8
+CC 🥤: 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14
+Swaps
+BIH 🇧🇦: 2 (×2), 3, 5, 14, 16, 19
+ESP 🇪🇸: 2 (×2), 8, 10 (×2)
+COD 🇨🇩: 6 (×2), 7, 8 (×2), 11 (×3), 20`;
+
+console.log('Full real export (quantities + CC)');
+const full = parseExport(FULL);
+assert(full.unmatched.length === 0, `CC now resolves, no unmatched (got ${full.unmatched}）`);
+assert(full.needs.includes('CC-1') && full.needs.includes('CC-14'), 'CC needs parsed');
+assert(full.needs.includes('FWC-world-5'), 'FWC 🌎 need parsed');
+assert(full.swaps.includes('BIH-2') && full.swapQty['BIH-2'] === 2, 'BIH-2 has 2 spares');
+assert(full.swapQty['COD-11'] === 3, 'COD-11 has 3 spares (×3)');
+assert(full.swapQty['ESP-10'] === 2 && full.swapQty['ESP-8'] === 1, 'mixed qty in one line');
+assert((full.swapQty['BIH-3'] ?? 1) === 1, 'plain entry defaults to 1 spare');
+
+const fullCounts = parsedToCounts(full, album.stickers.map((s) => s.id));
+assert(fullCounts['COD-11'] === 4, 'owned(1) + 3 spares = count 4');
+assert(fullCounts['BIH-2'] === 3, 'owned(1) + 2 spares = count 3');
+assert(fullCounts['CC-1'] === 0, 'CC need -> missing');
+const fullStats = computeStats(fullCounts);
+const expectedSwapsTotal = Object.values(full.swapQty).reduce((a, b) => a + b, 0);
+assert(fullStats.swapsTotal === expectedSwapsTotal, `swapsTotal = sum of spares (${expectedSwapsTotal}, got ${fullStats.swapsTotal})`);
+assert(fullStats.missing === full.needs.length, `missing == needs (${full.needs.length}, got ${fullStats.missing})`);
 
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);

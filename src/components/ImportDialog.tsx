@@ -34,7 +34,7 @@ export default function ImportDialog({ onClose }: Props) {
       // Merge: only adjust the stickers mentioned in the export.
       const map: Record<string, number> = {};
       for (const id of parsed.needs) map[id] = 0;
-      for (const id of parsed.swaps) map[id] = 2;
+      for (const id of parsed.swaps) map[id] = 1 + (parsed.swapQty[id] ?? 1);
       importCounts(map, 'merge');
     }
     const parts = [`Imported: ${parsed.needs.length} missing, ${parsed.swaps.length} swaps.`];

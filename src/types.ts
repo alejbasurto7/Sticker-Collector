@@ -1,4 +1,4 @@
-export type PageType = 'intro' | 'team';
+export type PageType = 'intro' | 'team' | 'extra';
 
 export interface Sticker {
   /** Stable unique id, e.g. "FWC-00" or "MEX-1". */
