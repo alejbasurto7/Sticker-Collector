@@ -7,7 +7,6 @@ import ProgressBar from './components/ProgressBar';
 import AlbumView from './components/AlbumView';
 import SwapsView from './components/SwapsView';
 import StatsView from './components/StatsView';
-import TradeView from './components/TradeView';
 import EditionDialog from './components/EditionDialog';
 
 export default function App() {
@@ -46,8 +45,7 @@ export default function App() {
       <main className="content" key={edition}>
         {tab === 'album' && <AlbumView />}
         {tab === 'swaps' && <SwapsView />}
-        {tab === 'trade' && <TradeView />}
-        {tab === 'stats' && <StatsView />}
+{tab === 'stats' && <StatsView />}
       </main>
 
       <TabBar active={tab} onChange={setTab} openSwaps={openSwaps} />
