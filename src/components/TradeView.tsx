@@ -1,28 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
+import jsQR from 'jsqr';
 import { useCollection } from '../store/collectionStore';
 import { buildExportText } from '../utils/qr';
 import TradeHistory from './TradeHistory';
 import NewSwapDialog from './NewSwapDialog';
 
-interface BarcodeDetectorResult {
-  rawValue: string;
-}
-interface BarcodeDetectorInit {
-  formats: string[];
-}
-declare class BarcodeDetector {
-  constructor(options?: BarcodeDetectorInit);
-  detect(source: HTMLVideoElement | HTMLImageElement): Promise<BarcodeDetectorResult[]>;
-}
-
 export default function TradeView() {
   const counts = useCollection((s) => s.counts);
   const swaps = useCollection((s) => s.swaps);
 
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const captureCanvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const rafRef = useRef<number>(0);
 
   const [historyOpen, setHistoryOpen] = useState(false);
   const [scanning, setScanning] = useState(false);
@@ -37,7 +29,7 @@ export default function TradeView() {
 
   // Generate QR code whenever the collection changes.
   useEffect(() => {
-    const canvas = canvasRef.current;
+    const canvas = qrCanvasRef.current;
     if (!canvas) return;
     const text = buildExportText(counts);
     if (!text) {
@@ -65,87 +57,92 @@ export default function TradeView() {
     });
   }, [counts]);
 
-  // Stop camera stream when scanning closes.
-  useEffect(() => {
-    if (!scanning) {
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
-  }, [scanning]);
+  // Stop camera when scanning closes.
+  const stopCamera = () => {
+    cancelAnimationFrame(rafRef.current);
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+  };
 
+  useEffect(() => () => stopCamera(), []);
+
+  const handleScannedValue = (value: string) => {
+    stopCamera();
+    setScanning(false);
+    setScannedText(value);
+  };
+
+  // Camera scanning via jsQR — works in all browsers.
   const startCamera = async () => {
     setScanError('');
-    if (!('BarcodeDetector' in window)) {
-      setScanError('QR scanning requires Chrome or Edge. Use "Upload QR image" instead.');
-      return;
-    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment' },
       });
       streamRef.current = stream;
       setScanning(true);
-      // Give the video element time to mount.
-      requestAnimationFrame(() => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.play();
-          detectFromVideo();
-        }
-      });
     } catch {
-      setScanError('Camera access denied. Try "Upload QR image" instead.');
+      setScanError('Camera access denied. Use "Upload QR image" instead.');
     }
   };
 
-  const detectFromVideo = async () => {
-    if (!videoRef.current || !streamRef.current) return;
-    const detector = new BarcodeDetector({ formats: ['qr_code'] });
-    const tick = async () => {
-      if (!videoRef.current || !streamRef.current) return;
-      try {
-        const results = await detector.detect(videoRef.current);
-        if (results.length > 0) {
-          handleScannedValue(results[0].rawValue);
-          return;
-        }
-      } catch {}
-      requestAnimationFrame(tick);
+  // Once video is in the DOM and playing, start scanning frames with jsQR.
+  const onVideoReady = () => {
+    const tick = () => {
+      const video = videoRef.current;
+      const canvas = captureCanvasRef.current;
+      if (!video || !canvas || !streamRef.current) return;
+      if (video.readyState < video.HAVE_ENOUGH_DATA) {
+        rafRef.current = requestAnimationFrame(tick);
+        return;
+      }
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      if (!ctx) return;
+      ctx.drawImage(video, 0, 0);
+      const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const result = jsQR(img.data, img.width, img.height);
+      if (result) {
+        handleScannedValue(result.data);
+      } else {
+        rafRef.current = requestAnimationFrame(tick);
+      }
     };
-    requestAnimationFrame(tick);
+    rafRef.current = requestAnimationFrame(tick);
   };
 
-  const handleScannedValue = (value: string) => {
-    setScanning(false);
-    setScannedText(value);
-  };
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // File upload — draw image to canvas and decode with jsQR.
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
-
-    if (!('BarcodeDetector' in window)) {
-      setScanError('QR image reading requires Chrome or Edge.');
-      return;
-    }
+    setScanError('');
 
     const img = new Image();
     img.src = URL.createObjectURL(file);
-    img.onload = async () => {
-      try {
-        const detector = new BarcodeDetector({ formats: ['qr_code'] });
-        const results = await detector.detect(img);
-        URL.revokeObjectURL(img.src);
-        if (results.length > 0) {
-          handleScannedValue(results[0].rawValue);
-        } else {
-          setScanError('No QR code found in the image.');
-        }
-      } catch {
-        setScanError('Could not read the QR code from that image.');
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(img.src);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const result = jsQR(imageData.data, imageData.width, imageData.height);
+      if (result) {
+        handleScannedValue(result.data);
+      } else {
+        setScanError('No QR code found in the image.');
       }
     };
+    img.onerror = () => setScanError('Could not read that image.');
+  };
+
+  const cancelScan = () => {
+    stopCamera();
+    setScanning(false);
   };
 
   return (
@@ -162,17 +159,31 @@ export default function TradeView() {
         </button>
       </div>
 
-      {/* QR code */}
+      {/* QR / camera area */}
       <div className="trade-qr-wrap">
         {scanning ? (
           <div className="trade-scanner">
-            <video ref={videoRef} className="trade-video" playsInline muted />
-            <button className="btn trade-cancel-scan" onClick={() => setScanning(false)}>
+            <video
+              ref={videoRef}
+              className="trade-video"
+              playsInline
+              muted
+              autoPlay
+              onCanPlay={onVideoReady}
+              onLoadedMetadata={(e) => {
+                const v = e.currentTarget;
+                v.srcObject = streamRef.current;
+                v.play();
+              }}
+            />
+            {/* Hidden canvas used to capture video frames for jsQR */}
+            <canvas ref={captureCanvasRef} style={{ display: 'none' }} />
+            <button className="btn trade-cancel-scan" onClick={cancelScan}>
               Cancel
             </button>
           </div>
         ) : (
-          <canvas ref={canvasRef} className="trade-qr-canvas" />
+          <canvas ref={qrCanvasRef} className="trade-qr-canvas" />
         )}
       </div>
 
