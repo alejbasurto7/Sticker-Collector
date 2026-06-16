@@ -1,4 +1,12 @@
-import type { Album, Page, Sticker } from '../types';
+import type { Album, Edition, Page, Sticker } from '../types';
+
+/** Per-edition metadata. Only the Coca-Cola extras page size differs. */
+export const EDITION_INFO: Record<Edition, { label: string; region: string; ccCount: number }> = {
+  na: { label: 'North America', region: '🇺🇸🇲🇽🇨🇦 NA edition', ccCount: 12 },
+  latam: { label: 'Latin America', region: '🌎 LATAM edition', ccCount: 14 },
+};
+
+export const DEFAULT_EDITION: Edition = 'latam';
 
 /**
  * The real "Usa Mex Can 26" album (2026 48-team World Cup), reconstructed from an
@@ -85,7 +93,7 @@ const TEAMS: TeamDef[] = [
 
 const TEAM_STICKER_COUNT = 20;
 
-function buildAlbum(): Album {
+function buildAlbum(ccCount: number): Album {
   const pages: Page[] = [];
   const stickers: Sticker[] = [];
 
@@ -128,9 +136,9 @@ function buildAlbum(): Album {
     });
   }
 
-  // Coca-Cola extras section (14 stickers), shown after the teams.
+  // Coca-Cola extras section (size depends on edition), shown after the teams.
   const ccIds: string[] = [];
-  for (let n = 1; n <= 14; n++) {
+  for (let n = 1; n <= ccCount; n++) {
     const number = String(n);
     const id = `CC-${number}`;
     stickers.push({ id, number, pageId: 'CC', special: false });
@@ -148,16 +156,26 @@ function buildAlbum(): Album {
   return { id: 'usa-mex-can-26', name: 'Usa Mex Can 26', pages, stickers };
 }
 
-export const album: Album = buildAlbum();
+// Live module bindings: rebuilt by applyEdition() and read fresh on each render/call.
+export let album: Album = buildAlbum(EDITION_INFO[DEFAULT_EDITION].ccCount);
 
-/** Lookup helpers. */
-export const stickerById: Record<string, Sticker> = Object.fromEntries(
-  album.stickers.map((s) => [s.id, s]),
-);
+/** Lookup helpers, rebuilt alongside the album. */
+export let stickerById: Record<string, Sticker> = indexStickers(album);
+export let pageById: Record<string, Page> = indexPages(album);
 
-export const pageById: Record<string, Page> = Object.fromEntries(
-  album.pages.map((p) => [p.id, p]),
-);
+function indexStickers(a: Album): Record<string, Sticker> {
+  return Object.fromEntries(a.stickers.map((s) => [s.id, s]));
+}
+function indexPages(a: Album): Record<string, Page> {
+  return Object.fromEntries(a.pages.map((p) => [p.id, p]));
+}
+
+/** Rebuild the album for the given edition. Existing count data is unaffected. */
+export function applyEdition(edition: Edition): void {
+  album = buildAlbum(EDITION_INFO[edition].ccCount);
+  stickerById = indexStickers(album);
+  pageById = indexPages(album);
+}
 
 /**
  * Resolve a sticker id from an import line. Intro lines share code "FWC" but split

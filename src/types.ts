@@ -1,5 +1,8 @@
 export type PageType = 'intro' | 'team' | 'extra';
 
+/** Album edition. Differs only in the Coca-Cola page size (NA: 12, LATAM: 14). */
+export type Edition = 'na' | 'latam';
+
 export interface Sticker {
   /** Stable unique id, e.g. "FWC-00" or "MEX-1". */
   id: string;

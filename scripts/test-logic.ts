@@ -1,4 +1,4 @@
-import { album } from '../src/data/sampleAlbum';
+import { album, applyEdition } from '../src/data/sampleAlbum';
 import { parseExport, parsedToCounts } from '../src/utils/import';
 import { computeStats } from '../src/utils/stats';
 import { computeCandidates, computeConflicts } from '../src/utils/swap';
@@ -23,7 +23,15 @@ const teamPages = album.pages.filter((p) => p.type === 'team');
 assert(teamPages.length === 48, `48 team pages (got ${teamPages.length})`);
 assert(teamPages.every((p) => p.stickerIds.length === 20), 'each team has 20 stickers');
 const cc = album.pages.find((p) => p.code === 'CC');
-assert(!!cc && cc.stickerIds.length === 14, 'CC extras page with 14 stickers');
+assert(!!cc && cc.stickerIds.length === 14, 'CC extras page with 14 stickers (LATAM default)');
+
+console.log('Edition switching');
+applyEdition('na');
+assert(album.stickers.length === 992, `NA edition: 992 stickers (got ${album.stickers.length})`);
+assert(album.pages.find((p) => p.code === 'CC')!.stickerIds.length === 12, 'NA: CC has 12');
+applyEdition('latam');
+assert(album.stickers.length === 994, `LATAM edition: 994 stickers (got ${album.stickers.length})`);
+assert(album.pages.find((p) => p.code === 'CC')!.stickerIds.length === 14, 'LATAM: CC has 14');
 
 // --- Real export parse ---
 const REAL = `Figuritas App - List

@@ -6,7 +6,9 @@ fully offline-capable, and installable on desktop and mobile. All data lives in 
 browser — no backend.
 
 The bundled album is the real **"Usa Mex Can 26"** (2026 48-team World Cup): an FWC
-intro section plus 48 national teams, **980 stickers** across 51 pages.
+intro section, 48 national teams, and a Coca-Cola extras page. Pick your **edition** from
+the ⚙️ menu — **Latin America** (14 CC stickers, 994 total) or **North America** (12 CC
+stickers, 992 total); switching preserves all your existing stickers.
 
 ## Features
 

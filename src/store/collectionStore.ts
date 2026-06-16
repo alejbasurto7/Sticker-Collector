@@ -1,12 +1,15 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Counts, Swap } from '../types';
+import type { Counts, Edition, Swap } from '../types';
+import { applyEdition, DEFAULT_EDITION } from '../data/sampleAlbum';
 
 type ImportMode = 'replace' | 'merge';
 
 interface CollectionState {
   counts: Counts;
   swaps: Swap[];
+  edition: Edition;
+  setEdition: (edition: Edition) => void;
 
   // Collection actions
   addOne: (id: string) => void;
@@ -39,6 +42,12 @@ export const useCollection = create<CollectionState>()(
     (set) => ({
       counts: {},
       swaps: [],
+      edition: DEFAULT_EDITION,
+
+      setEdition: (edition) => {
+        applyEdition(edition);
+        set({ edition });
+      },
 
       addOne: (id) =>
         set((s) => ({ counts: { ...s.counts, [id]: clampCount((s.counts[id] ?? 0) + 1) } })),
@@ -109,6 +118,12 @@ export const useCollection = create<CollectionState>()(
 
       deleteSwap: (id) => set((s) => ({ swaps: s.swaps.filter((sw) => sw.id !== id) })),
     }),
-    { name: 'figuritas-collection-v1' },
+    {
+      name: 'figuritas-collection-v1',
+      // Rebuild the album to match the persisted edition before first render.
+      onRehydrateStorage: () => (state) => {
+        if (state?.edition) applyEdition(state.edition);
+      },
+    },
   ),
 );
