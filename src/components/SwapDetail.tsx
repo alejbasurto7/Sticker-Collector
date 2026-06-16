@@ -12,6 +12,7 @@ interface Props {
 
 export default function SwapDetail({ swap, onClose }: Props) {
   const swaps = useCollection((s) => s.swaps);
+  const counts = useCollection((s) => s.counts);
   const deleteSwap = useCollection((s) => s.deleteSwap);
   const [closing, setClosing] = useState(false);
   const [deselectedGiving, setDeselectedGiving] = useState(new Set<string>());
@@ -19,14 +20,32 @@ export default function SwapDetail({ swap, onClose }: Props) {
 
   const isOpen = swap.status === 'open';
 
-  // Conflicts ignoring this swap's own contribution, so we see clashes with OTHERS.
-  // minCount=1 because we already excluded this swap — appearing once in another swap is enough.
-  const conflicts = useMemo(
-    () => computeConflicts(swaps.filter((s) => s.id !== swap.id), 1),
-    [swaps, swap.id],
-  );
-  const giveConflicts = new Set(swap.giving.filter((id) => conflicts.giving.has(id)));
-  const recvConflicts = new Set(swap.receiving.filter((id) => conflicts.receiving.has(id)));
+  const conflicts = useMemo(() => computeConflicts(swaps, counts), [swaps, counts]);
+
+  // Build per-sticker tooltip maps for conflicted chips.
+  const giveConflicts = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const id of swap.giving) {
+      if (conflicts.giving.has(id)) {
+        const spares = Math.max(0, (counts[id] ?? 0) - 1);
+        const n = conflicts.giveSwapCounts.get(id) ?? 0;
+        map.set(id, `Promised in ${n} swap${n !== 1 ? 's' : ''} · ${spares} spare${spares !== 1 ? 's' : ''} available`);
+      }
+    }
+    return map;
+  }, [swap.giving, conflicts, counts]);
+
+  const recvConflicts = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const id of swap.receiving) {
+      if (conflicts.receiving.has(id)) {
+        const n = conflicts.recvSwapCounts.get(id) ?? 0;
+        map.set(id, `Missing sticker expected from ${n} swap${n !== 1 ? 's' : ''} · you only need one`);
+      }
+    }
+    return map;
+  }, [swap.receiving, conflicts]);
+
   const conflictCount = giveConflicts.size + recvConflicts.size;
 
   const giving = new Set(swap.giving.filter((id) => !deselectedGiving.has(id)));

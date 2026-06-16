@@ -31,17 +31,20 @@ export function computeCandidates(counts: Counts, other: ParsedList): SwapCandid
 }
 
 /**
- * Cross-swap conflict sets across all OPEN swaps. A sticker is flagged when it is
- * promised in more than one open swap in the same direction.
- * - giving: duplicate promised to give in 2+ swaps (may not have enough copies).
- * - receiving: missing sticker expected from 2+ swaps (you only need one).
+ * Cross-swap conflict sets across all OPEN swaps.
+ * - giving: sticker promised to give in more open swaps than the user has spares for.
+ * - receiving: missing sticker (count=0) expected from 2+ open swaps (you only need one).
+ * - giveSwapCounts: how many open swaps each conflicted giving sticker appears in.
+ * - recvSwapCounts: how many open swaps each conflicted receiving sticker appears in.
  */
 export interface ConflictSets {
   giving: Set<string>;
   receiving: Set<string>;
+  giveSwapCounts: ReadonlyMap<string, number>;
+  recvSwapCounts: ReadonlyMap<string, number>;
 }
 
-export function computeConflicts(swaps: Swap[], minCount = 2): ConflictSets {
+export function computeConflicts(swaps: Swap[], counts: Counts): ConflictSets {
   const giveCounts = new Map<string, number>();
   const recvCounts = new Map<string, number>();
 
@@ -53,8 +56,13 @@ export function computeConflicts(swaps: Swap[], minCount = 2): ConflictSets {
 
   const giving = new Set<string>();
   const receiving = new Set<string>();
-  for (const [id, n] of giveCounts) if (n >= minCount) giving.add(id);
-  for (const [id, n] of recvCounts) if (n >= minCount) receiving.add(id);
+  for (const [id, n] of giveCounts) {
+    const spares = Math.max(0, (counts[id] ?? 0) - 1);
+    if (n > spares) giving.add(id);
+  }
+  for (const [id, n] of recvCounts) {
+    if ((counts[id] ?? 0) === 0 && n > 1) receiving.add(id);
+  }
 
-  return { giving, receiving };
+  return { giving, receiving, giveSwapCounts: giveCounts, recvSwapCounts: recvCounts };
 }

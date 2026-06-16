@@ -4,7 +4,8 @@ interface Props {
   ids: string[];
   selected: Set<string>;
   onToggle?: (id: string) => void;
-  conflicts?: Set<string>;
+  /** Map of sticker id → tooltip message for conflicted stickers. */
+  conflicts?: Map<string, string>;
   readOnly?: boolean;
 }
 
@@ -25,10 +26,10 @@ export default function StickerChips({ ids, selected, onToggle, conflicts, readO
           <div className="chip-grid">
             {stickers.map((s) => {
               const isSel = selected.has(s.id);
-              const isConflict = conflicts?.has(s.id);
+              const conflictMsg = conflicts?.get(s.id);
               const cls = ['chip'];
               if (isSel) cls.push('sel');
-              if (isConflict) cls.push('conflict');
+              if (conflictMsg) cls.push('conflict');
               return (
                 <button
                   key={s.id}
@@ -38,7 +39,7 @@ export default function StickerChips({ ids, selected, onToggle, conflicts, readO
                   disabled={readOnly}
                 >
                   {s.number}
-                  {isConflict && <span className="chip-warn" title="Already promised in another swap">⚠️</span>}
+                  {conflictMsg && <span className="chip-warn" title={conflictMsg}>⚠️</span>}
                 </button>
               );
             })}

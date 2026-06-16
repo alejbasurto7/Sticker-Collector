@@ -82,14 +82,37 @@ assert(!cand.youGet.includes('ARG-11') || myCounts['ARG-11'] === undefined, 'you
 
 // --- Conflicts across open swaps ---
 console.log('Conflict detection');
-const swaps: Swap[] = [
+const conflictSwaps: Swap[] = [
   { id: 'a', name: 'A', createdAt: 1, status: 'open', theirNeeds: [], theirSwaps: [], giving: ['BRA-3'], receiving: ['ARG-10'] },
-  { id: 'b', name: 'B', createdAt: 2, status: 'open', theirNeeds: [], theirSwaps: [], giving: ['BRA-3'], receiving: ['JPN-5'] },
+  { id: 'b', name: 'B', createdAt: 2, status: 'open', theirNeeds: [], theirSwaps: [], giving: ['BRA-3'], receiving: ['ARG-10'] },
   { id: 'c', name: 'C', createdAt: 3, status: 'closed', theirNeeds: [], theirSwaps: [], giving: ['BRA-3'], receiving: [] },
 ];
-const conf = computeConflicts(swaps);
-assert(conf.giving.has('BRA-3'), 'BRA-3 promised in 2 open swaps -> conflict');
-assert(!conf.receiving.has('ARG-10'), 'ARG-10 only received once -> no conflict');
+// BRA-3: count=2 (1 spare) → 2 swaps > 1 spare → conflict
+const conf1 = computeConflicts(conflictSwaps, { 'BRA-3': 2, 'ARG-10': 0 });
+assert(conf1.giving.has('BRA-3'), 'BRA-3 with 1 spare, promised in 2 open swaps -> conflict');
+assert(conf1.receiving.has('ARG-10'), 'ARG-10 missing, expected from 2 open swaps -> conflict');
+assert(conf1.giveSwapCounts.get('BRA-3') === 2, 'giveSwapCounts tracks open swap count');
+assert(conf1.recvSwapCounts.get('ARG-10') === 2, 'recvSwapCounts tracks open swap count');
+
+// BRA-3: count=3 (2 spares) → 2 swaps <= 2 spares → no conflict
+const conf2 = computeConflicts(conflictSwaps, { 'BRA-3': 3, 'ARG-10': 0 });
+assert(!conf2.giving.has('BRA-3'), 'BRA-3 with 2 spares, promised in 2 open swaps -> no conflict');
+assert(conf2.receiving.has('ARG-10'), 'ARG-10 missing, expected from 2 swaps -> still conflicts');
+
+// Receiving: only 1 swap -> no conflict
+const singleRecv: Swap[] = [
+  { id: 'd', name: 'D', createdAt: 4, status: 'open', theirNeeds: [], theirSwaps: [], giving: [], receiving: ['ARG-10'] },
+];
+const conf3 = computeConflicts(singleRecv, { 'ARG-10': 0 });
+assert(!conf3.receiving.has('ARG-10'), 'ARG-10 expected from only 1 swap -> no conflict');
+
+// Closed swaps are ignored
+const closedOnly: Swap[] = [
+  { id: 'e', name: 'E', createdAt: 5, status: 'closed', theirNeeds: [], theirSwaps: [], giving: ['BRA-3'], receiving: [] },
+  { id: 'f', name: 'F', createdAt: 6, status: 'closed', theirNeeds: [], theirSwaps: [], giving: ['BRA-3'], receiving: [] },
+];
+const conf4 = computeConflicts(closedOnly, { 'BRA-3': 2 });
+assert(!conf4.giving.has('BRA-3'), 'closed swaps are ignored in conflict detection');
 
 // --- FULL real export (needs + swaps with quantities + CC) ---
 const FULL = `Figuritas App - List
