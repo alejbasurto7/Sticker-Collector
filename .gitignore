@@ -6,3 +6,7 @@ dist-ssr
 .vite
 node_modules/.tmp
 *.tsbuildinfo
+
+# Local tooling (Claude Code / Superpowers)
+.claude/
+.superpowers/
