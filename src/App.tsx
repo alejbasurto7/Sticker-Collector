@@ -15,6 +15,7 @@ export default function App() {
   const counts = useCollection((s) => s.counts);
   const swaps = useCollection((s) => s.swaps);
   const edition = useCollection((s) => s.edition);
+  const albumName = useCollection((s) => s.albumName);
 
   // edition is a dep so totals recompute when the album layout changes.
   const stats = useMemo(() => computeStats(counts), [counts, edition]);
@@ -24,8 +25,8 @@ export default function App() {
     <div className="app">
       <header className="app-header">
         <div className="header-top">
-          <h1>{album.name}</h1>
-          <button className="icon-btn" onClick={() => setEditionOpen(true)} aria-label="Album edition">
+          <h1>{albumName}</h1>
+          <button className="icon-btn" onClick={() => setEditionOpen(true)} aria-label="Settings">
             ⚙️
           </button>
         </div>
