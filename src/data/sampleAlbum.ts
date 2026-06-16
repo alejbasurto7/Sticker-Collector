@@ -101,8 +101,8 @@ function buildAlbum(ccCount: number): Album {
     const stickerIds: string[] = [];
     for (const number of intro.numbers) {
       const id = `${intro.id}-${number}`;
-      // Trophy/badge page is foil; numbers 1-4 there are the shiny crests.
-      const special = intro.emoji === '🏆';
+      // All FWC intro stickers are holograms (foil/gold).
+      const special = true;
       stickers.push({ id, number, pageId: intro.id, special });
       stickerIds.push(id);
     }
