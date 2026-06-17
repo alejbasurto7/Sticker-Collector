@@ -614,6 +614,21 @@ button {
   color: var(--text-dim);
   margin-top: 1px;
 }
+.achievement-banner .ab-emoji-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  font-size: 18px;
+  line-height: 1.2;
+  margin-top: 3px;
+}
+.achievement-banner .ab-more {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text-dim);
+  align-self: center;
+}
 
 @keyframes ab-pop {
   0% {
