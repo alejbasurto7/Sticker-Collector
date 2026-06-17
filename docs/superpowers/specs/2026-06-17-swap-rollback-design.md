@@ -105,6 +105,15 @@ restores what was actually traded, not the original fuller list. This is accepta
 "give me my stickers back and let me redo it" rollback and keeps the implementation
 simple; full pre-conclude fidelity is out of scope.
 
+`rollbackSwap` restores the collection **counts** and the swap status, but does **not**
+revert the activity/completion side effects that `closeSwap` triggers via `withActivity`
+when stickers were received — `activityDays`, `firstStickerAt`, and a frozen `completedOn`
+stay as they were. This is intentional and consistent with the rest of the app: those
+fields are sticky everywhere (e.g. giving a sticker away with `removeOne` after reaching
+100% also leaves `completedOn` frozen), so a calendar day on which you collected stays
+counted, and the date you first completed the album stays recorded, even if a later
+rollback drops you back below 100%.
+
 ## Testing
 
 Unit tests for `rollbackSwap` in the store:
