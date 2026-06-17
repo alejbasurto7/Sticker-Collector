@@ -56,15 +56,17 @@ button {
 
 /* ---------- App shell ---------- */
 .app {
-  /* Pin the shell to the visual viewport instead of sizing with 100dvh.
-     In iOS standalone/PWA mode 100dvh can resolve a few CSS px SHORTER than
-     the real viewport, leaving a strip of body background below the tab bar.
-     position:fixed + inset:0 always covers the full screen (safe areas
-     included), so the tab bar reaches the very bottom with no space lost. */
-  position: fixed;
-  inset: 0;
+  /* Size the shell to the viewport with a normal-flow flex column rather than
+     position:fixed. In iOS standalone/PWA mode a fixed element is laid out
+     against the *visual* viewport, whose bottom sits short of the real screen
+     edge — so inset:0 / bottom:0 leaves a tall strip of body background below
+     the tab bar. Normal flow follows the layout viewport (which the <body>
+     fills edge to edge), so the tab bar reaches the true bottom. 100vh is the
+     fallback for older iOS; 100dvh is the exact dynamic-viewport height. */
   display: flex;
   flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
   max-width: 720px;
   margin: 0 auto;
   overflow: hidden;
