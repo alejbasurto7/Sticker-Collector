@@ -39,7 +39,7 @@ export default function ProgressRing({ pct, size = 96, stroke = 10 }: Props) {
         dominantBaseline="central"
         fontSize={size * 0.24}
         fontWeight="800"
-        fill="#f2f4f8"
+        fill="currentColor"
       >
         {Math.round(clamped * 100)}%
       </text>
