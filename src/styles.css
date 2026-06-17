@@ -32,8 +32,11 @@ body,
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
-    sans-serif;
+  /* "Twemoji Country Flags" is scoped to flag codepoints via unicode-range
+     (see polyfillCountryFlagEmojis in main.tsx), so listing it first only
+     affects flag emoji and never normal text. */
+  font-family: 'Twemoji Country Flags', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    Roboto, Helvetica, Arial, sans-serif;
   font-size: 15px;
   line-height: 1.4;
   overscroll-behavior-y: none;
