@@ -337,6 +337,10 @@ button {
   align-items: center;
   justify-content: center;
   user-select: none;
+  /* Treat each cell as a discrete tap target so the browser doesn't reclaim
+     quick successive taps as a scroll/zoom gesture (which would fire
+     pointercancel and drop the tap). */
+  touch-action: manipulation;
   transition: transform 0.08s ease, background 0.15s ease;
 }
 .cell:active {

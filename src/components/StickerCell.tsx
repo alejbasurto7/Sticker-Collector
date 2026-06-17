@@ -13,6 +13,10 @@ const LONG_PRESS_MS = 450;
 export default function StickerCell({ sticker, count, onAdd, onRemove }: Props) {
   const timer = useRef<number | null>(null);
   const longFired = useRef(false);
+  // Tracks an in-flight press so a dropped pointerup (e.g. the browser reclaims
+  // the gesture for scrolling and fires pointercancel) can't leave a stale
+  // long-press timer armed or double-handle a single tap.
+  const pressing = useRef(false);
 
   const clear = () => {
     if (timer.current !== null) {
@@ -21,8 +25,19 @@ export default function StickerCell({ sticker, count, onAdd, onRemove }: Props) 
     }
   };
 
-  const onPointerDown = () => {
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     longFired.current = false;
+    pressing.current = true;
+    // Bind the whole gesture to this cell. Without capture, the `:active`
+    // scale(0.92) shrinks the cell out from under a fingertip that landed near
+    // its edge, so the finger ends up over a neighbouring cell and the matching
+    // pointerup never returns here — silently dropping the tap. Capturing keeps
+    // pointerup/pointercancel anchored to the cell the press started on.
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      /* capture is unsupported in some environments; the tap still works without it */
+    }
     timer.current = window.setTimeout(() => {
       longFired.current = true;
       onRemove();
@@ -30,9 +45,18 @@ export default function StickerCell({ sticker, count, onAdd, onRemove }: Props) 
   };
 
   const onPointerUp = () => {
+    if (!pressing.current) return;
+    pressing.current = false;
     clear();
     // A short press (tap) that did not trigger the long-press → add one.
     if (!longFired.current) onAdd();
+  };
+
+  // The browser cancelled the gesture (scroll/zoom takeover, etc.). Abort the
+  // pending long-press without adding or removing so the cell stays responsive.
+  const onPointerCancel = () => {
+    pressing.current = false;
+    clear();
   };
 
   const owned = count >= 1;
@@ -47,7 +71,7 @@ export default function StickerCell({ sticker, count, onAdd, onRemove }: Props) 
       className={cls.join(' ')}
       onPointerDown={onPointerDown}
       onPointerUp={onPointerUp}
-      onPointerLeave={clear}
+      onPointerCancel={onPointerCancel}
       onContextMenu={(e) => e.preventDefault()}
       role="button"
       aria-label={`Sticker ${sticker.number}, ${owned ? 'owned' : 'missing'}${
