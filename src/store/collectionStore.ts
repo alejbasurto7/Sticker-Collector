@@ -9,7 +9,7 @@ type ImportMode = 'replace' | 'merge';
 /** Default name given to a freshly created album (deduplicated when it collides). */
 const NEW_ALBUM_NAME = 'New Album';
 const DEFAULT_ALBUM_ID = 'usa-mex-can-26';
-const DEFAULT_ALBUM_NAME = 'Usa Mex Can 26';
+const DEFAULT_ALBUM_NAME = 'My Album';
 
 /**
  * The full collecting state of a single album. The active album's fields are
