@@ -12,6 +12,12 @@ interface CollectionState {
   edition: Edition;
   trackCC: boolean;
   albumName: string;
+  /** Timestamp of the very first sticker added (for speed-run style achievements). */
+  firstStickerAt?: number;
+  /** Local YYYY-MM-DD days on which the collection grew (for streak achievements). */
+  activityDays: string[];
+  /** Sticky ledger: achievement key -> timestamp first earned. */
+  unlockedAchievements: Record<string, number>;
   setEdition: (edition: Edition) => void;
   setTrackCC: (trackCC: boolean) => void;
   setAlbumName: (name: string) => void;
@@ -35,12 +41,32 @@ interface CollectionState {
   closeSwap: (id: string, settled: { givenIds: string[]; receivedIds: string[] }) => void;
   deleteSwap: (id: string) => void;
   undoLastTrade: () => void;
+
+  // Achievements
+  markUnlocked: (keys: string[]) => void;
 }
 
 const clampCount = (n: number) => (n < 0 ? 0 : n);
 
 function newId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/** Local calendar day as YYYY-MM-DD, used to group collecting activity. */
+function todayKey(ts = Date.now()): string {
+  const d = new Date(ts);
+  const m = `${d.getMonth() + 1}`.padStart(2, '0');
+  const day = `${d.getDate()}`.padStart(2, '0');
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
+/** Stamp the first-sticker time and log today as an active collecting day. */
+function withActivity(s: CollectionState): Pick<CollectionState, 'firstStickerAt' | 'activityDays'> {
+  const today = todayKey();
+  return {
+    firstStickerAt: s.firstStickerAt ?? Date.now(),
+    activityDays: s.activityDays.includes(today) ? s.activityDays : [...s.activityDays, today].sort(),
+  };
 }
 
 export const useCollection = create<CollectionState>()(
@@ -51,6 +77,8 @@ export const useCollection = create<CollectionState>()(
       edition: DEFAULT_EDITION,
       trackCC: DEFAULT_TRACK_CC,
       albumName: 'Usa Mex Can 26',
+      activityDays: [],
+      unlockedAchievements: {},
 
       setEdition: (edition) =>
         set((s) => {
@@ -67,19 +95,28 @@ export const useCollection = create<CollectionState>()(
       setAlbumName: (name) => set({ albumName: name.trim() || 'Usa Mex Can 26' }),
 
       addOne: (id) =>
-        set((s) => ({ counts: { ...s.counts, [id]: clampCount((s.counts[id] ?? 0) + 1) } })),
+        set((s) => ({
+          counts: { ...s.counts, [id]: clampCount((s.counts[id] ?? 0) + 1) },
+          ...withActivity(s),
+        })),
 
       removeOne: (id) =>
         set((s) => ({ counts: { ...s.counts, [id]: clampCount((s.counts[id] ?? 0) - 1) } })),
 
-      setCount: (id, n) => set((s) => ({ counts: { ...s.counts, [id]: clampCount(n) } })),
+      setCount: (id, n) =>
+        set((s) => {
+          const next = clampCount(n);
+          const increased = next > (s.counts[id] ?? 0);
+          return { counts: { ...s.counts, [id]: next }, ...(increased ? withActivity(s) : {}) };
+        }),
 
       importCounts: (map, mode) =>
         set((s) => {
-          if (mode === 'replace') return { counts: { ...map } };
+          const added = Object.values(map).some((n) => n > 0);
+          if (mode === 'replace') return { counts: { ...map }, ...(added ? withActivity(s) : {}) };
           const merged = { ...s.counts };
           for (const [id, n] of Object.entries(map)) merged[id] = clampCount(n);
-          return { counts: merged };
+          return { counts: merged, ...(added ? withActivity(s) : {}) };
         }),
 
       reset: () => set({ counts: {} }),
@@ -135,7 +172,8 @@ export const useCollection = create<CollectionState>()(
                 }
               : sw,
           );
-          return { counts, swaps };
+          // Receiving new stickers counts as a collecting day.
+          return { counts, swaps, ...(settled.receivedIds.length ? withActivity(s) : {}) };
         }),
 
       deleteSwap: (id) => set((s) => ({ swaps: s.swaps.filter((sw) => sw.id !== id) })),
@@ -150,6 +188,20 @@ export const useCollection = create<CollectionState>()(
           for (const id of last.giving) counts[id] = clampCount((counts[id] ?? 0) + 1);
           for (const id of last.receiving) counts[id] = clampCount((counts[id] ?? 0) - 1);
           return { counts, swaps: s.swaps.filter((sw) => sw.id !== last.id) };
+        }),
+
+      markUnlocked: (keys) =>
+        set((s) => {
+          const now = Date.now();
+          let changed = false;
+          const unlockedAchievements = { ...s.unlockedAchievements };
+          for (const k of keys) {
+            if (unlockedAchievements[k] == null) {
+              unlockedAchievements[k] = now;
+              changed = true;
+            }
+          }
+          return changed ? { unlockedAchievements } : s;
         }),
     }),
     {

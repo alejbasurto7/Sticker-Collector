@@ -46,7 +46,7 @@ App
 ├─ AlbumView    (tab: album)   browse + edit the collection
 ├─ SwapsView    (tab: swaps)   create/manage swaps
 ├─ TradeView    (tab: trade)   QR generate / scan
-├─ StatsView    (tab: stats)   progress, skills, share
+├─ StatsView    (tab: stats)   progress, achievements, share
 └─ EditionDialog (modal)       NA / LATAM picker
 ```
 
@@ -175,10 +175,14 @@ uploaded image; scanned text feeds [NewSwapDialog](../src/components/NewSwapDial
 ## Stats & sharing ([src/utils/stats.ts](../src/utils/stats.ts), [src/utils/share.ts](../src/utils/share.ts))
 
 `computeStats(counts)` derives totals (owned/missing/spares/collected), completion %,
-per-page progress, and the most-duplicated sticker. `computeSkills(stats)` returns 7
-gamified achievement badges. [StatsView](../src/components/StatsView.tsx) renders the ring,
+per-page progress, and the most-duplicated sticker. `computeAchievements(stats, ctx)` returns
+the gamified achievement badges (completion, type, page, duplicate, trade, streak and
+speed-run milestones). Time-based badges read persisted signals from the store — a first-sticker
+timestamp and an `activityDays` log — and `StatsView` records earned badges into a sticky
+`unlockedAchievements` ledger so they stay unlocked even if stickers are later removed.
+[StatsView](../src/components/StatsView.tsx) renders the ring,
 tiles, [BarChart](../src/components/BarChart.tsx), and
-[CollectorSkills](../src/components/CollectorSkills.tsx); `shareNodeAsImage` exports the
+[Achievements](../src/components/Achievements.tsx); `shareNodeAsImage` exports the
 [ShareCard](../src/components/ShareCard.tsx) as a PNG via `html-to-image` + the Web Share
 API (with a download fallback).
 
@@ -199,14 +203,14 @@ src/
 │  ├─ import.ts            parseExport, parsedToCounts
 │  ├─ swap.ts              reservations, candidates, give floor, conflicts
 │  ├─ qr.ts                buildExportText (QR payload)
-│  ├─ stats.ts             computeStats, computeSkills
+│  ├─ stats.ts             computeStats, computeAchievements
 │  ├─ share.ts             shareNodeAsImage
 │  └─ group.ts             groupByPage, labelFor
 └─ components/
    ├─ Album:  AlbumView · PageSection · StickerCell · FilterBar · ImportDialog
    ├─ Swaps:  SwapsView · SwapCard · SwapDetail · NewSwapDialog · SwapClose · StickerChips
    ├─ Trade:  TradeView · TradeHistory
-   ├─ Stats:  StatsView · ProgressRing · ProgressBar · BarChart · CollectorSkills · ShareCard
+   ├─ Stats:  StatsView · ProgressRing · ProgressBar · BarChart · Achievements · ShareCard
    └─ Shell:  TabBar · EditionDialog
 ```
 

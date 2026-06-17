@@ -126,16 +126,63 @@ export function computeStats(counts: Counts): Stats {
   };
 }
 
-export interface CollectorSkill {
+export interface Achievement {
   key: string;
   label: string;
   description: string;
   unlocked: boolean;
 }
 
-/** Gamified "Collector Skills" derived from progress, mirroring the app. */
-export function computeSkills(stats: Stats): CollectorSkill[] {
+/** Extra collection signals (outside raw counts) that feed some achievements. */
+export interface AchievementContext {
+  /** Number of swaps that have been settled/closed. */
+  closedSwaps: number;
+  /** Timestamp of the first sticker ever added. */
+  firstStickerAt?: number;
+  /** Local YYYY-MM-DD days on which the collection grew. */
+  activityDays?: string[];
+  /** Current time, injected for testability (defaults to Date.now()). */
+  now?: number;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Longest run of consecutive calendar days present in the activity log. */
+export function longestStreak(days: string[] | undefined): number {
+  if (!days || days.length === 0) return 0;
+  const sorted = [...new Set(days)].sort();
+  let best = 1;
+  let run = 1;
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = Date.parse(`${sorted[i - 1]}T00:00:00`);
+    const cur = Date.parse(`${sorted[i]}T00:00:00`);
+    const gap = Math.round((cur - prev) / DAY_MS);
+    if (gap === 1) {
+      run += 1;
+      best = Math.max(best, run);
+    } else if (gap > 1) {
+      run = 1;
+    }
+  }
+  return best;
+}
+
+/** Gamified "Achievements" derived from progress, mirroring the app. */
+export function computeAchievements(
+  stats: Stats,
+  ctx: AchievementContext = { closedSwaps: 0 },
+): Achievement[] {
+  const typePct = (type: StickerType) => stats.byType.find((t) => t.type === type)?.pct ?? 0;
+  const topDuplicate = stats.mostDuplicated ? stats.mostDuplicated.extra + 1 : 0;
+  const streak = longestStreak(ctx.activityDays);
+  const now = ctx.now ?? Date.now();
+  const speedRun =
+    ctx.firstStickerAt != null &&
+    stats.completionPct >= 0.5 &&
+    now - ctx.firstStickerAt <= 7 * DAY_MS;
+
   return [
+    // Getting started
     {
       key: 'first-sticker',
       label: 'First Sticker',
@@ -147,6 +194,13 @@ export function computeSkills(stats: Stats): CollectorSkill[] {
       label: 'Page Master',
       description: 'Complete a full page',
       unlocked: stats.pagesCompleted >= 1,
+    },
+    // Completion milestones
+    {
+      key: 'liftoff',
+      label: 'Liftoff',
+      description: 'Reach 10% completion',
+      unlocked: stats.completionPct >= 0.1,
     },
     {
       key: 'quarter',
@@ -161,10 +215,10 @@ export function computeSkills(stats: Stats): CollectorSkill[] {
       unlocked: stats.completionPct >= 0.5,
     },
     {
-      key: 'swap-master',
-      label: 'Swap Master',
-      description: 'Hold 10+ duplicates',
-      unlocked: stats.swapsTotal >= 10,
+      key: 'on-a-roll',
+      label: 'On a Roll',
+      description: 'Reach 75% completion',
+      unlocked: stats.completionPct >= 0.75,
     },
     {
       key: 'home-stretch',
@@ -173,10 +227,111 @@ export function computeSkills(stats: Stats): CollectorSkill[] {
       unlocked: stats.completionPct >= 0.9,
     },
     {
+      key: 'final-push',
+      label: 'Final Push',
+      description: 'Reach 95% completion',
+      unlocked: stats.completionPct >= 0.95,
+    },
+    {
       key: 'complete',
       label: 'Album Complete',
       description: 'Collect every sticker',
       unlocked: stats.completionPct >= 1,
+    },
+    // Volume & pages
+    {
+      key: 'century',
+      label: 'Century',
+      description: 'Collect 100 unique stickers',
+      unlocked: stats.ownedUnique >= 100,
+    },
+    {
+      key: 'bookworm',
+      label: 'Bookworm',
+      description: 'Complete 5 pages',
+      unlocked: stats.pagesCompleted >= 5,
+    },
+    {
+      key: 'librarian',
+      label: 'Librarian',
+      description: 'Complete 25 pages',
+      unlocked: stats.pagesCompleted >= 25,
+    },
+    // Type completion
+    {
+      key: 'shiny-hunter',
+      label: 'Shiny Hunter',
+      description: 'Collect every hologram',
+      unlocked: typePct('hologram') >= 1,
+    },
+    {
+      key: 'squad-goals',
+      label: 'Squad Goals',
+      description: 'Collect every team sticker',
+      unlocked: typePct('team') >= 1,
+    },
+    {
+      key: 'by-the-book',
+      label: 'By the Book',
+      description: 'Collect every regular sticker',
+      unlocked: typePct('regular') >= 1,
+    },
+    // Duplicates
+    {
+      key: 'first-dupe',
+      label: 'Got, Got, Need',
+      description: 'Hold your first duplicate',
+      unlocked: stats.swapsTotal >= 1,
+    },
+    {
+      key: 'swap-master',
+      label: 'Swap Master',
+      description: 'Hold 10+ duplicates',
+      unlocked: stats.swapsTotal >= 10,
+    },
+    {
+      key: 'hoarder',
+      label: 'Hoarder',
+      description: 'Hold 50+ duplicates',
+      unlocked: stats.swapsTotal >= 50,
+    },
+    {
+      key: 'seeing-double',
+      label: 'Seeing Double',
+      description: 'Have 5 copies of one sticker',
+      unlocked: topDuplicate >= 5,
+    },
+    // Trading
+    {
+      key: 'first-trade',
+      label: 'First Trade',
+      description: 'Complete your first swap',
+      unlocked: ctx.closedSwaps >= 1,
+    },
+    {
+      key: 'wheeler-dealer',
+      label: 'Wheeler Dealer',
+      description: 'Complete 10 swaps',
+      unlocked: ctx.closedSwaps >= 10,
+    },
+    // Dedication (persisted activity log)
+    {
+      key: 'three-day-streak',
+      label: 'On a Streak',
+      description: 'Add stickers 3 days in a row',
+      unlocked: streak >= 3,
+    },
+    {
+      key: 'week-warrior',
+      label: 'Week Warrior',
+      description: 'Add stickers 7 days in a row',
+      unlocked: streak >= 7,
+    },
+    {
+      key: 'speed-run',
+      label: 'Speed Run',
+      description: 'Reach 50% within 7 days of starting',
+      unlocked: speedRun,
     },
   ];
 }

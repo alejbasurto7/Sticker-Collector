@@ -522,13 +522,13 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
-/* Collector skills */
-.skills {
+/* Achievements */
+.achievements {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 10px;
 }
-.skill {
+.achievement {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -538,18 +538,18 @@ button {
   padding: 12px;
   opacity: 0.45;
 }
-.skill.unlocked {
+.achievement.unlocked {
   opacity: 1;
   border-color: var(--green);
 }
-.skill .badge {
+.achievement .badge {
   font-size: 22px;
 }
-.skill .s-label {
+.achievement .a-label {
   font-weight: 800;
   font-size: 13px;
 }
-.skill .s-desc {
+.achievement .a-desc {
   color: var(--text-dim);
   font-size: 11px;
 }
