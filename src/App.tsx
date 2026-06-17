@@ -29,6 +29,21 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
+  // Prevent iOS PWA window-drag on the header and tab bar. iOS ignores
+  // touch-action:none alone; the passive:false listener is required.
+  useEffect(() => {
+    const noDrag = (e: TouchEvent) => e.preventDefault();
+    const opts: AddEventListenerOptions = { passive: false };
+    const header = document.querySelector('.app-header');
+    const tabbar = document.querySelector('.tabbar');
+    header?.addEventListener('touchmove', noDrag, opts);
+    tabbar?.addEventListener('touchmove', noDrag, opts);
+    return () => {
+      header?.removeEventListener('touchmove', noDrag, opts);
+      tabbar?.removeEventListener('touchmove', noDrag, opts);
+    };
+  }, []);
+
   // edition/trackCC are deps so totals recompute when the album layout changes.
   const stats = useMemo(() => computeStats(counts), [counts, edition, trackCC]);
   const openSwaps = swaps.filter((s) => s.status === 'open').length;

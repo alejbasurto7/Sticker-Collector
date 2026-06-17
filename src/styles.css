@@ -63,6 +63,7 @@ button {
   position: sticky;
   top: 0;
   z-index: 20;
+  touch-action: none;
   padding: calc(var(--safe-top) + 14px) 16px 12px;
   /* World Cup 2026 host colors: blue, red, green and white, fading into the
      app background at the bottom so the header text stays readable. */
@@ -154,6 +155,7 @@ button {
 .tabbar {
   flex-shrink: 0;
   z-index: 30;
+  touch-action: none;
   height: calc(var(--tabbar-h) + var(--safe-bottom));
   padding-bottom: var(--safe-bottom);
   display: flex;
