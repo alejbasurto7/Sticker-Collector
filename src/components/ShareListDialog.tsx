@@ -93,6 +93,12 @@ export default function ShareListDialog({ onClose }: Props) {
           />
           <span>Include swap quantities of each sticker</span>
         </label>
+
+        <div className="btn-row">
+          <button className="btn full" onClick={onClose}>
+            Close
+          </button>
+        </div>
       </div>
     </div>
   );
