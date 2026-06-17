@@ -8,6 +8,12 @@ export const EDITION_INFO: Record<Edition, { label: string; region: string; ccCo
 
 export const DEFAULT_EDITION: Edition = 'latam';
 
+/** A new album does not track the Coca-Cola extras section until the user opts in. */
+export const DEFAULT_TRACK_CC = false;
+
+/** Emoji used for the Coca-Cola section, reused by the Settings switch. */
+export const CC_EMOJI = '🥤';
+
 /**
  * The real "Usa Mex Can 26" album (2026 48-team World Cup), reconstructed from an
  * actual Figuritas app export. Built from a compact table so ids stay deterministic.
@@ -93,7 +99,7 @@ const TEAMS: TeamDef[] = [
 
 const TEAM_STICKER_COUNT = 20;
 
-function buildAlbum(ccCount: number): Album {
+function buildAlbum(ccCount: number, trackCC: boolean): Album {
   const pages: Page[] = [];
   const stickers: Sticker[] = [];
 
@@ -137,27 +143,31 @@ function buildAlbum(ccCount: number): Album {
   }
 
   // Coca-Cola extras section (size depends on edition), shown after the teams.
-  const ccIds: string[] = [];
-  for (let n = 1; n <= ccCount; n++) {
-    const number = String(n);
-    const id = `CC-${number}`;
-    stickers.push({ id, number, pageId: 'CC', special: false });
-    ccIds.push(id);
+  // Only included when the user is tracking the section; otherwise the album has
+  // no CC stickers at all (excluded from totals, filters, swaps, etc.).
+  if (trackCC) {
+    const ccIds: string[] = [];
+    for (let n = 1; n <= ccCount; n++) {
+      const number = String(n);
+      const id = `CC-${number}`;
+      stickers.push({ id, number, pageId: 'CC', special: false });
+      ccIds.push(id);
+    }
+    pages.push({
+      id: 'CC',
+      code: 'CC',
+      emoji: CC_EMOJI,
+      title: 'Coca-Cola',
+      type: 'extra',
+      stickerIds: ccIds,
+    });
   }
-  pages.push({
-    id: 'CC',
-    code: 'CC',
-    emoji: '🥤',
-    title: 'Coca-Cola',
-    type: 'extra',
-    stickerIds: ccIds,
-  });
 
   return { id: 'usa-mex-can-26', name: 'Usa Mex Can 26', pages, stickers };
 }
 
 // Live module bindings: rebuilt by applyEdition() and read fresh on each render/call.
-export let album: Album = buildAlbum(EDITION_INFO[DEFAULT_EDITION].ccCount);
+export let album: Album = buildAlbum(EDITION_INFO[DEFAULT_EDITION].ccCount, DEFAULT_TRACK_CC);
 
 /** Lookup helpers, rebuilt alongside the album. */
 export let stickerById: Record<string, Sticker> = indexStickers(album);
@@ -170,9 +180,12 @@ function indexPages(a: Album): Record<string, Page> {
   return Object.fromEntries(a.pages.map((p) => [p.id, p]));
 }
 
-/** Rebuild the album for the given edition. Existing count data is unaffected. */
-export function applyEdition(edition: Edition): void {
-  album = buildAlbum(EDITION_INFO[edition].ccCount);
+/**
+ * Rebuild the album for the given edition and Coca-Cola tracking setting.
+ * Existing count data is unaffected.
+ */
+export function applyEdition(edition: Edition, trackCC: boolean): void {
+  album = buildAlbum(EDITION_INFO[edition].ccCount, trackCC);
   stickerById = indexStickers(album);
   pageById = indexPages(album);
 }

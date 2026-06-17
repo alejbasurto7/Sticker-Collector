@@ -15,10 +15,11 @@ export default function App() {
   const counts = useCollection((s) => s.counts);
   const swaps = useCollection((s) => s.swaps);
   const edition = useCollection((s) => s.edition);
+  const trackCC = useCollection((s) => s.trackCC);
   const albumName = useCollection((s) => s.albumName);
 
-  // edition is a dep so totals recompute when the album layout changes.
-  const stats = useMemo(() => computeStats(counts), [counts, edition]);
+  // edition/trackCC are deps so totals recompute when the album layout changes.
+  const stats = useMemo(() => computeStats(counts), [counts, edition, trackCC]);
   const openSwaps = swaps.filter((s) => s.status === 'open').length;
 
   return (
@@ -42,8 +43,8 @@ export default function App() {
         </div>
       </header>
 
-      {/* key by edition so views remount and recompute when the layout changes */}
-      <main className="content" key={edition}>
+      {/* key by edition + CC tracking so views remount and recompute when the layout changes */}
+      <main className="content" key={`${edition}-${trackCC}`}>
         {tab === 'album' && <AlbumView />}
         {tab === 'swaps' && <SwapsView />}
 {tab === 'stats' && <StatsView />}

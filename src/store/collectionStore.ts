@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Counts, Edition, Swap } from '../types';
-import { applyEdition, DEFAULT_EDITION } from '../data/sampleAlbum';
+import { applyEdition, DEFAULT_EDITION, DEFAULT_TRACK_CC } from '../data/sampleAlbum';
 import { computeReservations, quantityAfterGive } from '../utils/swap';
 
 type ImportMode = 'replace' | 'merge';
@@ -10,8 +10,10 @@ interface CollectionState {
   counts: Counts;
   swaps: Swap[];
   edition: Edition;
+  trackCC: boolean;
   albumName: string;
   setEdition: (edition: Edition) => void;
+  setTrackCC: (trackCC: boolean) => void;
   setAlbumName: (name: string) => void;
 
   // Collection actions
@@ -47,12 +49,20 @@ export const useCollection = create<CollectionState>()(
       counts: {},
       swaps: [],
       edition: DEFAULT_EDITION,
+      trackCC: DEFAULT_TRACK_CC,
       albumName: 'Usa Mex Can 26',
 
-      setEdition: (edition) => {
-        applyEdition(edition);
-        set({ edition });
-      },
+      setEdition: (edition) =>
+        set((s) => {
+          applyEdition(edition, s.trackCC);
+          return { edition };
+        }),
+
+      setTrackCC: (trackCC) =>
+        set((s) => {
+          applyEdition(s.edition, trackCC);
+          return { trackCC };
+        }),
 
       setAlbumName: (name) => set({ albumName: name.trim() || 'Usa Mex Can 26' }),
 
@@ -144,9 +154,9 @@ export const useCollection = create<CollectionState>()(
     }),
     {
       name: 'figuritas-collection-v1',
-      // Rebuild the album to match the persisted edition before first render.
+      // Rebuild the album to match the persisted edition + CC tracking before first render.
       onRehydrateStorage: () => (state) => {
-        if (state?.edition) applyEdition(state.edition);
+        if (state) applyEdition(state.edition ?? DEFAULT_EDITION, state.trackCC ?? DEFAULT_TRACK_CC);
       },
     },
   ),

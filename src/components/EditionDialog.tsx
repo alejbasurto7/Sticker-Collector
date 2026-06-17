@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useCollection } from '../store/collectionStore';
-import { EDITION_INFO } from '../data/sampleAlbum';
+import { CC_EMOJI, EDITION_INFO } from '../data/sampleAlbum';
 import type { Edition } from '../types';
 
 interface Props {
@@ -12,6 +12,8 @@ const ORDER: Edition[] = ['latam', 'na'];
 export default function EditionDialog({ onClose }: Props) {
   const edition = useCollection((s) => s.edition);
   const setEdition = useCollection((s) => s.setEdition);
+  const trackCC = useCollection((s) => s.trackCC);
+  const setTrackCC = useCollection((s) => s.setTrackCC);
   const albumName = useCollection((s) => s.albumName);
   const setAlbumName = useCollection((s) => s.setAlbumName);
 
@@ -60,10 +62,28 @@ export default function EditionDialog({ onClose }: Props) {
           />
         </div>
 
+        <div style={{ marginBottom: '1rem' }}>
+          <button
+            type="button"
+            className="setting-toggle"
+            role="switch"
+            aria-checked={trackCC}
+            onClick={() => setTrackCC(!trackCC)}
+          >
+            <span className="setting-label">
+              {CC_EMOJI} {trackCC ? 'Untrack' : 'Track'} Coca-Cola stickers
+            </span>
+            <span className={`switch${trackCC ? ' on' : ''}`} aria-hidden="true">
+              <span className="knob" />
+            </span>
+          </button>
+        </div>
+
         <h3 style={{ margin: '0.5rem 0 0.5rem', fontSize: '0.9rem', fontWeight: 600 }}>Album edition</h3>
         <p className="modal-sub">
-          The editions differ only in the Coca-Cola page size. Switching keeps all your
-          existing stickers — it just shows or hides the extra slots.
+          {trackCC
+            ? 'The editions differ only in the Coca-Cola page size. Switching keeps all your existing stickers — it just shows or hides the extra slots.'
+            : 'Turn on Coca-Cola tracking above to choose between the NORAM and LATAM editions.'}
         </p>
 
         {ORDER.map((key) => {
@@ -73,10 +93,13 @@ export default function EditionDialog({ onClose }: Props) {
             <button
               key={key}
               className="swap-card"
+              disabled={!trackCC}
               style={{
                 width: '100%',
                 textAlign: 'left',
-                borderColor: selected ? 'var(--green)' : 'var(--border)',
+                borderColor: selected && trackCC ? 'var(--green)' : 'var(--border)',
+                opacity: trackCC ? 1 : 0.45,
+                cursor: trackCC ? 'pointer' : 'not-allowed',
               }}
               onClick={() => {
                 setEdition(key);
@@ -85,7 +108,7 @@ export default function EditionDialog({ onClose }: Props) {
             >
               <div className="swap-top">
                 <span className="swap-name">{info.label}</span>
-                {selected && <span className="pill open">current</span>}
+                {selected && trackCC && <span className="pill open">current</span>}
               </div>
               <div className="swap-summary">
                 <span>{info.region}</span>
