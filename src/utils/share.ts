@@ -15,7 +15,7 @@ export async function shareNodeAsImage(node: HTMLElement, fileName = 'sticker-co
   const nav = navigator as Navigator & { canShare?: (data: ShareData) => boolean };
   if (nav.share && nav.canShare && nav.canShare({ files: [file] })) {
     try {
-      await nav.share({ files: [file], title: `${APP_NAME} Stats` });
+      await nav.share({ files: [file], title: `My ${APP_NAME} Stats` });
       return;
     } catch {
       // User cancelled or share failed — fall through to download.
