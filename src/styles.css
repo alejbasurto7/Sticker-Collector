@@ -337,9 +337,15 @@ button {
   align-items: center;
   justify-content: center;
   user-select: none;
+  -webkit-user-select: none;
+  /* iOS fires its native text-selection magnifier / callout on a press held
+     long enough — which collides with the 450ms long-press-to-remove gesture
+     and can wedge touch handling in a standalone PWA (the web view is suspended
+     rather than reloaded, so it stays wedged across reopens). Opt out of both. */
+  -webkit-touch-callout: none;
   /* Treat each cell as a discrete tap target so the browser doesn't reclaim
      quick successive taps as a scroll/zoom gesture (which would fire
-     pointercancel and drop the tap). */
+     pointercancel and drop the tap) or trigger double-tap-zoom. */
   touch-action: manipulation;
   transition: transform 0.08s ease, background 0.15s ease;
 }
