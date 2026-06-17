@@ -126,16 +126,29 @@ export function computeStats(counts: Counts): Stats {
   };
 }
 
-export interface CollectorSkill {
+export interface Achievement {
   key: string;
   label: string;
   description: string;
   unlocked: boolean;
 }
 
-/** Gamified "Collector Skills" derived from progress, mirroring the app. */
-export function computeSkills(stats: Stats): CollectorSkill[] {
+/** Extra collection signals (outside raw counts) that feed some achievements. */
+export interface AchievementContext {
+  /** Number of swaps that have been settled/closed. */
+  closedSwaps: number;
+}
+
+/** Gamified "Achievements" derived from progress, mirroring the app. */
+export function computeAchievements(
+  stats: Stats,
+  ctx: AchievementContext = { closedSwaps: 0 },
+): Achievement[] {
+  const typePct = (type: StickerType) => stats.byType.find((t) => t.type === type)?.pct ?? 0;
+  const topDuplicate = stats.mostDuplicated ? stats.mostDuplicated.extra + 1 : 0;
+
   return [
+    // Getting started
     {
       key: 'first-sticker',
       label: 'First Sticker',
@@ -147,6 +160,13 @@ export function computeSkills(stats: Stats): CollectorSkill[] {
       label: 'Page Master',
       description: 'Complete a full page',
       unlocked: stats.pagesCompleted >= 1,
+    },
+    // Completion milestones
+    {
+      key: 'liftoff',
+      label: 'Liftoff',
+      description: 'Reach 10% completion',
+      unlocked: stats.completionPct >= 0.1,
     },
     {
       key: 'quarter',
@@ -161,10 +181,10 @@ export function computeSkills(stats: Stats): CollectorSkill[] {
       unlocked: stats.completionPct >= 0.5,
     },
     {
-      key: 'swap-master',
-      label: 'Swap Master',
-      description: 'Hold 10+ duplicates',
-      unlocked: stats.swapsTotal >= 10,
+      key: 'on-a-roll',
+      label: 'On a Roll',
+      description: 'Reach 75% completion',
+      unlocked: stats.completionPct >= 0.75,
     },
     {
       key: 'home-stretch',
@@ -173,10 +193,92 @@ export function computeSkills(stats: Stats): CollectorSkill[] {
       unlocked: stats.completionPct >= 0.9,
     },
     {
+      key: 'final-push',
+      label: 'Final Push',
+      description: 'Reach 95% completion',
+      unlocked: stats.completionPct >= 0.95,
+    },
+    {
       key: 'complete',
       label: 'Album Complete',
       description: 'Collect every sticker',
       unlocked: stats.completionPct >= 1,
+    },
+    // Volume & pages
+    {
+      key: 'century',
+      label: 'Century',
+      description: 'Collect 100 unique stickers',
+      unlocked: stats.ownedUnique >= 100,
+    },
+    {
+      key: 'bookworm',
+      label: 'Bookworm',
+      description: 'Complete 5 pages',
+      unlocked: stats.pagesCompleted >= 5,
+    },
+    {
+      key: 'librarian',
+      label: 'Librarian',
+      description: 'Complete 25 pages',
+      unlocked: stats.pagesCompleted >= 25,
+    },
+    // Type completion
+    {
+      key: 'shiny-hunter',
+      label: 'Shiny Hunter',
+      description: 'Collect every hologram',
+      unlocked: typePct('hologram') >= 1,
+    },
+    {
+      key: 'squad-goals',
+      label: 'Squad Goals',
+      description: 'Collect every team sticker',
+      unlocked: typePct('team') >= 1,
+    },
+    {
+      key: 'by-the-book',
+      label: 'By the Book',
+      description: 'Collect every regular sticker',
+      unlocked: typePct('regular') >= 1,
+    },
+    // Duplicates
+    {
+      key: 'first-dupe',
+      label: 'Got, Got, Need',
+      description: 'Hold your first duplicate',
+      unlocked: stats.swapsTotal >= 1,
+    },
+    {
+      key: 'swap-master',
+      label: 'Swap Master',
+      description: 'Hold 10+ duplicates',
+      unlocked: stats.swapsTotal >= 10,
+    },
+    {
+      key: 'hoarder',
+      label: 'Hoarder',
+      description: 'Hold 50+ duplicates',
+      unlocked: stats.swapsTotal >= 50,
+    },
+    {
+      key: 'seeing-double',
+      label: 'Seeing Double',
+      description: 'Have 5 copies of one sticker',
+      unlocked: topDuplicate >= 5,
+    },
+    // Trading
+    {
+      key: 'first-trade',
+      label: 'First Trade',
+      description: 'Complete your first swap',
+      unlocked: ctx.closedSwaps >= 1,
+    },
+    {
+      key: 'wheeler-dealer',
+      label: 'Wheeler Dealer',
+      description: 'Complete 10 swaps',
+      unlocked: ctx.closedSwaps >= 10,
     },
   ];
 }
