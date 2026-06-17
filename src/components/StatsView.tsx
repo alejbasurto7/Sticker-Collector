@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useCollection } from '../store/collectionStore';
 import { computeStats, computeAchievements } from '../utils/stats';
 import { shareNodeAsImage } from '../utils/share';
@@ -162,10 +163,14 @@ export default function StatsView() {
         <BarChart pages={stats.pages} />
       </div>
 
-      {/* Off-screen card rendered for image export. */}
-      <div style={{ position: 'fixed', left: -9999, top: 0, width: 360 }} aria-hidden>
-        <ShareCard ref={shareRef} stats={stats} albumName={albumName} />
-      </div>
+      {/* Off-screen card rendered for image export — portaled to body so it
+          sits outside the .app flex container and can't disturb the layout. */}
+      {createPortal(
+        <div style={{ position: 'fixed', left: -9999, top: 0, width: 360 }} aria-hidden>
+          <ShareCard ref={shareRef} stats={stats} albumName={albumName} />
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }
