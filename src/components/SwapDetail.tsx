@@ -18,6 +18,7 @@ export default function SwapDetail({ swap, onClose }: Props) {
   const swaps = useCollection((s) => s.swaps);
   const counts = useCollection((s) => s.counts);
   const deleteSwap = useCollection((s) => s.deleteSwap);
+  const rollbackSwap = useCollection((s) => s.rollbackSwap);
   const updateSwap = useCollection((s) => s.updateSwap);
   const [closing, setClosing] = useState(false);
   // Seed from what's already saved so reopening shows prior edits.
@@ -106,6 +107,17 @@ export default function SwapDetail({ swap, onClose }: Props) {
     }
   };
 
+  const rollback = () => {
+    if (
+      confirm(
+        `Roll back “${swap.name}”? Your collection counts will be restored and the swap reopened.`,
+      )
+    ) {
+      rollbackSwap(swap.id);
+      onClose();
+    }
+  };
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -162,6 +174,11 @@ export default function SwapDetail({ swap, onClose }: Props) {
           <button className="btn danger" onClick={remove}>
             Delete
           </button>
+          {!isOpen && (
+            <button className="btn" onClick={rollback}>
+              ↩ Rollback
+            </button>
+          )}
           <button className="btn" onClick={onClose}>
             Close
           </button>
