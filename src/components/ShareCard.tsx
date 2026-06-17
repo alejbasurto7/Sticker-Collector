@@ -1,18 +1,21 @@
 import { forwardRef } from 'react';
-import { album } from '../data/sampleAlbum';
+import { ALBUM_TYPE, APP_NAME } from '../config';
 import type { Stats } from '../utils/stats';
 import ProgressRing from './ProgressRing';
 
 interface Props {
   stats: Stats;
+  albumName: string;
 }
 
 /** Composed card used for the "share stats as image" export. */
-const ShareCard = forwardRef<HTMLDivElement, Props>(({ stats }, ref) => {
+const ShareCard = forwardRef<HTMLDivElement, Props>(({ stats, albumName }, ref) => {
   return (
     <div className="share-card" ref={ref}>
-      <div className="sc-title">My Sticker Album</div>
-      <div className="sc-album">{album.name}</div>
+      <div className="sc-title">{albumName}</div>
+      <div className="sc-album">
+        {ALBUM_TYPE} · {stats.totalStickers} stickers
+      </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
         <ProgressRing pct={stats.completionPct} size={92} />
@@ -45,7 +48,7 @@ const ShareCard = forwardRef<HTMLDivElement, Props>(({ stats }, ref) => {
         </div>
       </div>
 
-      <div className="sc-foot">Figuritas · Sticker Collector PWA</div>
+      <div className="sc-foot">{APP_NAME} PWA</div>
     </div>
   );
 });

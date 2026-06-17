@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { album } from './data/sampleAlbum';
+import { ALBUM_TYPE } from './config';
 import { useCollection } from './store/collectionStore';
 import { computeStats } from './utils/stats';
 import TabBar, { type Tab } from './components/TabBar';
@@ -31,7 +31,9 @@ export default function App() {
             ⚙️
           </button>
         </div>
-        <div className="subtitle">FIFA World Cup 2026 · {album.stickers.length} stickers</div>
+        <div className="subtitle">
+          {ALBUM_TYPE} · {stats.totalStickers} stickers
+        </div>
         <div className="header-progress">
           <ProgressBar
             label="Album progress"

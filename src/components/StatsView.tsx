@@ -13,6 +13,7 @@ const PACK_SIZE = 5;
 export default function StatsView() {
   const counts = useCollection((s) => s.counts);
   const swaps = useCollection((s) => s.swaps);
+  const albumName = useCollection((s) => s.albumName);
   const firstStickerAt = useCollection((s) => s.firstStickerAt);
   const activityDays = useCollection((s) => s.activityDays);
   const completedOn = useCollection((s) => s.completedOn);
@@ -163,7 +164,7 @@ export default function StatsView() {
 
       {/* Off-screen card rendered for image export. */}
       <div style={{ position: 'fixed', left: -9999, top: 0, width: 360 }} aria-hidden>
-        <ShareCard ref={shareRef} stats={stats} />
+        <ShareCard ref={shareRef} stats={stats} albumName={albumName} />
       </div>
     </div>
   );

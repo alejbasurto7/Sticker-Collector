@@ -1,7 +1,8 @@
 import { toPng } from 'html-to-image';
+import { APP_NAME } from '../config';
 
 /** Rasterize a DOM node to a PNG and share it (Web Share API) or download it. */
-export async function shareNodeAsImage(node: HTMLElement, fileName = 'figuritas-stats.png'): Promise<void> {
+export async function shareNodeAsImage(node: HTMLElement, fileName = 'sticker-collector-stats.png'): Promise<void> {
   const dataUrl = await toPng(node, {
     pixelRatio: 2,
     cacheBust: true,
@@ -14,7 +15,7 @@ export async function shareNodeAsImage(node: HTMLElement, fileName = 'figuritas-
   const nav = navigator as Navigator & { canShare?: (data: ShareData) => boolean };
   if (nav.share && nav.canShare && nav.canShare({ files: [file] })) {
     try {
-      await nav.share({ files: [file], title: 'My Figuritas Stats' });
+      await nav.share({ files: [file], title: `${APP_NAME} Stats` });
       return;
     } catch {
       // User cancelled or share failed — fall through to download.
