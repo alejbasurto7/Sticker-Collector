@@ -4,4 +4,4 @@
 export const APP_NAME = 'Sticker Collector';
 
 /** The album's edition/type label, shown under the album name. */
-export const ALBUM_TYPE = 'FIFA World Cup 2026';
+export const ALBUM_TYPE = '🇺🇸 🇲🇽 🇨🇦 FIFA World Cup 2026';
