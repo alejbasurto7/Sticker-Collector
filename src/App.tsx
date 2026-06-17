@@ -8,6 +8,7 @@ import AlbumView from './components/AlbumView';
 import SwapsView from './components/SwapsView';
 import StatsView from './components/StatsView';
 import EditionDialog from './components/EditionDialog';
+import AchievementToaster from './components/AchievementToaster';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('album');
@@ -56,6 +57,8 @@ export default function App() {
       <TabBar active={tab} onChange={setTab} openSwaps={openSwaps} />
 
       {editionOpen && <EditionDialog onClose={() => setEditionOpen(false)} />}
+
+      <AchievementToaster />
     </div>
   );
 }

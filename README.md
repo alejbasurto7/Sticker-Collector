@@ -22,7 +22,8 @@ stickers, 992 total); switching preserves all your existing stickers.
 ### Stats
 - Completion ring, owned / missing / swaps / total-collected tiles.
 - Per-page progress bar chart, highlights, and a completion **projection**.
-- **Achievements** badges that unlock as you progress.
+- **Achievements** badges that unlock as you progress, each celebrated the moment
+  you earn it with a temporary confetti banner (anywhere in the app).
 - **Share your stats as an image** (Web Share API with download fallback).
 
 ### Swaps
