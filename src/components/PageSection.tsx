@@ -15,6 +15,7 @@ export default function PageSection({ page, filter }: Props) {
   const counts = useCollection((s) => s.counts);
   const addOne = useCollection((s) => s.addOne);
   const removeOne = useCollection((s) => s.removeOne);
+  const locked = useCollection((s) => s.locked);
 
   const owned = page.stickerIds.filter((id) => (counts[id] ?? 0) >= 1).length;
   const total = page.stickerIds.length;
@@ -53,6 +54,7 @@ export default function PageSection({ page, filter }: Props) {
               key={id}
               sticker={stickerById[id]}
               count={counts[id] ?? 0}
+              locked={locked}
               onAdd={() => addOne(id)}
               onRemove={() => removeOne(id)}
             />

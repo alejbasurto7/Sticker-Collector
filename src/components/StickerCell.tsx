@@ -4,13 +4,15 @@ import type { Sticker } from '../types';
 interface Props {
   sticker: Sticker;
   count: number;
+  /** When true the album is locked: the cell is read-only and ignores taps. */
+  locked?: boolean;
   onAdd: () => void;
   onRemove: () => void;
 }
 
 const LONG_PRESS_MS = 450;
 
-export default function StickerCell({ sticker, count, onAdd, onRemove }: Props) {
+export default function StickerCell({ sticker, count, locked = false, onAdd, onRemove }: Props) {
   const timer = useRef<number | null>(null);
   // Set when a long-press fires so the click the browser still synthesizes on
   // release doesn't also add a sticker.
@@ -29,6 +31,7 @@ export default function StickerCell({ sticker, count, onAdd, onRemove }: Props) 
   // pairing, could shrink the cell out from under a fingertip near its edge so
   // the matching pointerup never landed and the tap was silently dropped).
   const onClick = () => {
+    if (locked) return;
     if (suppressClick.current) {
       suppressClick.current = false;
       return;
@@ -37,6 +40,7 @@ export default function StickerCell({ sticker, count, onAdd, onRemove }: Props) 
   };
 
   const onPointerDown = () => {
+    if (locked) return;
     suppressClick.current = false;
     clear();
     timer.current = window.setTimeout(() => {
@@ -56,6 +60,7 @@ export default function StickerCell({ sticker, count, onAdd, onRemove }: Props) 
   const cls = ['cell'];
   if (owned) cls.push('owned');
   if (sticker.special) cls.push('special');
+  if (locked) cls.push('locked');
 
   return (
     <div
@@ -67,6 +72,7 @@ export default function StickerCell({ sticker, count, onAdd, onRemove }: Props) 
       onPointerCancel={endPress}
       onContextMenu={(e) => e.preventDefault()}
       role="button"
+      aria-disabled={locked || undefined}
       aria-label={`Sticker ${sticker.number}, ${owned ? 'owned' : 'missing'}${
         swaps ? `, ${swaps} swaps` : ''
       }`}

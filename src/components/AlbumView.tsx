@@ -13,6 +13,8 @@ export default function AlbumView() {
   const [sort, setSort] = useState<SortMode>('album');
   const [importOpen, setImportOpen] = useState(false);
   const counts = useCollection((s) => s.counts);
+  const locked = useCollection((s) => s.locked);
+  const toggleLocked = useCollection((s) => s.toggleLocked);
 
   const filterCounts = useMemo(() => {
     let all = 0;
@@ -57,6 +59,16 @@ export default function AlbumView() {
       <div className="toolbar">
         <button className="btn" onClick={() => setImportOpen(true)}>
           ⬆ Import list
+        </button>
+        <button
+          className={`btn icon-btn lock-toggle${locked ? ' locked' : ''}`}
+          onClick={toggleLocked}
+          role="switch"
+          aria-checked={locked}
+          aria-label={locked ? 'Album locked — tap to unlock and edit' : 'Album unlocked — tap to lock'}
+          title={locked ? 'Locked (read-only)' : 'Unlocked (editable)'}
+        >
+          {locked ? '🔒' : '🔓'}
         </button>
       </div>
 

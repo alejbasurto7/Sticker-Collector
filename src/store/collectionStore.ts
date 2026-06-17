@@ -23,6 +23,8 @@ interface AlbumSnapshot {
   swaps: Swap[];
   edition: Edition;
   trackCC: boolean;
+  /** When true the album is read-only: tapping sticker cells does nothing. */
+  locked: boolean;
   firstStickerAt?: number;
   activityDays: string[];
   completedOn: string | null;
@@ -35,6 +37,8 @@ interface CollectionState {
   edition: Edition;
   trackCC: boolean;
   albumName: string;
+  /** When true the active album is locked (read-only): sticker cells ignore taps. */
+  locked: boolean;
   /** Timestamp of the very first sticker added (for speed-run style achievements). */
   firstStickerAt?: number;
   /** Local YYYY-MM-DD days on which the collection grew (streak + days collecting). */
@@ -58,6 +62,8 @@ interface CollectionState {
   setEdition: (edition: Edition) => void;
   setTrackCC: (trackCC: boolean) => void;
   setAlbumName: (name: string) => void;
+  /** Flip the active album between locked (read-only) and unlocked (editable). */
+  toggleLocked: () => void;
 
   // Album management
   createAlbum: () => void;
@@ -103,6 +109,7 @@ function snapshotActive(s: CollectionState): AlbumSnapshot {
     swaps: s.swaps,
     edition: s.edition,
     trackCC: s.trackCC,
+    locked: s.locked,
     firstStickerAt: s.firstStickerAt,
     activityDays: s.activityDays,
     completedOn: s.completedOn,
@@ -117,6 +124,7 @@ function loadSnapshot(a: AlbumSnapshot) {
     swaps: a.swaps,
     edition: a.edition,
     trackCC: a.trackCC,
+    locked: a.locked ?? false,
     albumName: a.albumName,
     firstStickerAt: a.firstStickerAt,
     activityDays: a.activityDays,
@@ -178,6 +186,7 @@ export const useCollection = create<CollectionState>()(
       edition: DEFAULT_EDITION,
       trackCC: DEFAULT_TRACK_CC,
       albumName: DEFAULT_ALBUM_NAME,
+      locked: false,
       activityDays: [],
       completedOn: null,
       unlockedAchievements: {},
@@ -191,6 +200,7 @@ export const useCollection = create<CollectionState>()(
           swaps: [],
           edition: DEFAULT_EDITION,
           trackCC: DEFAULT_TRACK_CC,
+          locked: false,
           activityDays: [],
           completedOn: null,
           unlockedAchievements: {},
@@ -208,6 +218,7 @@ export const useCollection = create<CollectionState>()(
             swaps: [],
             edition: DEFAULT_EDITION,
             trackCC: DEFAULT_TRACK_CC,
+            locked: false,
             firstStickerAt: undefined,
             activityDays: [],
             completedOn: null,
@@ -245,6 +256,7 @@ export const useCollection = create<CollectionState>()(
               swaps: [],
               edition: DEFAULT_EDITION,
               trackCC: DEFAULT_TRACK_CC,
+              locked: false,
               firstStickerAt: undefined,
               activityDays: [],
               completedOn: null,
@@ -283,6 +295,16 @@ export const useCollection = create<CollectionState>()(
             a.id === s.activeAlbumId ? { ...a, albumName } : a,
           );
           return { albumName, albums };
+        }),
+
+      toggleLocked: () =>
+        set((s) => {
+          const locked = !s.locked;
+          // Keep the parked snapshot in sync so the lock survives album switches.
+          const albums = s.albums.map((a) =>
+            a.id === s.activeAlbumId ? { ...a, locked } : a,
+          );
+          return { locked, albums };
         }),
 
       addOne: (id) =>

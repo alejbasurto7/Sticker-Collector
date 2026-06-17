@@ -365,6 +365,13 @@ button {
 .cell:active {
   transform: scale(0.92);
 }
+/* Locked album: cells are read-only, so don't react to presses. */
+.cell.locked {
+  cursor: not-allowed;
+}
+.cell.locked:active {
+  transform: none;
+}
 .cell.owned {
   background: linear-gradient(160deg, var(--green), #0a6f3d);
   color: #fff;
@@ -1039,6 +1046,17 @@ textarea {
 }
 .toolbar .btn {
   flex: 1;
+}
+/* Compact, square icon buttons (lock toggle, share, …) sit at their natural size. */
+.toolbar .btn.icon-btn {
+  flex: 0 0 auto;
+  padding: 11px 13px;
+  font-size: 18px;
+  line-height: 1;
+}
+.toolbar .btn.lock-toggle.locked {
+  border-color: var(--green);
+  color: var(--green);
 }
 
 
