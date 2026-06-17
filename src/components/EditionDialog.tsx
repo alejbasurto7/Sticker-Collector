@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useCollection } from '../store/collectionStore';
 import { CC_EMOJI, EDITION_INFO } from '../data/sampleAlbum';
 import type { Edition } from '../types';
@@ -16,8 +16,18 @@ export default function EditionDialog({ onClose }: Props) {
   const setTrackCC = useCollection((s) => s.setTrackCC);
   const albumName = useCollection((s) => s.albumName);
   const setAlbumName = useCollection((s) => s.setAlbumName);
+  const albums = useCollection((s) => s.albums);
+  const activeAlbumId = useCollection((s) => s.activeAlbumId);
+  const createAlbum = useCollection((s) => s.createAlbum);
+  const switchAlbum = useCollection((s) => s.switchAlbum);
 
   const [draft, setDraft] = useState(albumName);
+
+  // The album name changes out from under us when the user creates or switches
+  // albums, so keep the editable draft mirrored to the active album's name.
+  useEffect(() => {
+    setDraft(albumName);
+  }, [albumName]);
 
   function handleNameBlur() {
     setAlbumName(draft);
@@ -34,6 +44,42 @@ export default function EditionDialog({ onClose }: Props) {
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h2>Settings</h2>
+
+        <button type="button" className="btn full" onClick={() => createAlbum()} style={{ marginBottom: '1rem' }}>
+          ➕ New Album
+        </button>
+
+        {albums.length > 1 && (
+          <div style={{ marginBottom: '1rem' }}>
+            <label
+              htmlFor="album-selector"
+              style={{ display: 'block', fontWeight: 600, marginBottom: '0.35rem', fontSize: '0.9rem' }}
+            >
+              Current album
+            </label>
+            <select
+              id="album-selector"
+              value={activeAlbumId}
+              onChange={(e) => switchAlbum(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.5rem 0.75rem',
+                border: '1.5px solid var(--border)',
+                borderRadius: '8px',
+                fontSize: '1rem',
+                background: 'var(--surface)',
+                color: 'var(--text)',
+                boxSizing: 'border-box',
+              }}
+            >
+              {albums.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.albumName}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div style={{ marginBottom: '1rem' }}>
           <label

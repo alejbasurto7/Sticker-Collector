@@ -17,6 +17,7 @@ export default function App() {
   const edition = useCollection((s) => s.edition);
   const trackCC = useCollection((s) => s.trackCC);
   const albumName = useCollection((s) => s.albumName);
+  const activeAlbumId = useCollection((s) => s.activeAlbumId);
 
   // edition/trackCC are deps so totals recompute when the album layout changes.
   const stats = useMemo(() => computeStats(counts), [counts, edition, trackCC]);
@@ -46,7 +47,7 @@ export default function App() {
       </header>
 
       {/* key by edition + CC tracking so views remount and recompute when the layout changes */}
-      <main className="content" key={`${edition}-${trackCC}`}>
+      <main className="content" key={`${activeAlbumId}-${edition}-${trackCC}`}>
         {tab === 'album' && <AlbumView />}
         {tab === 'swaps' && <SwapsView />}
 {tab === 'stats' && <StatsView />}

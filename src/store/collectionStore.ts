@@ -6,6 +6,29 @@ import { computeReservations, quantityAfterGive } from '../utils/swap';
 
 type ImportMode = 'replace' | 'merge';
 
+/** Default name given to a freshly created album (deduplicated when it collides). */
+const NEW_ALBUM_NAME = 'New Album';
+const DEFAULT_ALBUM_ID = 'usa-mex-can-26';
+const DEFAULT_ALBUM_NAME = 'Usa Mex Can 26';
+
+/**
+ * The full collecting state of a single album. The active album's fields are
+ * mirrored at the top level of the store (so every view keeps reading them
+ * directly); the inactive albums are parked in `albums` until selected.
+ */
+interface AlbumSnapshot {
+  id: string;
+  albumName: string;
+  counts: Counts;
+  swaps: Swap[];
+  edition: Edition;
+  trackCC: boolean;
+  firstStickerAt?: number;
+  activityDays: string[];
+  completedOn: string | null;
+  unlockedAchievements: Record<string, number>;
+}
+
 interface CollectionState {
   counts: Counts;
   swaps: Swap[];
@@ -20,9 +43,19 @@ interface CollectionState {
   completedOn: string | null;
   /** Sticky ledger: achievement key -> timestamp first earned. */
   unlockedAchievements: Record<string, number>;
+
+  /** Every album the user has, including a (possibly stale) snapshot of the active one. */
+  albums: AlbumSnapshot[];
+  /** Id of the album whose data is currently mirrored at the top level. */
+  activeAlbumId: string;
+
   setEdition: (edition: Edition) => void;
   setTrackCC: (trackCC: boolean) => void;
   setAlbumName: (name: string) => void;
+
+  // Album management
+  createAlbum: () => void;
+  switchAlbum: (id: string) => void;
 
   // Collection actions
   addOne: (id: string) => void;
@@ -52,6 +85,50 @@ const clampCount = (n: number) => (n < 0 ? 0 : n);
 
 function newId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/** Capture the active album's live top-level fields as a parkable snapshot. */
+function snapshotActive(s: CollectionState): AlbumSnapshot {
+  return {
+    id: s.activeAlbumId,
+    albumName: s.albumName,
+    counts: s.counts,
+    swaps: s.swaps,
+    edition: s.edition,
+    trackCC: s.trackCC,
+    firstStickerAt: s.firstStickerAt,
+    activityDays: s.activityDays,
+    completedOn: s.completedOn,
+    unlockedAchievements: s.unlockedAchievements,
+  };
+}
+
+/** Spread a parked album's data back onto the top-level (active) fields. */
+function loadSnapshot(a: AlbumSnapshot) {
+  return {
+    counts: a.counts,
+    swaps: a.swaps,
+    edition: a.edition,
+    trackCC: a.trackCC,
+    albumName: a.albumName,
+    firstStickerAt: a.firstStickerAt,
+    activityDays: a.activityDays,
+    completedOn: a.completedOn,
+    unlockedAchievements: a.unlockedAchievements,
+  };
+}
+
+/**
+ * Pick a default name for a new album, appending " (2)", " (3)", … when the
+ * plain "New Album" (or a prior numbered variant) is already taken.
+ */
+function nextAlbumName(existing: string[]): string {
+  const taken = new Set(existing.map((n) => n.trim()));
+  if (!taken.has(NEW_ALBUM_NAME)) return NEW_ALBUM_NAME;
+  for (let i = 2; ; i++) {
+    const candidate = `${NEW_ALBUM_NAME} (${i})`;
+    if (!taken.has(candidate)) return candidate;
+  }
 }
 
 const ownedUnique = (counts: Counts) =>
@@ -93,10 +170,60 @@ export const useCollection = create<CollectionState>()(
       swaps: [],
       edition: DEFAULT_EDITION,
       trackCC: DEFAULT_TRACK_CC,
-      albumName: 'Usa Mex Can 26',
+      albumName: DEFAULT_ALBUM_NAME,
       activityDays: [],
       completedOn: null,
       unlockedAchievements: {},
+      activeAlbumId: DEFAULT_ALBUM_ID,
+      albums: [
+        {
+          id: DEFAULT_ALBUM_ID,
+          albumName: DEFAULT_ALBUM_NAME,
+          counts: {},
+          swaps: [],
+          edition: DEFAULT_EDITION,
+          trackCC: DEFAULT_TRACK_CC,
+          activityDays: [],
+          completedOn: null,
+          unlockedAchievements: {},
+        },
+      ],
+
+      createAlbum: () =>
+        set((s) => {
+          const id = newId();
+          const albumName = nextAlbumName(s.albums.map((a) => a.albumName));
+          const fresh: AlbumSnapshot = {
+            id,
+            albumName,
+            counts: {},
+            swaps: [],
+            edition: DEFAULT_EDITION,
+            trackCC: DEFAULT_TRACK_CC,
+            firstStickerAt: undefined,
+            activityDays: [],
+            completedOn: null,
+            unlockedAchievements: {},
+          };
+          // Park the album we're leaving, then make the new one active & live.
+          const albums = s.albums
+            .map((a) => (a.id === s.activeAlbumId ? snapshotActive(s) : a))
+            .concat(fresh);
+          applyEdition(fresh.edition, fresh.trackCC);
+          return { albums, activeAlbumId: id, ...loadSnapshot(fresh) };
+        }),
+
+      switchAlbum: (id) =>
+        set((s) => {
+          if (id === s.activeAlbumId) return s;
+          const target = s.albums.find((a) => a.id === id);
+          if (!target) return s;
+          const albums = s.albums.map((a) =>
+            a.id === s.activeAlbumId ? snapshotActive(s) : a,
+          );
+          applyEdition(target.edition, target.trackCC);
+          return { albums, activeAlbumId: id, ...loadSnapshot(target) };
+        }),
 
       setEdition: (edition) =>
         set((s) => {
@@ -110,7 +237,15 @@ export const useCollection = create<CollectionState>()(
           return { trackCC };
         }),
 
-      setAlbumName: (name) => set({ albumName: name.trim() || 'Usa Mex Can 26' }),
+      setAlbumName: (name) =>
+        set((s) => {
+          const albumName = name.trim() || DEFAULT_ALBUM_NAME;
+          // Keep the parked snapshot's name in sync so the selector stays current.
+          const albums = s.albums.map((a) =>
+            a.id === s.activeAlbumId ? { ...a, albumName } : a,
+          );
+          return { albumName, albums };
+        }),
 
       addOne: (id) =>
         set((s) => {
@@ -234,7 +369,20 @@ export const useCollection = create<CollectionState>()(
       name: 'figuritas-collection-v1',
       // Rebuild the album to match the persisted edition + CC tracking before first render.
       onRehydrateStorage: () => (state) => {
-        if (state) applyEdition(state.edition ?? DEFAULT_EDITION, state.trackCC ?? DEFAULT_TRACK_CC);
+        if (!state) return;
+        applyEdition(state.edition ?? DEFAULT_EDITION, state.trackCC ?? DEFAULT_TRACK_CC);
+        // Pre-multi-album saves have no album list: seed it from the live fields so
+        // the active album is represented and its name matches the top level.
+        if (!state.activeAlbumId) state.activeAlbumId = DEFAULT_ALBUM_ID;
+        if (!Array.isArray(state.albums) || state.albums.length === 0) {
+          state.albums = [snapshotActive(state)];
+        } else if (!state.albums.some((a) => a.id === state.activeAlbumId)) {
+          state.albums = [...state.albums, snapshotActive(state)];
+        } else {
+          state.albums = state.albums.map((a) =>
+            a.id === state.activeAlbumId ? { ...a, albumName: state.albumName } : a,
+          );
+        }
       },
     },
   ),
