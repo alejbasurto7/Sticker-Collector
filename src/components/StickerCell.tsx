@@ -12,11 +12,9 @@ const LONG_PRESS_MS = 450;
 
 export default function StickerCell({ sticker, count, onAdd, onRemove }: Props) {
   const timer = useRef<number | null>(null);
-  const longFired = useRef(false);
-  // Tracks an in-flight press so a dropped pointerup (e.g. the browser reclaims
-  // the gesture for scrolling and fires pointercancel) can't leave a stale
-  // long-press timer armed or double-handle a single tap.
-  const pressing = useRef(false);
+  // Set when a long-press fires so the click the browser still synthesizes on
+  // release doesn't also add a sticker.
+  const suppressClick = useRef(false);
 
   const clear = () => {
     if (timer.current !== null) {
@@ -25,39 +23,32 @@ export default function StickerCell({ sticker, count, onAdd, onRemove }: Props) 
     }
   };
 
-  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    longFired.current = false;
-    pressing.current = true;
-    // Bind the whole gesture to this cell. Without capture, the `:active`
-    // scale(0.92) shrinks the cell out from under a fingertip that landed near
-    // its edge, so the finger ends up over a neighbouring cell and the matching
-    // pointerup never returns here — silently dropping the tap. Capturing keeps
-    // pointerup/pointercancel anchored to the cell the press started on.
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId);
-    } catch {
-      /* capture is unsupported in some environments; the tap still works without it */
+  // Adding is handled by the browser's own click event rather than a hand-rolled
+  // pointerdown/pointerup pair. Click reliably targets the cell the press began
+  // on even though `.cell:active` scales it down (which, with the old manual
+  // pairing, could shrink the cell out from under a fingertip near its edge so
+  // the matching pointerup never landed and the tap was silently dropped).
+  const onClick = () => {
+    if (suppressClick.current) {
+      suppressClick.current = false;
+      return;
     }
+    onAdd();
+  };
+
+  const onPointerDown = () => {
+    suppressClick.current = false;
+    clear();
     timer.current = window.setTimeout(() => {
-      longFired.current = true;
+      timer.current = null;
+      suppressClick.current = true;
       onRemove();
     }, LONG_PRESS_MS);
   };
 
-  const onPointerUp = () => {
-    if (!pressing.current) return;
-    pressing.current = false;
-    clear();
-    // A short press (tap) that did not trigger the long-press → add one.
-    if (!longFired.current) onAdd();
-  };
-
-  // The browser cancelled the gesture (scroll/zoom takeover, etc.). Abort the
-  // pending long-press without adding or removing so the cell stays responsive.
-  const onPointerCancel = () => {
-    pressing.current = false;
-    clear();
-  };
+  // Any way the press ends (release, finger leaves, gesture cancelled) just
+  // disarms the long-press; a genuine tap then falls through to onClick.
+  const endPress = () => clear();
 
   const owned = count >= 1;
   const swaps = count > 1 ? count - 1 : 0;
@@ -69,9 +60,11 @@ export default function StickerCell({ sticker, count, onAdd, onRemove }: Props) 
   return (
     <div
       className={cls.join(' ')}
+      onClick={onClick}
       onPointerDown={onPointerDown}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerCancel}
+      onPointerUp={endPress}
+      onPointerLeave={endPress}
+      onPointerCancel={endPress}
       onContextMenu={(e) => e.preventDefault()}
       role="button"
       aria-label={`Sticker ${sticker.number}, ${owned ? 'owned' : 'missing'}${
