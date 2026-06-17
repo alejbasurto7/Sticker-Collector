@@ -52,4 +52,10 @@ export interface Swap {
   /** Promised sticker ids in each direction. */
   giving: string[];
   receiving: string[];
+  /**
+   * Ids the user has unselected in the detail modal — still part of the swap but
+   * parked out of the active trade. Absent/empty means everything is selected.
+   */
+  deselectedGiving?: string[];
+  deselectedReceiving?: string[];
 }

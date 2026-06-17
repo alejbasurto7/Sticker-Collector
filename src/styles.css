@@ -713,6 +713,11 @@ button {
   border-color: var(--red);
   color: var(--red);
 }
+.btn.success {
+  background: var(--green-bright);
+  border-color: transparent;
+  color: #fff;
+}
 .btn.full {
   width: 100%;
 }

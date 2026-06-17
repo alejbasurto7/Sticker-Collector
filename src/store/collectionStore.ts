@@ -85,7 +85,16 @@ interface CollectionState {
     giving: string[];
     receiving: string[];
   }) => string;
-  updateSwap: (id: string, patch: { giving?: string[]; receiving?: string[]; name?: string }) => void;
+  updateSwap: (
+    id: string,
+    patch: {
+      giving?: string[];
+      receiving?: string[];
+      name?: string;
+      deselectedGiving?: string[];
+      deselectedReceiving?: string[];
+    },
+  ) => void;
   closeSwap: (id: string, settled: { givenIds: string[]; receivedIds: string[] }) => void;
   deleteSwap: (id: string) => void;
   undoLastTrade: () => void;
@@ -369,6 +378,10 @@ export const useCollection = create<CollectionState>()(
                   ...(patch.giving ? { giving: patch.giving } : {}),
                   ...(patch.receiving ? { receiving: patch.receiving } : {}),
                   ...(patch.name !== undefined ? { name: patch.name } : {}),
+                  ...(patch.deselectedGiving ? { deselectedGiving: patch.deselectedGiving } : {}),
+                  ...(patch.deselectedReceiving
+                    ? { deselectedReceiving: patch.deselectedReceiving }
+                    : {}),
                 }
               : sw,
           ),
@@ -392,6 +405,10 @@ export const useCollection = create<CollectionState>()(
                   closedAt: Date.now(),
                   giving: settled.givenIds,
                   receiving: settled.receivedIds,
+                  // Settlement rewrites the lists to exactly what was traded, so any
+                  // parked deselections no longer apply.
+                  deselectedGiving: [],
+                  deselectedReceiving: [],
                 }
               : sw,
           );

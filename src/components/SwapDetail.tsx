@@ -1,9 +1,13 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Swap } from '../types';
 import { useCollection } from '../store/collectionStore';
 import { computeConflicts } from '../utils/swap';
 import StickerChips from './StickerChips';
 import SwapClose from './SwapClose';
+
+/** Same membership, order-independent — used to tell saved state from edited state. */
+const sameMembers = (set: Set<string>, arr: string[]) =>
+  set.size === arr.length && arr.every((id) => set.has(id));
 
 interface Props {
   swap: Swap;
@@ -14,11 +18,26 @@ export default function SwapDetail({ swap, onClose }: Props) {
   const swaps = useCollection((s) => s.swaps);
   const counts = useCollection((s) => s.counts);
   const deleteSwap = useCollection((s) => s.deleteSwap);
+  const updateSwap = useCollection((s) => s.updateSwap);
   const [closing, setClosing] = useState(false);
-  const [deselectedGiving, setDeselectedGiving] = useState(new Set<string>());
-  const [deselectedReceiving, setDeselectedReceiving] = useState(new Set<string>());
+  // Seed from what's already saved so reopening shows prior edits.
+  const [deselectedGiving, setDeselectedGiving] = useState(() => new Set(swap.deselectedGiving ?? []));
+  const [deselectedReceiving, setDeselectedReceiving] = useState(() => new Set(swap.deselectedReceiving ?? []));
+  const [justSaved, setJustSaved] = useState(false);
+  const savedTimer = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (savedTimer.current) clearTimeout(savedTimer.current);
+    },
+    [],
+  );
 
   const isOpen = swap.status === 'open';
+
+  // True when the live selection differs from what's persisted on the swap.
+  const dirty =
+    !sameMembers(deselectedGiving, swap.deselectedGiving ?? []) ||
+    !sameMembers(deselectedReceiving, swap.deselectedReceiving ?? []);
 
   const conflicts = useMemo(() => computeConflicts(swaps, counts), [swaps, counts]);
 
@@ -52,6 +71,7 @@ export default function SwapDetail({ swap, onClose }: Props) {
   const receiving = new Set(swap.receiving.filter((id) => !deselectedReceiving.has(id)));
 
   const toggleGiving = (id: string) => {
+    setJustSaved(false);
     setDeselectedGiving((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -60,12 +80,23 @@ export default function SwapDetail({ swap, onClose }: Props) {
     });
   };
   const toggleReceiving = (id: string) => {
+    setJustSaved(false);
     setDeselectedReceiving((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
+  };
+
+  const save = () => {
+    updateSwap(swap.id, {
+      deselectedGiving: [...deselectedGiving],
+      deselectedReceiving: [...deselectedReceiving],
+    });
+    setJustSaved(true);
+    if (savedTimer.current) clearTimeout(savedTimer.current);
+    savedTimer.current = window.setTimeout(() => setJustSaved(false), 1500);
   };
 
   const remove = () => {
@@ -116,6 +147,17 @@ export default function SwapDetail({ swap, onClose }: Props) {
           readOnly={!isOpen}
         />
 
+        {isOpen && (
+          <button
+            className={`btn full ${justSaved ? 'success' : 'primary'}`}
+            style={{ marginTop: 14 }}
+            onClick={save}
+            disabled={!dirty && !justSaved}
+          >
+            {justSaved ? '✓ Saved' : 'Save changes'}
+          </button>
+        )}
+
         <div className="btn-row">
           <button className="btn danger" onClick={remove}>
             Delete
@@ -125,7 +167,7 @@ export default function SwapDetail({ swap, onClose }: Props) {
           </button>
           {isOpen && (
             <button className="btn primary full" onClick={() => setClosing(true)}>
-              ✓ Conclude swap
+              🤝 Mark as swapped
             </button>
           )}
         </div>

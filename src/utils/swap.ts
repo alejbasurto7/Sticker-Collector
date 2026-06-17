@@ -24,14 +24,31 @@ export interface Reservations {
   committedGet: Set<string>;
 }
 
+/**
+ * The stickers actually in play for a swap: the promised list minus any the user
+ * has unselected. Deselected stickers stay on the swap but no longer count as
+ * promised, so reservations and conflicts ignore them.
+ */
+export function activeGiving(sw: Swap): string[] {
+  if (!sw.deselectedGiving?.length) return sw.giving;
+  const off = new Set(sw.deselectedGiving);
+  return sw.giving.filter((id) => !off.has(id));
+}
+
+export function activeReceiving(sw: Swap): string[] {
+  if (!sw.deselectedReceiving?.length) return sw.receiving;
+  const off = new Set(sw.deselectedReceiving);
+  return sw.receiving.filter((id) => !off.has(id));
+}
+
 export function computeReservations(swaps: Swap[], excludeSwapId?: string): Reservations {
   const committedGive = new Map<string, number>();
   const committedGet = new Set<string>();
 
   for (const sw of swaps) {
     if (sw.status !== 'open' || sw.id === excludeSwapId) continue;
-    for (const id of sw.giving) committedGive.set(id, (committedGive.get(id) ?? 0) + 1);
-    for (const id of sw.receiving) committedGet.add(id);
+    for (const id of activeGiving(sw)) committedGive.set(id, (committedGive.get(id) ?? 0) + 1);
+    for (const id of activeReceiving(sw)) committedGet.add(id);
   }
 
   return { committedGive, committedGet };
@@ -101,8 +118,8 @@ export function computeConflicts(swaps: Swap[], counts: Counts): ConflictSets {
 
   for (const sw of swaps) {
     if (sw.status !== 'open') continue;
-    for (const id of sw.giving) giveCounts.set(id, (giveCounts.get(id) ?? 0) + 1);
-    for (const id of sw.receiving) recvCounts.set(id, (recvCounts.get(id) ?? 0) + 1);
+    for (const id of activeGiving(sw)) giveCounts.set(id, (giveCounts.get(id) ?? 0) + 1);
+    for (const id of activeReceiving(sw)) recvCounts.set(id, (recvCounts.get(id) ?? 0) + 1);
   }
 
   const giving = new Set<string>();
