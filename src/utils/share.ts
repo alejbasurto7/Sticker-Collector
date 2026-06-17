@@ -27,3 +27,29 @@ export async function shareNodeAsImage(node: HTMLElement, fileName = 'sticker-co
   link.download = fileName;
   link.click();
 }
+
+/** Copy text to the clipboard, falling back to a hidden textarea on older browsers. */
+export async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // Permission denied or insecure context — fall through to the legacy path.
+  }
+
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false;
+  }
+}
