@@ -15,6 +15,8 @@
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --tabbar-h: 64px;
+  /* Album identity gradient — update this for each new album type */
+  --album-gradient: linear-gradient(105deg, #1d4ed8 0%, #c0392b 38%, #0b8a4b 72%, #eef2f8 100%);
 }
 
 * {
@@ -66,10 +68,9 @@ button {
   top: 0;
   z-index: 20;
   padding: calc(var(--safe-top) + 14px) 16px 12px;
-  /* World Cup 2026 host colors: blue, red, green and white, fading into the
-     app background at the bottom so the header text stays readable. */
+  /* Album gradient fades into the app background at the bottom for readability */
   background: linear-gradient(180deg, rgba(15, 17, 21, 0.45), var(--bg)),
-    linear-gradient(105deg, #1d4ed8 0%, #c0392b 38%, #0b8a4b 72%, #eef2f8 100%);
+    var(--album-gradient);
   border-bottom: 1px solid var(--border);
 }
 
@@ -1070,7 +1071,8 @@ textarea {
 
 /* Share card (rendered for image export) */
 .share-card {
-  background: linear-gradient(160deg, #11331f, #0f1115);
+  background: linear-gradient(180deg, rgba(15, 17, 21, 0.45), rgba(15, 17, 21, 0.45)),
+    var(--album-gradient);
   border-radius: 18px;
   padding: 22px;
   border: 1px solid var(--border);
