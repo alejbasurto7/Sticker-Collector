@@ -5,7 +5,7 @@ truth; this file is a map of it. (There is no separate spec — earlier design/p
 documents were removed because they described an abandoned server-side architecture that
 was never built.)
 
-**Figuritas — Sticker Collector** is a client-only React PWA for tracking a Panini-style
+**Sticker Collector** is a client-only React PWA for tracking a Panini-style
 sticker album, viewing collection stats, and organizing swaps with other collectors. There
 is **no backend**: all data lives in the browser's `localStorage`.
 
