@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Counts, Edition, Swap } from '../types';
-import { applyEdition, DEFAULT_EDITION, DEFAULT_TRACK_CC } from '../data/sampleAlbum';
+import { album, applyEdition, DEFAULT_EDITION, DEFAULT_TRACK_CC } from '../data/sampleAlbum';
 import { computeReservations, quantityAfterGive } from '../utils/swap';
+import { dateKey } from '../utils/stats';
 
 type ImportMode = 'replace' | 'merge';
 
@@ -12,6 +13,10 @@ interface CollectionState {
   edition: Edition;
   trackCC: boolean;
   albumName: string;
+  /** Local date keys (YYYY-MM-DD) on which a sticker was added. Drives the streak. */
+  collectDays: string[];
+  /** Date the album first reached 100% unique, which freezes "days collecting". */
+  completedOn: string | null;
   setEdition: (edition: Edition) => void;
   setTrackCC: (trackCC: boolean) => void;
   setAlbumName: (name: string) => void;
@@ -43,6 +48,35 @@ function newId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+const sumCounts = (counts: Counts) => Object.values(counts).reduce((a, n) => a + n, 0);
+
+const ownedUnique = (counts: Counts) =>
+  album.stickers.reduce((acc, s) => acc + ((counts[s.id] ?? 0) >= 1 ? 1 : 0), 0);
+
+/**
+ * Records the collection-history side effects of a count change: a streak day
+ * whenever the total number of stickers grew, and the completion date the first
+ * time every unique sticker is owned. Returns the patch to merge into state.
+ */
+function trackHistory(
+  prev: Pick<CollectionState, 'counts' | 'collectDays' | 'completedOn'>,
+  nextCounts: Counts,
+): Pick<CollectionState, 'collectDays' | 'completedOn'> {
+  let collectDays = prev.collectDays;
+  let completedOn = prev.completedOn;
+  const today = dateKey(Date.now());
+
+  if (sumCounts(nextCounts) > sumCounts(prev.counts) && !collectDays.includes(today)) {
+    collectDays = [...collectDays, today].sort();
+  }
+
+  if (!completedOn && album.stickers.length > 0 && ownedUnique(nextCounts) === album.stickers.length) {
+    completedOn = today;
+  }
+
+  return { collectDays, completedOn };
+}
+
 export const useCollection = create<CollectionState>()(
   persist(
     (set) => ({
@@ -51,6 +85,8 @@ export const useCollection = create<CollectionState>()(
       edition: DEFAULT_EDITION,
       trackCC: DEFAULT_TRACK_CC,
       albumName: 'Usa Mex Can 26',
+      collectDays: [],
+      completedOn: null,
 
       setEdition: (edition) =>
         set((s) => {
@@ -67,22 +103,34 @@ export const useCollection = create<CollectionState>()(
       setAlbumName: (name) => set({ albumName: name.trim() || 'Usa Mex Can 26' }),
 
       addOne: (id) =>
-        set((s) => ({ counts: { ...s.counts, [id]: clampCount((s.counts[id] ?? 0) + 1) } })),
+        set((s) => {
+          const counts = { ...s.counts, [id]: clampCount((s.counts[id] ?? 0) + 1) };
+          return { counts, ...trackHistory(s, counts) };
+        }),
 
       removeOne: (id) =>
         set((s) => ({ counts: { ...s.counts, [id]: clampCount((s.counts[id] ?? 0) - 1) } })),
 
-      setCount: (id, n) => set((s) => ({ counts: { ...s.counts, [id]: clampCount(n) } })),
+      setCount: (id, n) =>
+        set((s) => {
+          const counts = { ...s.counts, [id]: clampCount(n) };
+          return { counts, ...trackHistory(s, counts) };
+        }),
 
       importCounts: (map, mode) =>
         set((s) => {
-          if (mode === 'replace') return { counts: { ...map } };
-          const merged = { ...s.counts };
-          for (const [id, n] of Object.entries(map)) merged[id] = clampCount(n);
-          return { counts: merged };
+          const counts =
+            mode === 'replace'
+              ? { ...map }
+              : (() => {
+                  const merged = { ...s.counts };
+                  for (const [id, n] of Object.entries(map)) merged[id] = clampCount(n);
+                  return merged;
+                })();
+          return { counts, ...trackHistory(s, counts) };
         }),
 
-      reset: () => set({ counts: {} }),
+      reset: () => set({ counts: {}, collectDays: [], completedOn: null }),
 
       createSwap: (input) => {
         const id = newId();
@@ -135,7 +183,7 @@ export const useCollection = create<CollectionState>()(
                 }
               : sw,
           );
-          return { counts, swaps };
+          return { counts, swaps, ...trackHistory(s, counts) };
         }),
 
       deleteSwap: (id) => set((s) => ({ swaps: s.swaps.filter((sw) => sw.id !== id) })),

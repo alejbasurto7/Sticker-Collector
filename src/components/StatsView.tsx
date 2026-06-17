@@ -12,7 +12,12 @@ const PACK_SIZE = 5;
 
 export default function StatsView() {
   const counts = useCollection((s) => s.counts);
-  const stats = useMemo(() => computeStats(counts), [counts]);
+  const collectDays = useCollection((s) => s.collectDays);
+  const completedOn = useCollection((s) => s.completedOn);
+  const stats = useMemo(
+    () => computeStats(counts, { collectDays, completedOn }),
+    [counts, collectDays, completedOn],
+  );
   const skills = useMemo(() => computeSkills(stats), [stats]);
   const shareRef = useRef<HTMLDivElement>(null);
   const [sharing, setSharing] = useState(false);
@@ -99,6 +104,18 @@ export default function StatsView() {
         <div className="highlight">
           <div className="h-top">Projection to finish</div>
           <div className="h-main">{projection === null ? '🎉 Done!' : `≈ ${projection} packs`}</div>
+        </div>
+        <div className="highlight">
+          <div className="h-top">Current streak</div>
+          <div className="h-main">
+            🔥 {stats.currentStreak} {stats.currentStreak === 1 ? 'day' : 'days'}
+          </div>
+        </div>
+        <div className="highlight">
+          <div className="h-top">Days collecting</div>
+          <div className="h-main">
+            📅 {stats.daysCollecting} {stats.daysCollecting === 1 ? 'day' : 'days'}
+          </div>
         </div>
       </div>
 

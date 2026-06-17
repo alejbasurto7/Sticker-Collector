@@ -1,6 +1,6 @@
 import { album, applyEdition } from '../src/data/sampleAlbum';
 import { parseExport, parsedToCounts } from '../src/utils/import';
-import { computeStats } from '../src/utils/stats';
+import { computeStats, longestStreak, daysCollecting } from '../src/utils/stats';
 import {
   computeCandidates,
   computeConflicts,
@@ -215,6 +215,36 @@ assert(quantityAfterGive(0, 0) === 0, 'nothing to give: 0 -> 0 (no phantom)');
 assert(quantityAfterGive(3, 1) === 2, 'one reserved by others: 3 -> 2');
 assert(quantityAfterGive(2, 1) === 2, 'protect 1 owned + 1 reserved: cannot drop below 2');
 assert(quantityAfterGive(1, 1) === 1, 'inconsistent reserve never creates a phantom copy');
+
+// --- Streak (longest run of consecutive collecting days) ---
+console.log('Current streak');
+assert(longestStreak([]) === 0, 'no days -> 0 streak');
+assert(longestStreak(['2026-06-17']) === 1, 'one day -> streak 1');
+assert(
+  longestStreak(['2026-06-15', '2026-06-16', '2026-06-17']) === 3,
+  'three consecutive days -> streak 3',
+);
+assert(
+  longestStreak(['2026-06-10', '2026-06-15', '2026-06-16']) === 2,
+  'gap resets, best run is the 2-day tail',
+);
+assert(
+  longestStreak(['2026-06-16', '2026-06-15', '2026-06-15', '2026-06-17']) === 3,
+  'unsorted + duplicate days still yield streak 3',
+);
+
+// --- Days collecting (inclusive span, frozen at completion) ---
+console.log('Days collecting');
+assert(daysCollecting(null, '2026-06-17') === 0, 'no first day -> 0');
+assert(daysCollecting('2026-06-17', '2026-06-17') === 1, 'same day -> 1 (first day counts)');
+assert(daysCollecting('2026-06-10', '2026-06-17') === 8, 'June 10 to 17 inclusive -> 8 days');
+// completedOn freezes the end date: a completion date before "today" stops the count.
+const completedStats = computeStats(
+  Object.fromEntries(album.stickers.map((s) => [s.id, 1])),
+  { collectDays: ['2026-06-01', '2026-06-02'], completedOn: '2026-06-05' },
+);
+assert(completedStats.daysCollecting === 5, 'frozen at completion: Jun 1 -> Jun 5 = 5 days');
+assert(completedStats.currentStreak === 2, 'streak read from collectDays');
 
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);

@@ -174,8 +174,11 @@ uploaded image; scanned text feeds [NewSwapDialog](../src/components/NewSwapDial
 
 ## Stats & sharing ([src/utils/stats.ts](../src/utils/stats.ts), [src/utils/share.ts](../src/utils/share.ts))
 
-`computeStats(counts)` derives totals (owned/missing/spares/collected), completion %,
-per-page progress, and the most-duplicated sticker. `computeSkills(stats)` returns 7
+`computeStats(counts, history?)` derives totals (owned/missing/spares/collected), completion %,
+per-page progress, and the most-duplicated sticker. When given the optional `history`
+(`collectDays` + `completedOn`, persisted by the store) it also derives the current streak
+(longest run of consecutive collecting days) and days collecting (first sticker → today,
+frozen once the album is complete). `computeSkills(stats)` returns 7
 gamified achievement badges. [StatsView](../src/components/StatsView.tsx) renders the ring,
 tiles, [BarChart](../src/components/BarChart.tsx), and
 [CollectorSkills](../src/components/CollectorSkills.tsx); `shareNodeAsImage` exports the

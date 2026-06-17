@@ -35,6 +35,63 @@ export interface Stats {
   pages: PageProgress[];
   byType: TypeProgress[];
   mostDuplicated: { id: string; number: string; code: string; emoji: string; extra: number } | null;
+  /** Longest run of consecutive calendar days on which a sticker was added. */
+  currentStreak: number;
+  /** Days from the first sticker collected to today, frozen once the album is complete. */
+  daysCollecting: number;
+}
+
+/**
+ * Persisted history used to derive time-based stats. `collectDays` holds the
+ * sorted, unique local date keys (YYYY-MM-DD) on which at least one sticker was
+ * added; `completedOn` is the date the album first reached 100% (or null).
+ */
+export interface CollectionHistory {
+  collectDays: string[];
+  completedOn: string | null;
+}
+
+const MS_PER_DAY = 86_400_000;
+
+/** Local calendar date key (YYYY-MM-DD) for a timestamp. */
+export function dateKey(ts: number): string {
+  const d = new Date(ts);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/** Midnight timestamp for a YYYY-MM-DD key, in local time. */
+function keyToTime(key: string): number {
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(y, m - 1, d).getTime();
+}
+
+/** Whole-day gap between two date keys (start assumed <= end). */
+function dayGap(startKey: string, endKey: string): number {
+  return Math.round((keyToTime(endKey) - keyToTime(startKey)) / MS_PER_DAY);
+}
+
+/** Longest run of consecutive calendar days present in a list of date keys. */
+export function longestStreak(dateKeys: string[]): number {
+  const sorted = [...new Set(dateKeys)].sort();
+  if (sorted.length === 0) return 0;
+  let best = 1;
+  let run = 1;
+  for (let i = 1; i < sorted.length; i++) {
+    const gap = dayGap(sorted[i - 1], sorted[i]);
+    if (gap === 1) run++;
+    else run = 1;
+    if (run > best) best = run;
+  }
+  return best;
+}
+
+/** Inclusive span in days between two date keys, so the first day counts as 1. */
+export function daysCollecting(startKey: string | null, endKey: string): number {
+  if (!startKey) return 0;
+  return Math.max(0, dayGap(startKey, endKey)) + 1;
 }
 
 /** The team photo sticker is always #13 on every national-team page. */
@@ -51,7 +108,7 @@ export function countOf(counts: Counts, id: string): number {
   return counts[id] ?? 0;
 }
 
-export function computeStats(counts: Counts): Stats {
+export function computeStats(counts: Counts, history?: CollectionHistory): Stats {
   const total = album.stickers.length;
   let ownedUnique = 0;
   let swapsTotal = 0;
@@ -111,6 +168,10 @@ export function computeStats(counts: Counts): Stats {
     }
   }
 
+  const collectDays = history?.collectDays ?? [];
+  // Days Collecting freezes the day the album was completed; otherwise it tracks today.
+  const endKey = history?.completedOn ?? dateKey(Date.now());
+
   return {
     totalStickers: total,
     ownedUnique,
@@ -123,6 +184,8 @@ export function computeStats(counts: Counts): Stats {
     pages,
     byType,
     mostDuplicated,
+    currentStreak: longestStreak(collectDays),
+    daysCollecting: daysCollecting(collectDays[0] ?? null, endKey),
   };
 }
 
