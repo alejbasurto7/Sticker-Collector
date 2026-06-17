@@ -32,10 +32,10 @@ export default function App() {
   // Prevent iOS PWA window-drag on the header and tab bar. iOS ignores
   // touch-action:none alone; the passive:false listener is required.
   useEffect(() => {
-    const noDrag = (e: TouchEvent) => e.preventDefault();
+    const noDrag = (e: Event) => e.preventDefault();
     const opts: AddEventListenerOptions = { passive: false };
-    const header = document.querySelector('.app-header');
-    const tabbar = document.querySelector('.tabbar');
+    const header = document.querySelector<HTMLElement>('.app-header');
+    const tabbar = document.querySelector<HTMLElement>('.tabbar');
     header?.addEventListener('touchmove', noDrag, opts);
     tabbar?.addEventListener('touchmove', noDrag, opts);
     return () => {
