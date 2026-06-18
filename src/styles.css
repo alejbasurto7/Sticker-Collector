@@ -34,7 +34,11 @@ body,
 html {
   background: var(--bg);
   /* Lock the document so the page itself can never scroll or rubber-band.
-     Only the inner .content region scrolls. */
+     Only the inner .content region scrolls. We deliberately do NOT use
+     position:fixed here — in iOS standalone/PWA mode a fixed element is laid
+     out against the *visual* viewport, whose bottom sits short of the real
+     screen edge, which leaves a strip of background below the tab bar. Normal
+     flow + an exact JS-measured height (see .app) avoids both problems. */
   overflow: hidden;
 }
 
@@ -49,11 +53,6 @@ body {
   font-size: 15px;
   line-height: 1.4;
   overscroll-behavior: none;
-  /* Pin the body to the viewport. Without this iOS can still drag the whole
-     document (rubber-banding the entire screen), which is what made the layout
-     "jump and fix itself" when dragged. */
-  position: fixed;
-  inset: 0;
   overflow: hidden;
 }
 
