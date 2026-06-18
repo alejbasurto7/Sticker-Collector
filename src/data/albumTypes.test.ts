@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildAlbumFromType, editionInfoFor, type AlbumType } from './albumTypes';
+import { buildAlbumFromType, editionInfoFor, type AlbumType, activeType, templateFor } from './albumTypes';
 
 const FIXTURE: AlbumType = {
   id: 'demo',
@@ -39,5 +39,53 @@ describe('editionInfoFor', () => {
     const info = editionInfoFor(FIXTURE);
     expect(info.na).toEqual({ label: 'NA', region: 'na-region', ccCount: 0 });
     expect(info.latam.label).toBe('LATAM');
+  });
+});
+
+const liveAlbum = (variant: string, trackCC: boolean) =>
+  buildAlbumFromType(activeType, { variant, enabledOptional: trackCC ? ['CC'] : [] });
+
+describe('2026-fwc definition (regression vs. today)', () => {
+  it('has the exact section order', () => {
+    const ids = activeType.sections.map((s) => s.id);
+    expect(ids.slice(0, 2)).toEqual(['FWC-trophy', 'FWC-world']);
+    expect(ids[2]).toBe('MEX');
+    expect(ids[ids.indexOf('TUN') + 1]).toBe('CC');
+    expect(ids[ids.length - 1]).toBe('FWC-scroll');
+  });
+
+  it('reproduces base totals and per-edition CC', () => {
+    expect(liveAlbum('latam', false).stickers).toHaveLength(980);
+    expect(liveAlbum('na', true).stickers).toHaveLength(992);
+    expect(liveAlbum('latam', true).stickers).toHaveLength(994);
+  });
+
+  it('keeps the foil flags (team crest #1, all intro stickers, no CC foils)', () => {
+    const a = liveAlbum('latam', true);
+    const byId = Object.fromEntries(a.stickers.map((s) => [s.id, s]));
+    expect(byId['MEX-1'].special).toBe(true);
+    expect(byId['MEX-2'].special).toBe(false);
+    expect(byId['FWC-trophy-00'].special).toBe(true);
+    expect(byId['CC-1'].special).toBe(false);
+  });
+});
+
+describe('templateFor', () => {
+  const pageOf = (id: string) => liveAlbum('latam', true).pages.find((p) => p.id === id)!;
+  const pageOfNa = (id: string) => liveAlbum('na', true).pages.find((p) => p.id === id)!;
+
+  it('shares one country-spread instance across teams', () => {
+    expect(templateFor(pageOf('MEX'))).toBe(templateFor(pageOf('BRA')));
+    expect(templateFor(pageOf('MEX'))!.id).toBe('country-spread');
+  });
+
+  it('maps non-country sections to their templates', () => {
+    expect(templateFor(pageOf('FWC-trophy'))!.id).toBe('fwc-specials');
+    expect(templateFor(pageOf('FWC-scroll'))!.id).toBe('fwc-history');
+  });
+
+  it('uses cc-latam only at 14 stickers; NA(12) falls back to the flow grid', () => {
+    expect(templateFor(pageOf('CC'))!.id).toBe('cc-latam');
+    expect(templateFor(pageOfNa('CC'))).toBeUndefined();
   });
 });
