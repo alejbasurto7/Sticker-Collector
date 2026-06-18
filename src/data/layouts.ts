@@ -54,6 +54,7 @@ const COUNTRY_SPREAD = gridTemplate('country-spread', [
 
 // Specials (00,1,2,3,4): 00 on the left page; trophy halves (1,2), mascots (3),
 // emblem (4) on the right. 00,1,2,3 landscape; 4 portrait.
+// Non-country seed positions are rough (lifted from the old grid) and may overflow the page box until refined in the dev-only template editor; only orientation and the country spread need to be exact here.
 const FWC_SPECIALS = gridTemplate('fwc-specials', [
   { cols: 4, cells: [{ col: 1, row: 1, colSpan: 2, landscape: true }] }, // 00
   {

@@ -445,7 +445,20 @@ button {
 /* Album-spread cells are sized explicitly (width + height %) by the template, so
    the square default aspect-ratio must be cleared. */
 .album-page .cell {
+  /* Slots are positioned + sized inline (left/top/width/height as page %). The
+     centring translate lives here, NOT inline, so the :active press-scale below
+     can compose with it instead of being overridden by an inline transform. */
+  --slot-center: translate(-50%, -50%);
   aspect-ratio: auto;
+  transform: var(--slot-center);
+}
+/* Restore the tap press-scale for templated cells, composed with centring. */
+.album-page .cell:active {
+  transform: var(--slot-center) scale(0.92);
+}
+/* Locked album: no press feedback, but keep the slot centred. */
+.album-page .cell.locked:active {
+  transform: var(--slot-center);
 }
 /* Pre-printed pictures (e.g. History's non-folio team photos): a disabled,
    numberless placeholder that just reserves the slot so the real folios line up
@@ -457,7 +470,7 @@ button {
   cursor: default;
 }
 .album-page .cell.decorative:active {
-  transform: none;
+  transform: var(--slot-center);
 }
 
 /* ---------- Sticker cell ---------- */

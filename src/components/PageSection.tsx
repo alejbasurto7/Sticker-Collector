@@ -25,7 +25,6 @@ function slotStyle(placement: Placement, t: SectionTemplate): CSSProperties {
     top: `${b.topPct}%`,
     width: `${b.widthPct}%`,
     height: `${b.heightPct}%`,
-    transform: 'translate(-50%, -50%)',
   };
 }
 
