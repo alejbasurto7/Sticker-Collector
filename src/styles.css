@@ -411,10 +411,11 @@ button {
 }
 
 /* ---------- Album spread ----------
-   A section mirrors the printed album: each printed page is a grid, and pages
-   are shown side by side as spreads (a muted fold line marks the page join).
-   A country section is one 4×3 spread; History is two spreads stacked. Per-page
-   column/row counts are set inline from the layout template. */
+   A section mirrors the printed album: each printed page is an aspect-locked box
+   whose slots are absolutely positioned by the layout template, and pages show
+   side by side as spreads (a muted fold line marks the page join). The fixed
+   page aspect means every section is the country-spread height regardless of how
+   few stickers it holds — empty space is reserved, never collapsed. */
 .album-spread {
   display: flex;
   flex-direction: column;
@@ -428,19 +429,12 @@ button {
   gap: 16px;
 }
 .album-page {
-  /* Shared gap, reused below to size the landscape sticker against a column. */
-  --grid-gap: 6px;
-  /* Column count, mirrored from the inline grid template so the landscape
-     sticker can size itself to one column (see .cell.landscape). */
-  --cols: 4;
-  /* flex: 1 1 0 keeps both pages exactly equal width, so a sticker is the same
-     size on either page. */
+  /* flex: 1 1 0 keeps both pages exactly equal width; the aspect ratio (set
+     inline per template) then fixes their height, so a spread is always the
+     same height. Slots are absolutely positioned within this box. */
   flex: 1 1 0;
-  display: grid;
-  gap: var(--grid-gap);
-  /* Query container: lets the landscape sticker be sized to one column width
-     (see .cell.landscape) regardless of how wide the page renders. */
-  container-type: inline-size;
+  position: relative;
+  aspect-ratio: var(--page-aspect, 0.963);
 }
 /* The fold: a muted divider drawn between the two equal-width pages. */
 .album-fold {
@@ -448,22 +442,14 @@ button {
   width: 1px;
   background: var(--border);
 }
-/* Every sticker is the same physical foil: a portrait rectangle. */
+/* Album-spread cells are sized explicitly (width + height %) by the template, so
+   the square default aspect-ratio must be cleared. */
 .album-page .cell {
-  aspect-ratio: 5 / 7;
-}
-/* A landscape sticker (e.g. the country spread's 13) is that same foil turned
-   90°. Its height equals one column width and its width is that × 7/5, and it
-   sits in its multi-column slot centred horizontally and aligned to the top,
-   matching the printed album. */
-.album-page .cell.landscape {
-  height: calc((100cqw - (var(--cols) - 1) * var(--grid-gap)) / var(--cols));
-  aspect-ratio: 7 / 5;
-  place-self: start center;
+  aspect-ratio: auto;
 }
 /* Pre-printed pictures (e.g. History's non-folio team photos): a disabled,
-   numberless placeholder that just reserves the grid slot so the real folios
-   line up with the album. */
+   numberless placeholder that just reserves the slot so the real folios line up
+   with the album. */
 .album-page .cell.decorative {
   background: var(--bg-elev);
   border-style: dashed;

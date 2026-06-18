@@ -2,8 +2,9 @@ import { Fragment } from 'react';
 import type { CSSProperties } from 'react';
 import type { Page } from '../types';
 import { stickerById } from '../data/sampleAlbum';
-import { layoutFor } from '../data/layouts';
-import type { LayoutCell, LayoutPage } from '../data/layouts';
+import { templateFor } from '../data/layouts';
+import { slotBox, bindTemplate } from '../data/layoutGeometry';
+import type { SectionTemplate, Placement } from '../data/layoutGeometry';
 import { useCollection } from '../store/collectionStore';
 import StickerCell from './StickerCell';
 import type { AlbumFilter } from './FilterBar';
@@ -15,17 +16,22 @@ interface Props {
   onToggle: () => void;
 }
 
-/** Inline CSS-grid placement for a layout cell (1-based col/row, optional spans). */
-function placement(cell: LayoutCell): CSSProperties {
+/** Absolute placement (centre-anchored) for one slot, in page percentages. */
+function slotStyle(placement: Placement, t: SectionTemplate): CSSProperties {
+  const b = slotBox(placement.slot, t);
   return {
-    gridColumn: cell.colSpan ? `${cell.col} / span ${cell.colSpan}` : cell.col,
-    gridRow: cell.rowSpan ? `${cell.row} / span ${cell.rowSpan}` : cell.row,
+    position: 'absolute',
+    left: `${b.leftPct}%`,
+    top: `${b.topPct}%`,
+    width: `${b.widthPct}%`,
+    height: `${b.heightPct}%`,
+    transform: 'translate(-50%, -50%)',
   };
 }
 
-/** Group printed pages into spreads of two (each rendered as a side-by-side row). */
-function spreadsOf(pages: LayoutPage[]): LayoutPage[][] {
-  const spreads: LayoutPage[][] = [];
+/** Group printed pages into spreads of two (rendered side by side). */
+function spreadsOf<T>(pages: T[]): T[][] {
+  const spreads: T[][] = [];
   for (let i = 0; i < pages.length; i += 2) spreads.push(pages.slice(i, i + 2));
   return spreads;
 }
@@ -46,14 +52,13 @@ export default function PageSection({ page, filter, open, onToggle }: Props) {
     return true;
   });
 
-  // Hide pages with nothing to show under a non-"all" filter.
   if (filter !== 'all' && visibleIds.length === 0) return null;
 
-  // The printed-album layout only applies under the "all" filter (it shows every
-  // sticker in album order). Filtered views and untemplated pages keep the flow
-  // grid.
-  const layout = layoutFor(page);
-  const useSpread = Boolean(layout) && filter === 'all';
+  // The printed-album layout only applies under the "all" filter; filtered and
+  // untemplated pages keep the responsive flow grid.
+  const template = templateFor(page);
+  const useSpread = Boolean(template) && filter === 'all';
+  const bound = template ? bindTemplate(template, page.stickerIds) : null;
 
   const renderCell = (id: string, style?: CSSProperties, landscape?: boolean) => (
     <StickerCell
@@ -67,18 +72,6 @@ export default function PageSection({ page, filter, open, onToggle }: Props) {
       onRemove={() => removeOne(id)}
     />
   );
-
-  // A single layout cell: a pre-printed decorative placeholder, or a real sticker
-  // placed by its 1-based index into the page's stickerIds.
-  const renderLayoutCell = (cell: LayoutCell, key: number) => {
-    const style = placement(cell);
-    if (cell.decorative || cell.index == null) {
-      return <div key={`d${key}`} className="cell decorative" style={style} aria-hidden="true" />;
-    }
-    const id = page.stickerIds[cell.index - 1];
-    if (!id) return null;
-    return renderCell(id, style, cell.landscape);
-  };
 
   return (
     <section className="page-section">
@@ -98,34 +91,48 @@ export default function PageSection({ page, filter, open, onToggle }: Props) {
       </button>
 
       {open &&
-        (useSpread && layout ? (
+        (useSpread && template && bound ? (
           <div className="album-spread">
-            {spreadsOf(layout.pages).map((spread, si) => (
+            {spreadsOf(bound.pages).map((spread, si) => (
               <div className="album-spread-row" key={si}>
-                {spread.map((lp, pi) => (
+                {spread.map((bp, pi) => (
                   <Fragment key={pi}>
                     {pi > 0 && <div className="album-fold" aria-hidden="true" />}
                     <div
                       className="album-page"
-                      style={
-                        {
-                          gridTemplateColumns: `repeat(${lp.cols}, minmax(0, 1fr))`,
-                          gridTemplateRows: `repeat(${lp.rows}, auto)`,
-                          '--cols': lp.cols,
-                        } as CSSProperties
-                      }
+                      style={{ '--page-aspect': template.pageAspect } as CSSProperties}
                     >
-                      {lp.cells.map((cell, ci) => renderLayoutCell(cell, ci))}
+                      {bp.placements.map((pl, ci) => {
+                        const style = slotStyle(pl, template);
+                        if (pl.slot.decorative || !pl.stickerId) {
+                          return (
+                            <div
+                              key={`d${ci}`}
+                              className="cell decorative"
+                              style={style}
+                              aria-hidden="true"
+                            />
+                          );
+                        }
+                        return renderCell(
+                          pl.stickerId,
+                          style,
+                          pl.slot.orientation === 'landscape',
+                        );
+                      })}
                     </div>
                   </Fragment>
                 ))}
               </div>
             ))}
+            {bound.unplaced.length > 0 && (
+              <div className="sticker-grid">
+                {bound.unplaced.map((id) => renderCell(id))}
+              </div>
+            )}
           </div>
         ) : (
-          <div className="sticker-grid">
-            {visibleIds.map((id) => renderCell(id))}
-          </div>
+          <div className="sticker-grid">{visibleIds.map((id) => renderCell(id))}</div>
         ))}
     </section>
   );
