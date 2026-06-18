@@ -13,6 +13,22 @@ import { templatesToSource } from './serializeTemplates';
 
 const DRAFT_KEY = 'figuritas-template-draft-v1';
 
+// Readable button styling — the app's global button CSS leaves plain buttons as
+// near-white text on the browser's default light button, i.e. invisible on the
+// editor's dark background. BTN_SM is the compact variant for the in-page buttons.
+const BTN: CSSProperties = {
+  background: '#223047',
+  color: '#e7ecf3',
+  border: '1px solid #3a4a60',
+  borderRadius: 6,
+  padding: '5px 10px',
+  fontSize: 13,
+  fontWeight: 600,
+  cursor: 'pointer',
+  whiteSpace: 'nowrap',
+};
+const BTN_SM: CSSProperties = { ...BTN, padding: '3px 7px', fontSize: 11 };
+
 /** Deep clone via JSON — templates are plain data. */
 const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 
@@ -201,8 +217,8 @@ export default function TemplateEditor() {
             ))}
           </select>
         </label>
-        <button onClick={exportSource}>Export (copy + download)</button>
-        <button onClick={resetToSeeds}>Reset to seeds</button>
+        <button style={BTN} onClick={exportSource}>Export (copy + download)</button>
+        <button style={BTN} onClick={resetToSeeds}>Reset to seeds</button>
       </div>
 
       <p style={{ opacity: 0.7, fontSize: 13, maxWidth: 640 }}>
@@ -244,7 +260,7 @@ export default function TemplateEditor() {
             onChange={(e) => setAspect(Number(e.target.value))}
           />
         </label>
-        <button onClick={addPage}>+ page</button>
+        <button style={BTN} onClick={addPage}>+ page</button>
         {unplacedCount > 0 && (
           <span style={{ color: '#f0b450' }}>
             {unplacedCount} sticker(s) unplaced — add slots to place them
@@ -306,13 +322,14 @@ export default function TemplateEditor() {
             <div
               style={{ position: 'absolute', bottom: 4, left: 4, display: 'flex', gap: 4 }}
             >
-              <button onPointerDown={(e) => e.stopPropagation()} onClick={() => addSlot(pageIdx, false)}>
+              <button style={BTN_SM} onPointerDown={(e) => e.stopPropagation()} onClick={() => addSlot(pageIdx, false)}>
                 + sticker
               </button>
-              <button onPointerDown={(e) => e.stopPropagation()} onClick={() => addSlot(pageIdx, true)}>
+              <button style={BTN_SM} onPointerDown={(e) => e.stopPropagation()} onClick={() => addSlot(pageIdx, true)}>
                 + photo
               </button>
               <button
+                style={BTN_SM}
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={() => removePage(pageIdx)}
               >
