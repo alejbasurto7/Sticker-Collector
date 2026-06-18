@@ -979,6 +979,83 @@ button {
   font-size: 11px;
   line-height: 1;
 }
+
+/* ---------- Settings dialog layout ---------- */
+.settings-section {
+  margin-bottom: 20px;
+}
+.settings-section:first-of-type {
+  margin-top: 16px;
+}
+.settings-section:last-of-type {
+  margin-bottom: 0;
+}
+.settings-heading {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-dim);
+}
+.settings-heading.danger-heading {
+  color: var(--red);
+}
+.settings-field {
+  margin-bottom: 12px;
+}
+.settings-field-label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+.settings-input,
+.settings-select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  background: var(--bg);
+  color: var(--text);
+}
+/* New Album + Import list share one row */
+.settings-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+/* The two editions sit side-by-side so they read as a comparison */
+.edition-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+.edition-grid .edition-card {
+  margin-bottom: 0;
+  text-align: left;
+  width: 100%;
+}
+.edition-grid .edition-card .swap-top {
+  align-items: flex-start;
+}
+.edition-grid .edition-card .swap-name {
+  font-size: 15px;
+}
+.edition-grid .edition-summary {
+  flex-direction: column;
+  gap: 4px;
+  color: var(--text-dim);
+}
+.settings-version {
+  margin: 14px 0 0;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
 textarea,
 input[type='text'] {
   width: 100%;

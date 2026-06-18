@@ -59,20 +59,58 @@ export default function EditionDialog({ onClose }: Props) {
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h2>Settings</h2>
 
-        <button type="button" className="btn full" onClick={() => createAlbum()} style={{ marginBottom: '1rem' }}>
-          ➕ New Album
-        </button>
+        {/* ---------- Album ---------- */}
+        <section className="settings-section">
+          <h3 className="settings-heading">Album</h3>
 
-        <button
-          type="button"
-          className="btn full"
-          onClick={() => setImportOpen(true)}
-          style={{ marginBottom: '1rem' }}
-        >
-          ⬆ Import list
-        </button>
+          {albums.length > 1 && (
+            <div className="settings-field">
+              <label htmlFor="album-selector" className="settings-field-label">
+                Current album
+              </label>
+              <select
+                id="album-selector"
+                className="settings-select"
+                value={activeAlbumId}
+                onChange={(e) => switchAlbum(e.target.value)}
+              >
+                {albums.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.albumName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
-        <div style={{ marginBottom: '1rem' }}>
+          <div className="settings-field">
+            <label htmlFor="album-name-input" className="settings-field-label">
+              Album name
+            </label>
+            <input
+              id="album-name-input"
+              type="text"
+              className="settings-input"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={handleNameBlur}
+              onKeyDown={handleNameKeyDown}
+            />
+          </div>
+
+          <div className="settings-actions">
+            <button type="button" className="btn full" onClick={() => createAlbum()}>
+              ➕ New Album
+            </button>
+            <button type="button" className="btn full" onClick={() => setImportOpen(true)}>
+              ⬆ Import list
+            </button>
+          </div>
+        </section>
+
+        {/* ---------- Appearance ---------- */}
+        <section className="settings-section">
+          <h3 className="settings-heading">Appearance</h3>
           <button
             type="button"
             className="setting-toggle"
@@ -86,68 +124,11 @@ export default function EditionDialog({ onClose }: Props) {
               <span className="knob">{theme === 'light' ? '☀️' : '🌙'}</span>
             </span>
           </button>
-        </div>
+        </section>
 
-        {albums.length > 1 && (
-          <div style={{ marginBottom: '1rem' }}>
-            <label
-              htmlFor="album-selector"
-              style={{ display: 'block', fontWeight: 600, marginBottom: '0.35rem', fontSize: '0.9rem' }}
-            >
-              Current album
-            </label>
-            <select
-              id="album-selector"
-              value={activeAlbumId}
-              onChange={(e) => switchAlbum(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.5rem 0.75rem',
-                border: '1.5px solid var(--border)',
-                borderRadius: '8px',
-                fontSize: '1rem',
-                background: 'var(--surface)',
-                color: 'var(--text)',
-                boxSizing: 'border-box',
-              }}
-            >
-              {albums.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.albumName}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        <div style={{ marginBottom: '1rem' }}>
-          <label
-            htmlFor="album-name-input"
-            style={{ display: 'block', fontWeight: 600, marginBottom: '0.35rem', fontSize: '0.9rem' }}
-          >
-            Album name
-          </label>
-          <input
-            id="album-name-input"
-            type="text"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onBlur={handleNameBlur}
-            onKeyDown={handleNameKeyDown}
-            style={{
-              width: '100%',
-              padding: '0.5rem 0.75rem',
-              border: '1.5px solid var(--border)',
-              borderRadius: '8px',
-              fontSize: '1rem',
-              background: 'var(--surface)',
-              color: 'var(--text)',
-              boxSizing: 'border-box',
-            }}
-          />
-        </div>
-
-        <div style={{ marginBottom: '1rem' }}>
+        {/* ---------- Coca-Cola tracking ---------- */}
+        <section className="settings-section">
+          <h3 className="settings-heading">Coca-Cola tracking</h3>
           <button
             type="button"
             className="setting-toggle"
@@ -162,55 +143,54 @@ export default function EditionDialog({ onClose }: Props) {
               <span className="knob" />
             </span>
           </button>
-        </div>
 
-        <h3 style={{ margin: '0.5rem 0 0.5rem', fontSize: '0.9rem', fontWeight: 600 }}>Album edition</h3>
-        <p className="modal-sub">
-          {trackCC
-            ? 'The editions differ only in the Coca-Cola page size. Switching keeps all your existing stickers — it just shows or hides the extra slots.'
-            : 'Turn on Coca-Cola tracking above to choose between the NORAM and LATAM editions.'}
-        </p>
+          <p className="modal-sub" style={{ margin: '12px 0 0' }}>
+            {trackCC
+              ? 'The editions differ only in the Coca-Cola page size. Switching keeps all your existing stickers — it just shows or hides the extra slots.'
+              : 'Turn on Coca-Cola tracking above to choose between the NORAM and LATAM editions.'}
+          </p>
 
-        {ORDER.map((key) => {
-          const info = EDITION_INFO[key];
-          const selected = edition === key;
-          return (
-            <button
-              key={key}
-              className="swap-card"
-              disabled={!trackCC}
-              style={{
-                width: '100%',
-                textAlign: 'left',
-                borderColor: selected && trackCC ? 'var(--green)' : 'var(--border)',
-                opacity: trackCC ? 1 : 0.45,
-                cursor: trackCC ? 'pointer' : 'not-allowed',
-              }}
-              onClick={() => {
-                setEdition(key);
-                onClose();
-              }}
-            >
-              <div className="swap-top">
-                <span className="swap-name">{info.label}</span>
-                {selected && trackCC && <span className="pill open">current</span>}
-              </div>
-              <div className="swap-summary">
-                <span>{info.region}</span>
-                <span>Coca-Cola: {info.ccCount} stickers</span>
-              </div>
-            </button>
-          );
-        })}
+          {trackCC && (
+            <div className="edition-grid">
+              {ORDER.map((key) => {
+                const info = EDITION_INFO[key];
+                const selected = edition === key;
+                return (
+                  <button
+                    key={key}
+                    className="swap-card edition-card"
+                    style={{ borderColor: selected ? 'var(--green)' : undefined }}
+                    onClick={() => {
+                      setEdition(key);
+                      onClose();
+                    }}
+                  >
+                    <div className="swap-top">
+                      <span className="swap-name">{info.label}</span>
+                      {selected && <span className="pill open">current</span>}
+                    </div>
+                    <div className="swap-summary edition-summary">
+                      <span>{info.region}</span>
+                      <span>Coca-Cola: {info.ccCount} stickers</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </section>
 
-        <h3 style={{ margin: '1.25rem 0 0.5rem', fontSize: '0.9rem', fontWeight: 600 }}>Danger zone</h3>
-        <button
-          type="button"
-          className="btn danger full"
-          onClick={() => setConfirmingDelete(true)}
-        >
-          🗑️ Delete album
-        </button>
+        {/* ---------- Danger zone ---------- */}
+        <section className="settings-section">
+          <h3 className="settings-heading danger-heading">Danger zone</h3>
+          <button
+            type="button"
+            className="btn danger full"
+            onClick={() => setConfirmingDelete(true)}
+          >
+            🗑️ Delete album
+          </button>
+        </section>
 
         <div className="btn-row">
           <button className="btn full" onClick={onClose}>
@@ -218,17 +198,7 @@ export default function EditionDialog({ onClose }: Props) {
           </button>
         </div>
 
-        <p
-          style={{
-            marginTop: '1rem',
-            marginBottom: 0,
-            textAlign: 'center',
-            fontSize: '0.72rem',
-            color: 'var(--text-dim)',
-          }}
-        >
-          {VERSION_LABEL}
-        </p>
+        <p className="settings-version">{VERSION_LABEL}</p>
       </div>
 
       {confirmingDelete && (
