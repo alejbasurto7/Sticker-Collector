@@ -77,6 +77,11 @@ export function bindTemplate(t: SectionTemplate, stickerIds: string[]): BoundTem
   return { pages, unplaced: stickerIds.slice(cursor) };
 }
 
+/** Number of real (non-decorative) slots across a template's pages. */
+export function realSlotCount(t: SectionTemplate): number {
+  return t.pages.reduce((n, p) => n + p.slots.filter((s) => !s.decorative).length, 0);
+}
+
 export function clamp(n: number, lo: number, hi: number): number {
   return n < lo ? lo : n > hi ? hi : n;
 }

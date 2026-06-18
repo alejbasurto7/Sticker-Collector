@@ -4,6 +4,7 @@ import {
   bindTemplate,
   gridTemplate,
   clientToPagePercent,
+  realSlotCount,
   STANDARD_PAGE_ASPECT,
   STANDARD_STICKER_WIDTH_PCT,
   type SectionTemplate,
@@ -97,5 +98,18 @@ describe('clientToPagePercent', () => {
     expect(clientToPagePercent(300, 600, rect)).toEqual({ x: 50, y: 50 });
     expect(clientToPagePercent(0, 0, rect)).toEqual({ x: 0, y: 0 }); // clamped
     expect(clientToPagePercent(9999, 9999, rect)).toEqual({ x: 100, y: 100 }); // clamped
+  });
+});
+
+describe('realSlotCount', () => {
+  it('counts non-decorative slots across pages', () => {
+    const t = {
+      id: 'x', pageAspect: 1, stickerWidthPct: 20,
+      pages: [
+        { slots: [{ x: 0, y: 0, orientation: 'portrait' as const }, { x: 0, y: 0, orientation: 'landscape' as const, decorative: true }] },
+        { slots: [{ x: 0, y: 0, orientation: 'portrait' as const }] },
+      ],
+    };
+    expect(realSlotCount(t)).toBe(2);
   });
 });
