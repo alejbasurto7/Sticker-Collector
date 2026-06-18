@@ -100,6 +100,38 @@ export default function TemplateEditor() {
       t.pages[pageIdx].slots.splice(slotIdx, 1);
     });
 
+  const addSlot = (pageIdx: number, decorative: boolean) =>
+    updateTemplate((t) => {
+      t.pages[pageIdx].slots.push({
+        x: 50,
+        y: 50,
+        orientation: decorative ? 'landscape' : 'portrait',
+        ...(decorative ? { decorative: true } : {}),
+      });
+    });
+
+  const addPage = () =>
+    updateTemplate((t) => {
+      t.pages.push({ slots: [] });
+    });
+
+  const removePage = (pageIdx: number) =>
+    updateTemplate((t) => {
+      if (t.pages.length > 1) t.pages.splice(pageIdx, 1);
+    });
+
+  const setWidth = (v: number) =>
+    updateTemplate((t) => {
+      t.stickerWidthPct = v;
+    });
+
+  const setAspect = (v: number) =>
+    updateTemplate((t) => {
+      t.pageAspect = v;
+    });
+
+  const unplacedCount = bound.unplaced.length;
+
   const resetToSeeds = () => commit(clone(TEMPLATES));
 
   const exportSource = async () => {
@@ -180,6 +212,46 @@ export default function TemplateEditor() {
         TEMPLATES literal to paste into <code>src/data/layouts.ts</code>.
       </p>
 
+      <div
+        style={{
+          display: 'flex',
+          gap: 14,
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          marginBottom: 12,
+          fontSize: 13,
+        }}
+      >
+        <label>
+          Sticker size: {template.stickerWidthPct.toFixed(1)}%{' '}
+          <input
+            type="range"
+            min={10}
+            max={40}
+            step={0.25}
+            value={template.stickerWidthPct}
+            onChange={(e) => setWidth(Number(e.target.value))}
+          />
+        </label>
+        <label>
+          Page aspect: {template.pageAspect.toFixed(3)}{' '}
+          <input
+            type="range"
+            min={0.6}
+            max={1.4}
+            step={0.001}
+            value={template.pageAspect}
+            onChange={(e) => setAspect(Number(e.target.value))}
+          />
+        </label>
+        <button onClick={addPage}>+ page</button>
+        {unplacedCount > 0 && (
+          <span style={{ color: '#f0b450' }}>
+            {unplacedCount} sticker(s) unplaced — add slots to place them
+          </span>
+        )}
+      </div>
+
       <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
         {template.pages.map((p, pageIdx) => (
           <div
@@ -231,6 +303,22 @@ export default function TemplateEditor() {
                 </button>
               </div>
             ))}
+            <div
+              style={{ position: 'absolute', bottom: 4, left: 4, display: 'flex', gap: 4 }}
+            >
+              <button onPointerDown={(e) => e.stopPropagation()} onClick={() => addSlot(pageIdx, false)}>
+                + sticker
+              </button>
+              <button onPointerDown={(e) => e.stopPropagation()} onClick={() => addSlot(pageIdx, true)}>
+                + photo
+              </button>
+              <button
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() => removePage(pageIdx)}
+              >
+                ✕ page
+              </button>
+            </div>
           </div>
         ))}
       </div>
