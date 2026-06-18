@@ -20,9 +20,10 @@ export default function AlbumTypeBar({
   types, editingTypeId, previewVariant, onSelectType, onNewType,
   onPreviewVariant, onUpdateType, onExport, onResetAll, onResetType,
 }: AlbumTypeBarProps) {
-  const type = types[editingTypeId];
   const [newId, setNewId] = useState('');
   const [newName, setNewName] = useState('');
+  const type = types[editingTypeId];
+  if (!type) return null; // editingTypeId is always a live id in practice; guard hardens the deref
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
