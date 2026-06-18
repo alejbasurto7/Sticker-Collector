@@ -411,24 +411,32 @@ button {
 }
 
 /* ---------- Album spread ----------
-   A country section mirrors the printed album: two 4×3 pages side by side
-   (stickers 1–10 left, 11–20 right) so the user can eye the real spread while
-   tapping. A muted gutter line marks the page fold between the two halves. */
+   A section mirrors the printed album: each printed page is a grid, and pages
+   are shown side by side as spreads (a muted fold line marks the page join).
+   A country section is one 4×3 spread; History is two spreads stacked. Per-page
+   column/row counts are set inline from the layout template. */
 .album-spread {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 6px 14px 16px;
+}
+/* One spread: two printed pages side by side with the fold between them. */
+.album-spread-row {
   display: flex;
   align-items: flex-start;
   gap: 16px;
-  padding: 6px 14px 16px;
 }
 .album-page {
   /* Shared gap, reused below to size the landscape sticker against a column. */
   --grid-gap: 6px;
+  /* Column count, mirrored from the inline grid template so the landscape
+     sticker can size itself to one column (see .cell.landscape). */
+  --cols: 4;
   /* flex: 1 1 0 keeps both pages exactly equal width, so a sticker is the same
      size on either page. */
   flex: 1 1 0;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  grid-template-rows: repeat(3, auto);
   gap: var(--grid-gap);
   /* Query container: lets the landscape sticker be sized to one column width
      (see .cell.landscape) regardless of how wide the page renders. */
@@ -444,14 +452,26 @@ button {
 .album-page .cell {
   aspect-ratio: 5 / 7;
 }
-/* Sticker 13 is that same foil turned 90°. It keeps the exact size of a
-   portrait sticker — its height equals one column width and its width is that
-   × 7/5 — and sits in its two-column slot centred horizontally and aligned to
-   the top, matching the printed album. */
+/* A landscape sticker (e.g. the country spread's 13) is that same foil turned
+   90°. Its height equals one column width and its width is that × 7/5, and it
+   sits in its multi-column slot centred horizontally and aligned to the top,
+   matching the printed album. */
 .album-page .cell.landscape {
-  height: calc((100cqw - 3 * var(--grid-gap)) / 4);
+  height: calc((100cqw - (var(--cols) - 1) * var(--grid-gap)) / var(--cols));
   aspect-ratio: 7 / 5;
   place-self: start center;
+}
+/* Pre-printed pictures (e.g. History's non-folio team photos): a disabled,
+   numberless placeholder that just reserves the grid slot so the real folios
+   line up with the album. */
+.album-page .cell.decorative {
+  background: var(--bg-elev);
+  border-style: dashed;
+  opacity: 0.45;
+  cursor: default;
+}
+.album-page .cell.decorative:active {
+  transform: none;
 }
 
 /* ---------- Sticker cell ---------- */

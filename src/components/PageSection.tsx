@@ -1,6 +1,9 @@
+import { Fragment } from 'react';
 import type { CSSProperties } from 'react';
 import type { Page } from '../types';
 import { stickerById } from '../data/sampleAlbum';
+import { layoutFor } from '../data/layouts';
+import type { LayoutCell, LayoutPage } from '../data/layouts';
 import { useCollection } from '../store/collectionStore';
 import StickerCell from './StickerCell';
 import type { AlbumFilter } from './FilterBar';
@@ -12,45 +15,19 @@ interface Props {
   onToggle: () => void;
 }
 
-/**
- * Grid placement for a country spread, mirroring the printed album so users can
- * eye the real pages against the app while tapping. A team page is two 4×3 pages
- * side by side: stickers 1–10 on the left, 11–20 on the right. Index = position
- * (0-based) within each page; `span` marks the landscape sticker 13.
- */
-type Cell = { col: number; row: number; span?: number };
-
-const LEFT_LAYOUT: Cell[] = [
-  { col: 3, row: 1 }, // 1
-  { col: 4, row: 1 }, // 2
-  { col: 1, row: 2 }, // 3
-  { col: 2, row: 2 }, // 4
-  { col: 3, row: 2 }, // 5
-  { col: 4, row: 2 }, // 6
-  { col: 1, row: 3 }, // 7
-  { col: 2, row: 3 }, // 8
-  { col: 3, row: 3 }, // 9
-  { col: 4, row: 3 }, // 10
-];
-
-const RIGHT_LAYOUT: Cell[] = [
-  { col: 1, row: 1 }, // 11
-  { col: 2, row: 1 }, // 12
-  { col: 3, row: 1, span: 2 }, // 13 — landscape, spans columns 3–4
-  { col: 1, row: 2 }, // 14
-  { col: 2, row: 2 }, // 15
-  { col: 3, row: 2 }, // 16
-  { col: 4, row: 2 }, // 17
-  { col: 2, row: 3 }, // 18
-  { col: 3, row: 3 }, // 19
-  { col: 4, row: 3 }, // 20
-];
-
-function placement(cell: Cell): CSSProperties {
+/** Inline CSS-grid placement for a layout cell (1-based col/row, optional spans). */
+function placement(cell: LayoutCell): CSSProperties {
   return {
-    gridColumn: cell.span ? `${cell.col} / span ${cell.span}` : cell.col,
-    gridRow: cell.row,
+    gridColumn: cell.colSpan ? `${cell.col} / span ${cell.colSpan}` : cell.col,
+    gridRow: cell.rowSpan ? `${cell.row} / span ${cell.rowSpan}` : cell.row,
   };
+}
+
+/** Group printed pages into spreads of two (each rendered as a side-by-side row). */
+function spreadsOf(pages: LayoutPage[]): LayoutPage[][] {
+  const spreads: LayoutPage[][] = [];
+  for (let i = 0; i < pages.length; i += 2) spreads.push(pages.slice(i, i + 2));
+  return spreads;
 }
 
 export default function PageSection({ page, filter, open, onToggle }: Props) {
@@ -72,9 +49,11 @@ export default function PageSection({ page, filter, open, onToggle }: Props) {
   // Hide pages with nothing to show under a non-"all" filter.
   if (filter !== 'all' && visibleIds.length === 0) return null;
 
-  // The printed-album spread only applies to full country pages (20 stickers in
-  // album order). Filtered views and intro/extra pages keep the flow grid.
-  const useSpread = page.type === 'team' && filter === 'all';
+  // The printed-album layout only applies under the "all" filter (it shows every
+  // sticker in album order). Filtered views and untemplated pages keep the flow
+  // grid.
+  const layout = layoutFor(page);
+  const useSpread = Boolean(layout) && filter === 'all';
 
   const renderCell = (id: string, style?: CSSProperties, landscape?: boolean) => (
     <StickerCell
@@ -89,13 +68,21 @@ export default function PageSection({ page, filter, open, onToggle }: Props) {
     />
   );
 
+  // A single layout cell: a pre-printed decorative placeholder, or a real sticker
+  // placed by its 1-based index into the page's stickerIds.
+  const renderLayoutCell = (cell: LayoutCell, key: number) => {
+    const style = placement(cell);
+    if (cell.decorative || cell.index == null) {
+      return <div key={`d${key}`} className="cell decorative" style={style} aria-hidden="true" />;
+    }
+    const id = page.stickerIds[cell.index - 1];
+    if (!id) return null;
+    return renderCell(id, style, cell.landscape);
+  };
+
   return (
     <section className="page-section">
-      <button
-        className="page-head"
-        onClick={onToggle}
-        aria-expanded={open}
-      >
+      <button className="page-head" onClick={onToggle} aria-expanded={open}>
         <span className="emoji">{page.emoji}</span>
         <span className="titles">
           <div className="code">{page.code}</div>
@@ -111,20 +98,29 @@ export default function PageSection({ page, filter, open, onToggle }: Props) {
       </button>
 
       {open &&
-        (useSpread ? (
+        (useSpread && layout ? (
           <div className="album-spread">
-            <div className="album-page left">
-              {visibleIds
-                .slice(0, 10)
-                .map((id, i) => renderCell(id, placement(LEFT_LAYOUT[i])))}
-            </div>
-            <div className="album-fold" aria-hidden="true" />
-            <div className="album-page right">
-              {visibleIds.slice(10).map((id, i) => {
-                const cell = RIGHT_LAYOUT[i];
-                return renderCell(id, placement(cell), Boolean(cell.span));
-              })}
-            </div>
+            {spreadsOf(layout.pages).map((spread, si) => (
+              <div className="album-spread-row" key={si}>
+                {spread.map((lp, pi) => (
+                  <Fragment key={pi}>
+                    {pi > 0 && <div className="album-fold" aria-hidden="true" />}
+                    <div
+                      className="album-page"
+                      style={
+                        {
+                          gridTemplateColumns: `repeat(${lp.cols}, minmax(0, 1fr))`,
+                          gridTemplateRows: `repeat(${lp.rows}, auto)`,
+                          '--cols': lp.cols,
+                        } as CSSProperties
+                      }
+                    >
+                      {lp.cells.map((cell, ci) => renderLayoutCell(cell, ci))}
+                    </div>
+                  </Fragment>
+                ))}
+              </div>
+            ))}
           </div>
         ) : (
           <div className="sticker-grid">
