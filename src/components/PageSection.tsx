@@ -114,6 +114,7 @@ export default function PageSection({ page, filter }: Props) {
                 .slice(0, 10)
                 .map((id, i) => renderCell(id, placement(LEFT_LAYOUT[i])))}
             </div>
+            <div className="album-fold" aria-hidden="true" />
             <div className="album-page right">
               {visibleIds.slice(10).map((id, i) => {
                 const cell = RIGHT_LAYOUT[i];
