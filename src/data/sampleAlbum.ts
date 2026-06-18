@@ -99,11 +99,17 @@ const TEAMS: TeamDef[] = [
 
 const TEAM_STICKER_COUNT = 20;
 
+/** The FWC intro page that is displayed as the very last section of the album. */
+const HISTORY_PAGE_ID = 'FWC-scroll';
+
+/** The team after which the Coca-Cola extras section is inserted. */
+const CC_AFTER_TEAM = 'TUN';
+
 function buildAlbum(ccCount: number, trackCC: boolean): Album {
   const pages: Page[] = [];
   const stickers: Sticker[] = [];
 
-  for (const intro of INTRO_PAGES) {
+  const addIntroPage = (intro: IntroDef) => {
     const stickerIds: string[] = [];
     for (const number of intro.numbers) {
       const id = `${intro.id}-${number}`;
@@ -120,6 +126,34 @@ function buildAlbum(ccCount: number, trackCC: boolean): Album {
       type: 'intro',
       stickerIds,
     });
+  };
+
+  // Coca-Cola extras section (size depends on edition). Only included when the
+  // user is tracking the section; otherwise the album has no CC stickers at all
+  // (excluded from totals, filters, swaps, etc.).
+  const addCcPage = () => {
+    if (!trackCC) return;
+    const ccIds: string[] = [];
+    for (let n = 1; n <= ccCount; n++) {
+      const number = String(n);
+      const id = `CC-${number}`;
+      stickers.push({ id, number, pageId: 'CC', special: false });
+      ccIds.push(id);
+    }
+    pages.push({
+      id: 'CC',
+      code: 'CC',
+      emoji: CC_EMOJI,
+      title: 'Coca-Cola',
+      type: 'extra',
+      stickerIds: ccIds,
+    });
+  };
+
+  // Intro pages, except History which moves to the very end of the album.
+  for (const intro of INTRO_PAGES) {
+    if (intro.id === HISTORY_PAGE_ID) continue;
+    addIntroPage(intro);
   }
 
   for (const team of TEAMS) {
@@ -140,28 +174,16 @@ function buildAlbum(ccCount: number, trackCC: boolean): Album {
       type: 'team',
       stickerIds,
     });
+
+    // The Coca-Cola extras section sits right after Tunisia.
+    if (team.code === CC_AFTER_TEAM) {
+      addCcPage();
+    }
   }
 
-  // Coca-Cola extras section (size depends on edition), shown after the teams.
-  // Only included when the user is tracking the section; otherwise the album has
-  // no CC stickers at all (excluded from totals, filters, swaps, etc.).
-  if (trackCC) {
-    const ccIds: string[] = [];
-    for (let n = 1; n <= ccCount; n++) {
-      const number = String(n);
-      const id = `CC-${number}`;
-      stickers.push({ id, number, pageId: 'CC', special: false });
-      ccIds.push(id);
-    }
-    pages.push({
-      id: 'CC',
-      code: 'CC',
-      emoji: CC_EMOJI,
-      title: 'Coca-Cola',
-      type: 'extra',
-      stickerIds: ccIds,
-    });
-  }
+  // FWC History is the very last section of the album.
+  const historyPage = INTRO_PAGES.find((p) => p.id === HISTORY_PAGE_ID);
+  if (historyPage) addIntroPage(historyPage);
 
   return { id: 'usa-mex-can-26', name: 'Usa Mex Can 26', pages, stickers };
 }
