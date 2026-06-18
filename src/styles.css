@@ -33,6 +33,9 @@ body,
 
 html {
   background: var(--bg);
+  /* Lock the document so the page itself can never scroll or rubber-band.
+     Only the inner .content region scrolls. */
+  overflow: hidden;
 }
 
 body {
@@ -45,7 +48,13 @@ body {
     Roboto, Helvetica, Arial, sans-serif;
   font-size: 15px;
   line-height: 1.4;
-  overscroll-behavior-y: none;
+  overscroll-behavior: none;
+  /* Pin the body to the viewport. Without this iOS can still drag the whole
+     document (rubber-banding the entire screen), which is what made the layout
+     "jump and fix itself" when dragged. */
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
 }
 
 button {
@@ -56,17 +65,18 @@ button {
 
 /* ---------- App shell ---------- */
 .app {
-  /* Size the shell to the viewport with a normal-flow flex column rather than
-     position:fixed. In iOS standalone/PWA mode a fixed element is laid out
-     against the *visual* viewport, whose bottom sits short of the real screen
-     edge — so inset:0 / bottom:0 leaves a tall strip of body background below
-     the tab bar. Normal flow follows the layout viewport (which the <body>
-     fills edge to edge), so the tab bar reaches the true bottom. 100vh is the
-     fallback for older iOS; 100dvh is the exact dynamic-viewport height. */
+  /* Size the shell to the *visible* viewport. We drive --app-height from JS
+     (window.visualViewport.height — see main.tsx) because iOS Safari's 100dvh
+     is computed lazily: at load it can resolve a few px short, leaving a white
+     gap below the tab bar that only disappears once a scroll/resize fires (the
+     "drag the screen and it snaps back" behaviour). The JS value is always
+     exact and updates on every viewport change. 100vh/100dvh are the fallbacks
+     for browsers without custom-property or visualViewport support. */
   display: flex;
   flex-direction: column;
   height: 100vh;
   height: 100dvh;
+  height: var(--app-height, 100dvh);
   max-width: 720px;
   margin: 0 auto;
   overflow: hidden;
