@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { Page } from '../types';
 import { stickerById } from '../data/sampleAlbum';
@@ -9,6 +8,8 @@ import type { AlbumFilter } from './FilterBar';
 interface Props {
   page: Page;
   filter: AlbumFilter;
+  open: boolean;
+  onToggle: () => void;
 }
 
 /**
@@ -52,8 +53,7 @@ function placement(cell: Cell): CSSProperties {
   };
 }
 
-export default function PageSection({ page, filter }: Props) {
-  const [open, setOpen] = useState(false);
+export default function PageSection({ page, filter, open, onToggle }: Props) {
   const counts = useCollection((s) => s.counts);
   const addOne = useCollection((s) => s.addOne);
   const removeOne = useCollection((s) => s.removeOne);
@@ -91,7 +91,11 @@ export default function PageSection({ page, filter }: Props) {
 
   return (
     <section className="page-section">
-      <button className="page-head" onClick={() => setOpen((o) => !o)}>
+      <button
+        className="page-head"
+        onClick={onToggle}
+        aria-expanded={open}
+      >
         <span className="emoji">{page.emoji}</span>
         <span className="titles">
           <div className="code">{page.code}</div>
