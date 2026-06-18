@@ -13,18 +13,18 @@ polyfillCountryFlagEmojis(
   `${import.meta.env.BASE_URL}TwemojiCountryFlags.woff2`,
 );
 
-// Keep the app shell exactly as tall as the visible viewport.
-// iOS Safari's `100dvh` is resolved lazily — at load it can land a few px short
-// and only corrects after a scroll/resize, leaving a white gap below the tab
-// bar until you drag the screen. visualViewport.height (innerHeight fallback)
-// is always the true visible height, so we mirror it into a CSS variable and
-// refresh it on every viewport change.
+// Keep the app shell exactly as tall as the screen.
+// iOS resolves `100dvh`/`100vh` unreliably: in standalone/PWA mode it can land
+// shorter than the real screen (leaving a gap below the tab bar), and in Safari
+// it's computed lazily so a gap lingers until a scroll/resize fires (the "drag
+// and it snaps back" behaviour). window.innerHeight is always the true visible
+// height — and, unlike visualViewport.height, it does NOT shrink when the
+// on-screen keyboard appears, so the shell won't jump while typing. We mirror it
+// into a CSS variable and refresh it on every viewport change.
 function setAppHeight() {
-  const h = window.visualViewport?.height ?? window.innerHeight;
-  document.documentElement.style.setProperty('--app-height', `${h}px`);
+  document.documentElement.style.setProperty('--app-height', `${window.innerHeight}px`);
 }
 setAppHeight();
-window.visualViewport?.addEventListener('resize', setAppHeight);
 window.addEventListener('resize', setAppHeight);
 window.addEventListener('orientationchange', setAppHeight);
 
