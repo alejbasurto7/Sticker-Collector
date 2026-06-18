@@ -1,4 +1,5 @@
 import { useRef } from 'react';
+import type { CSSProperties } from 'react';
 import type { Sticker } from '../types';
 
 interface Props {
@@ -6,13 +7,25 @@ interface Props {
   count: number;
   /** When true the album is locked: the cell is read-only and ignores taps. */
   locked?: boolean;
+  /** Landscape (wide) cell — used by the album-spread layout for sticker 13. */
+  landscape?: boolean;
+  /** Inline grid placement, supplied by the album-spread layout. */
+  style?: CSSProperties;
   onAdd: () => void;
   onRemove: () => void;
 }
 
 const LONG_PRESS_MS = 450;
 
-export default function StickerCell({ sticker, count, locked = false, onAdd, onRemove }: Props) {
+export default function StickerCell({
+  sticker,
+  count,
+  locked = false,
+  landscape = false,
+  style,
+  onAdd,
+  onRemove,
+}: Props) {
   const timer = useRef<number | null>(null);
   // Set when a long-press fires so the click the browser still synthesizes on
   // release doesn't also add a sticker.
@@ -61,10 +74,12 @@ export default function StickerCell({ sticker, count, locked = false, onAdd, onR
   if (owned) cls.push('owned');
   if (sticker.special) cls.push('special');
   if (locked) cls.push('locked');
+  if (landscape) cls.push('landscape');
 
   return (
     <div
       className={cls.join(' ')}
+      style={style}
       onClick={onClick}
       onPointerDown={onPointerDown}
       onPointerUp={endPress}

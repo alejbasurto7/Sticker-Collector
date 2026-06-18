@@ -369,6 +369,39 @@ button {
   padding: 4px 14px 16px;
 }
 
+/* ---------- Album spread ----------
+   A country section mirrors the printed album: two 4×3 pages side by side
+   (stickers 1–10 left, 11–20 right) so the user can eye the real spread while
+   tapping. A muted gutter line marks the page fold between the two halves. */
+.album-spread {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 6px 14px 16px;
+}
+.album-page {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(3, auto);
+  gap: 6px;
+}
+/* The fold: a muted divider between the left and right pages. */
+.album-page.left {
+  padding-right: 16px;
+  border-right: 1px solid var(--border);
+}
+/* Stickers are portrait rectangles, like the real foils. */
+.album-page .cell {
+  aspect-ratio: 5 / 7;
+}
+/* Sticker 13 is the same foil turned landscape, spanning two columns; let it
+   stretch to the row height set by its portrait neighbours. */
+.album-page .cell.landscape {
+  aspect-ratio: auto;
+  align-self: stretch;
+}
+
 /* ---------- Sticker cell ---------- */
 .cell {
   position: relative;
