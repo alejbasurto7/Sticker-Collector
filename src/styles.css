@@ -80,21 +80,20 @@ button {
   overflow: hidden;
 }
 
-/* When installed to the home screen (standalone PWA), iOS miscomputes the
-   viewport units — 100vh/100dvh AND visualViewport/innerHeight can all resolve
-   shorter than the real screen, so the shell stops above the bottom and leaves
-   a gap below the tab bar. There is no browser chrome to track in this mode, so
-   the plain percentage chain (html → body → #root → .app) is reliable: the
-   initial containing block *is* the full screen. Force it here and ignore the
-   measured height entirely. */
+/* When installed to the home screen (standalone PWA), iOS reports the viewport
+   ~62px short of the real screen: on a device whose true screen is 874px,
+   innerHeight, visualViewport.height, 100dvh, 100svh AND the 100% chain all
+   resolve to 812, so the shell stops above the bottom and leaves a gap below
+   the tab bar (verified on-device). The ONLY unit that reports the full webview
+   height here is 100vh (=874), so size the whole chain with it. (In a real
+   Safari tab 100vh would be too tall because of the collapsing toolbar — but
+   this rule is scoped to standalone, where there is no toolbar.) */
 @media all and (display-mode: standalone) {
   html,
   body,
-  #root {
-    height: 100%;
-  }
+  #root,
   .app {
-    height: 100%;
+    height: 100vh;
   }
 }
 
