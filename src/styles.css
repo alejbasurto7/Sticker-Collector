@@ -14,7 +14,7 @@
   --radius-sm: 10px;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
-  --tabbar-h: 64px;
+  --tabbar-h: 50px;
   /* Album identity gradient — update this for each new album type */
   --album-gradient: linear-gradient(105deg, #1d4ed8 0%, #c0392b 38%, #0b8a4b 72%, #eef2f8 100%);
 }
