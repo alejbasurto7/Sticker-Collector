@@ -224,7 +224,7 @@ src/
 ```bash
 npm install
 npm run dev       # vite dev server (base /)
-npm run build     # tsc -b && vite build  ->  dist/  (base /Sticker-Swap/)
+npm run build     # tsc -b && vite build  ->  dist/  (base /Sticker-Collector/)
 npm run preview   # serve the production build
 ```
 
@@ -236,7 +236,7 @@ npm run preview   # serve the production build
   theme, standalone/portrait) and Workbox precaching of `js/css/html/svg/png/ico/woff2`.
 - **Deploy:** [.github/workflows/deploy.yml](../.github/workflows/deploy.yml) builds and
   publishes `dist/` to **GitHub Pages** on push to `claude/figuritas-sticker-pwa-vhafqz`
-  (or manual `workflow_dispatch`). The production base path is `/Sticker-Swap/`.
+  (or manual `workflow_dispatch`). The production base path is `/Sticker-Collector/`.
 
 ---
 
