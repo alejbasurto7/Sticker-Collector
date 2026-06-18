@@ -10,6 +10,7 @@ import StatsView from './components/StatsView';
 import EditionDialog from './components/EditionDialog';
 import ShareListDialog from './components/ShareListDialog';
 import AchievementToaster from './components/AchievementToaster';
+import DebugViewport from './components/DebugViewport';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('album');
@@ -103,6 +104,7 @@ export default function App() {
       {editionOpen && <EditionDialog onClose={() => setEditionOpen(false)} />}
 
       <AchievementToaster />
+      <DebugViewport />
     </div>
   );
 }

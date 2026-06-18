@@ -64,13 +64,12 @@ button {
 
 /* ---------- App shell ---------- */
 .app {
-  /* Size the shell to the *visible* viewport. We drive --app-height from JS
-     (window.visualViewport.height — see main.tsx) because iOS Safari's 100dvh
-     is computed lazily: at load it can resolve a few px short, leaving a white
-     gap below the tab bar that only disappears once a scroll/resize fires (the
-     "drag the screen and it snaps back" behaviour). The JS value is always
-     exact and updates on every viewport change. 100vh/100dvh are the fallbacks
-     for browsers without custom-property or visualViewport support. */
+  /* In a *browser* tab we size the shell to the visible viewport via the
+     JS-measured --app-height (see main.tsx), because iOS Safari resolves 100dvh
+     lazily — at load it lands a few px short, leaving a gap below the tab bar
+     that only closes once a scroll/resize fires (the "drag and it snaps back"
+     behaviour). 100vh/100dvh are fallbacks for older browsers. NOTE: standalone
+     mode is handled by the display-mode media query below. */
   display: flex;
   flex-direction: column;
   height: 100vh;
@@ -79,6 +78,24 @@ button {
   max-width: 720px;
   margin: 0 auto;
   overflow: hidden;
+}
+
+/* When installed to the home screen (standalone PWA), iOS miscomputes the
+   viewport units — 100vh/100dvh AND visualViewport/innerHeight can all resolve
+   shorter than the real screen, so the shell stops above the bottom and leaves
+   a gap below the tab bar. There is no browser chrome to track in this mode, so
+   the plain percentage chain (html → body → #root → .app) is reliable: the
+   initial containing block *is* the full screen. Force it here and ignore the
+   measured height entirely. */
+@media all and (display-mode: standalone) {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  .app {
+    height: 100%;
+  }
 }
 
 .app-header {
