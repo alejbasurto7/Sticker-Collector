@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useCollection } from '../store/collectionStore';
 import { CC_EMOJI, EDITION_INFO } from '../data/sampleAlbum';
 import { ALBUM_TYPE } from '../config';
+import { VERSION_LABEL } from '../version';
 import type { Edition } from '../types';
 
 interface Props {
@@ -205,6 +206,18 @@ export default function EditionDialog({ onClose }: Props) {
             Close
           </button>
         </div>
+
+        <p
+          style={{
+            marginTop: '1rem',
+            marginBottom: 0,
+            textAlign: 'center',
+            fontSize: '0.72rem',
+            color: 'var(--text-dim)',
+          }}
+        >
+          {VERSION_LABEL}
+        </p>
       </div>
 
       {confirmingDelete && (

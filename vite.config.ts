@@ -1,3 +1,5 @@
+import { execSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
@@ -5,13 +7,35 @@ import { VitePWA } from 'vite-plugin-pwa';
 // Repo name for GitHub Pages project-site base path.
 const REPO = 'Sticker-Swap';
 
+const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf-8'));
+
+// Short commit hash for the build. CI exposes GITHUB_SHA; locally we ask git.
+// Either way it's resolved at build time and baked into the bundle, so the
+// running app can report exactly which commit it was built from.
+function commitSha(): string {
+  if (process.env.GITHUB_SHA) return process.env.GITHUB_SHA.slice(0, 7);
+  try {
+    return execSync('git rev-parse --short HEAD').toString().trim();
+  } catch {
+    return 'dev';
+  }
+}
+
 export default defineConfig(({ command }) => ({
   // On GitHub Pages the app is served from /<repo>/; locally from /.
   base: command === 'build' ? `/${REPO}/` : '/',
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+    __APP_COMMIT__: JSON.stringify(commitSha()),
+    __APP_BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+  },
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt' keeps a freshly deployed service worker waiting instead of
+      // silently swapping in, so the app can show a "new version" banner and
+      // reload deterministically (see ReloadPrompt.tsx).
+      registerType: 'prompt',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
         name: 'Sticker Collector',
