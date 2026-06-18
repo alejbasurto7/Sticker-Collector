@@ -303,6 +303,47 @@ button {
   border-color: var(--green);
 }
 
+/* ---------- Album toolbar (hint + expand/collapse all) ---------- */
+.album-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 0;
+}
+.album-toolbar .empty-note {
+  flex: 1;
+  min-width: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.expand-toggle {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-dim);
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.expand-toggle:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.expand-toggle .chevron {
+  display: inline-block;
+  color: var(--text-dim);
+  transition: transform 0.2s ease;
+}
+.expand-toggle .chevron.open {
+  transform: rotate(90deg);
+}
+
 /* ---------- Album page section ---------- */
 .page-section {
   background: var(--bg-elev);

@@ -10,6 +10,7 @@ export default function AlbumView() {
   const [filter, setFilter] = useState<AlbumFilter>('all');
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SortMode>('album');
+  const [openIds, setOpenIds] = useState<Set<string>>(() => new Set());
   const counts = useCollection((s) => s.counts);
 
   const filterCounts = useMemo(() => {
@@ -50,6 +51,32 @@ export default function AlbumView() {
     return pages;
   }, [search, sort, counts]);
 
+  // A single smart toggle drives every visible section: it expands all when
+  // any are collapsed, and collapses all once everything is open.
+  const allOpen =
+    visiblePages.length > 0 && visiblePages.every((p) => openIds.has(p.id));
+
+  const toggleAll = () => {
+    setOpenIds((prev) => {
+      if (allOpen) {
+        const next = new Set(prev);
+        for (const p of visiblePages) next.delete(p.id);
+        return next;
+      }
+      const next = new Set(prev);
+      for (const p of visiblePages) next.add(p.id);
+      return next;
+    });
+  };
+
+  const togglePage = (id: string) =>
+    setOpenIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
   return (
     <div>
       <FilterBar value={filter} onChange={setFilter} counts={filterCounts} />
@@ -74,12 +101,27 @@ export default function AlbumView() {
         </select>
       </div>
 
-      <p className="empty-note" style={{ paddingTop: 0 }}>
-        Tap a sticker to add it · long-press to remove.
-      </p>
+      <div className="album-toolbar">
+        <p className="empty-note">Tap a sticker to add it · long-press to remove.</p>
+        <button
+          className="expand-toggle"
+          onClick={toggleAll}
+          disabled={visiblePages.length === 0}
+          aria-pressed={allOpen}
+        >
+          <span className={`chevron ${allOpen ? 'open' : ''}`}>›</span>
+          {allOpen ? 'Collapse all' : 'Expand all'}
+        </button>
+      </div>
 
       {visiblePages.map((p) => (
-        <PageSection key={p.id} page={p} filter={filter} />
+        <PageSection
+          key={p.id}
+          page={p}
+          filter={filter}
+          open={openIds.has(p.id)}
+          onToggle={() => togglePage(p.id)}
+        />
       ))}
     </div>
   );
