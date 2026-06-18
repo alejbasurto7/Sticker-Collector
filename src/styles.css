@@ -380,26 +380,36 @@ button {
   padding: 6px 14px 16px;
 }
 .album-page {
-  flex: 1;
+  /* Shared gap, reused below to size the landscape sticker against a column. */
+  --grid-gap: 6px;
+  /* flex: 1 1 0 keeps both pages exactly equal width, so a sticker is the same
+     size on either page. */
+  flex: 1 1 0;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   grid-template-rows: repeat(3, auto);
-  gap: 6px;
+  gap: var(--grid-gap);
+  /* Query container: lets the landscape sticker be sized to one column width
+     (see .cell.landscape) regardless of how wide the page renders. */
+  container-type: inline-size;
 }
-/* The fold: a muted divider between the left and right pages. */
-.album-page.left {
-  padding-right: 16px;
-  border-right: 1px solid var(--border);
+/* The fold: a muted divider drawn between the two equal-width pages. */
+.album-fold {
+  align-self: stretch;
+  width: 1px;
+  background: var(--border);
 }
-/* Stickers are portrait rectangles, like the real foils. */
+/* Every sticker is the same physical foil: a portrait rectangle. */
 .album-page .cell {
   aspect-ratio: 5 / 7;
 }
-/* Sticker 13 is the same foil turned landscape, spanning two columns; let it
-   stretch to the row height set by its portrait neighbours. */
+/* Sticker 13 is that same foil turned 90°. It keeps the exact size of a
+   portrait sticker — its height equals one column width and its width is that
+   × 7/5 — and sits centred in the two-column slot it occupies in the album. */
 .album-page .cell.landscape {
-  aspect-ratio: auto;
-  align-self: stretch;
+  height: calc((100cqw - 3 * var(--grid-gap)) / 4);
+  aspect-ratio: 7 / 5;
+  place-self: center;
 }
 
 /* ---------- Sticker cell ---------- */
