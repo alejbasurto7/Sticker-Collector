@@ -272,67 +272,65 @@ export default function TemplateEditor() {
         {template.pages.map((p, pageIdx) => (
           <div
             key={pageIdx}
-            ref={(el) => (pageRefs.current[pageIdx] = el)}
-            style={{
-              position: 'relative',
-              flex: '1 1 0',
-              maxWidth: 320,
-              aspectRatio: String(template.pageAspect),
-              background: '#11161d',
-              border: '1px solid #2a3340',
-              borderRadius: 8,
-            }}
+            style={{ flex: '1 1 0', maxWidth: 320, display: 'flex', flexDirection: 'column', gap: 6 }}
           >
-            {p.slots.map((slot, slotIdx) => (
-              <div
-                key={slotIdx}
-                style={slotStyle(slot)}
-                onPointerDown={onSlotPointerDown(pageIdx, slotIdx)}
-                onPointerMove={onSlotPointerMove}
-                onPointerUp={onSlotPointerUp(pageIdx, slotIdx)}
-              >
-                {slotLabel(pageIdx)[slotIdx]}
-                <button
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeSlot(pageIdx, slotIdx);
-                  }}
-                  style={{
-                    position: 'absolute',
-                    top: -8,
-                    right: -8,
-                    width: 18,
-                    height: 18,
-                    borderRadius: 9,
-                    border: 'none',
-                    background: '#c0392b',
-                    color: '#fff',
-                    fontSize: 11,
-                    lineHeight: '18px',
-                    padding: 0,
-                    cursor: 'pointer',
-                  }}
-                  aria-label="Remove slot"
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
             <div
-              style={{ position: 'absolute', bottom: 4, left: 4, display: 'flex', gap: 4 }}
+              ref={(el) => (pageRefs.current[pageIdx] = el)}
+              style={{
+                position: 'relative',
+                width: '100%',
+                aspectRatio: String(template.pageAspect),
+                background: '#11161d',
+                border: '1px solid #2a3340',
+                borderRadius: 8,
+              }}
             >
-              <button style={BTN_SM} onPointerDown={(e) => e.stopPropagation()} onClick={() => addSlot(pageIdx, false)}>
+              {p.slots.map((slot, slotIdx) => (
+                <div
+                  key={slotIdx}
+                  style={slotStyle(slot)}
+                  onPointerDown={onSlotPointerDown(pageIdx, slotIdx)}
+                  onPointerMove={onSlotPointerMove}
+                  onPointerUp={onSlotPointerUp(pageIdx, slotIdx)}
+                >
+                  {slotLabel(pageIdx)[slotIdx]}
+                  <button
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeSlot(pageIdx, slotIdx);
+                    }}
+                    style={{
+                      position: 'absolute',
+                      top: -8,
+                      right: -8,
+                      width: 18,
+                      height: 18,
+                      borderRadius: 9,
+                      border: 'none',
+                      background: '#c0392b',
+                      color: '#fff',
+                      fontSize: 11,
+                      lineHeight: '18px',
+                      padding: 0,
+                      cursor: 'pointer',
+                    }}
+                    aria-label="Remove slot"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+            {/* Page controls live BELOW the canvas so they never cover a slot. */}
+            <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+              <button style={BTN_SM} onClick={() => addSlot(pageIdx, false)}>
                 + sticker
               </button>
-              <button style={BTN_SM} onPointerDown={(e) => e.stopPropagation()} onClick={() => addSlot(pageIdx, true)}>
+              <button style={BTN_SM} onClick={() => addSlot(pageIdx, true)}>
                 + photo
               </button>
-              <button
-                style={BTN_SM}
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={() => removePage(pageIdx)}
-              >
+              <button style={BTN_SM} onClick={() => removePage(pageIdx)}>
                 ✕ page
               </button>
             </div>
