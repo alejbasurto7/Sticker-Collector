@@ -1158,7 +1158,7 @@ textarea {
   font-size: 18px;
   line-height: 1;
 }
-.toolbar .btn.lock-toggle.locked {
+.lock-toggle.locked {
   border-color: var(--green);
   color: var(--green);
 }

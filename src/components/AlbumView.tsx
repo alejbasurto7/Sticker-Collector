@@ -3,7 +3,6 @@ import { album } from '../data/sampleAlbum';
 import { useCollection } from '../store/collectionStore';
 import FilterBar, { type AlbumFilter } from './FilterBar';
 import PageSection from './PageSection';
-import ImportDialog from './ImportDialog';
 
 type SortMode = 'album' | 'az' | 'progress-asc' | 'progress-desc';
 
@@ -11,10 +10,7 @@ export default function AlbumView() {
   const [filter, setFilter] = useState<AlbumFilter>('all');
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SortMode>('album');
-  const [importOpen, setImportOpen] = useState(false);
   const counts = useCollection((s) => s.counts);
-  const locked = useCollection((s) => s.locked);
-  const toggleLocked = useCollection((s) => s.toggleLocked);
 
   const filterCounts = useMemo(() => {
     let all = 0;
@@ -56,22 +52,6 @@ export default function AlbumView() {
 
   return (
     <div>
-      <div className="toolbar">
-        <button className="btn" onClick={() => setImportOpen(true)}>
-          ⬆ Import list
-        </button>
-        <button
-          className={`btn icon-btn lock-toggle${locked ? ' locked' : ''}`}
-          onClick={toggleLocked}
-          role="switch"
-          aria-checked={locked}
-          aria-label={locked ? 'Album locked — tap to unlock and edit' : 'Album unlocked — tap to lock'}
-          title={locked ? 'Locked (read-only)' : 'Unlocked (editable)'}
-        >
-          {locked ? '🔒' : '🔓'}
-        </button>
-      </div>
-
       <FilterBar value={filter} onChange={setFilter} counts={filterCounts} />
 
       <div className="search-sort-bar">
@@ -101,8 +81,6 @@ export default function AlbumView() {
       {visiblePages.map((p) => (
         <PageSection key={p.id} page={p} filter={filter} />
       ))}
-
-      {importOpen && <ImportDialog onClose={() => setImportOpen(false)} />}
     </div>
   );
 }

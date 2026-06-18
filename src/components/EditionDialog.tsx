@@ -4,6 +4,7 @@ import { CC_EMOJI, EDITION_INFO } from '../data/sampleAlbum';
 import { ALBUM_TYPE } from '../config';
 import { VERSION_LABEL } from '../version';
 import type { Edition } from '../types';
+import ImportDialog from './ImportDialog';
 
 interface Props {
   onClose: () => void;
@@ -28,6 +29,7 @@ export default function EditionDialog({ onClose }: Props) {
 
   const [draft, setDraft] = useState(albumName);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   // The album name changes out from under us when the user creates or switches
   // albums, so keep the editable draft mirrored to the active album's name.
@@ -59,6 +61,15 @@ export default function EditionDialog({ onClose }: Props) {
 
         <button type="button" className="btn full" onClick={() => createAlbum()} style={{ marginBottom: '1rem' }}>
           ➕ New Album
+        </button>
+
+        <button
+          type="button"
+          className="btn full"
+          onClick={() => setImportOpen(true)}
+          style={{ marginBottom: '1rem' }}
+        >
+          ⬆ Import list
         </button>
 
         <div style={{ marginBottom: '1rem' }}>
@@ -250,6 +261,8 @@ export default function EditionDialog({ onClose }: Props) {
           </div>
         </div>
       )}
+
+      {importOpen && <ImportDialog onClose={() => setImportOpen(false)} />}
     </div>
   );
 }

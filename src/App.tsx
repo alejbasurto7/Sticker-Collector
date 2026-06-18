@@ -23,6 +23,8 @@ export default function App() {
   const albumName = useCollection((s) => s.albumName);
   const activeAlbumId = useCollection((s) => s.activeAlbumId);
   const theme = useCollection((s) => s.theme);
+  const locked = useCollection((s) => s.locked);
+  const toggleLocked = useCollection((s) => s.toggleLocked);
 
   // Mirror the chosen colour scheme onto the document root so the light-mode
   // CSS variable overrides (see styles.css) take effect app-wide.
@@ -55,6 +57,16 @@ export default function App() {
         <div className="header-top">
           <h1>{albumName}</h1>
           <div className="header-actions">
+            <button
+              className={`icon-btn lock-toggle${locked ? ' locked' : ''}`}
+              onClick={toggleLocked}
+              role="switch"
+              aria-checked={locked}
+              aria-label={locked ? 'Album locked — tap to unlock and edit' : 'Album unlocked — tap to lock'}
+              title={locked ? 'Locked (read-only)' : 'Unlocked (editable)'}
+            >
+              {locked ? '🔒' : '🔓'}
+            </button>
             <button className="icon-btn" onClick={() => setShareOpen(true)} aria-label="Share list">
               <svg
                 width="19"
@@ -77,9 +89,7 @@ export default function App() {
             </button>
           </div>
         </div>
-        <div className="subtitle">
-          {ALBUM_TYPE} · {stats.totalStickers} stickers
-        </div>
+        <div className="subtitle">{ALBUM_TYPE}</div>
         <div className="header-progress">
           <ProgressBar
             label="Album progress"
