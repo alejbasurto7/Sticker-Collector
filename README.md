@@ -37,6 +37,25 @@ stickers, 992 total); switching preserves all your existing stickers.
   automatically, and giving a sticker never strips a copy still reserved by another open
   swap.
 
+## Using it with a friend / a second user
+
+Each person gets their **own** collection automatically — there are no accounts and nothing
+is shared between devices. All data lives in *your* browser's local storage, so two people
+on two different phones (or two different browsers) have completely separate collections. A
+brand-new user starts with an empty album.
+
+**To share the app:** send your friend the link —
+**https://alejbasurto7.github.io/Sticker-Collector/** — and have them open it and choose
+**"Add to Home Screen"** to install it. Once they've started their own collection, you can
+trade with each other using the **Trade** tab's QR codes.
+
+**One gotcha:** a separate phone or browser means separate data (what you want). But two
+people sharing the *same browser on the same phone* would share one collection — for that
+case use a separate device/browser, or the in-app multi-album feature.
+
+**Caveat:** data is local-only. There's no cross-device sync, and clearing your browser's
+site data (or uninstalling the app) erases that collection — there is no cloud backup.
+
 ## Export / import format
 
 ```
