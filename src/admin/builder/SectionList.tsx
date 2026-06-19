@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { type AlbumType } from '../../data/albumTypes';
-import { addSection, moveSection, deleteSection, uniqueId } from '../registryOps';
+import { addSection, moveSection, deleteSection } from '../registryOps';
 import { type Confirm } from './useConfirm';
 
 interface SectionListProps {
@@ -17,9 +17,11 @@ export default function SectionList({
   const dragFrom = useRef<number | null>(null);
 
   const handleAddSection = () => {
-    const predictedId = uniqueId('section', type.sections.map((s) => s.id));
-    onUpdateType(addSection);
-    onSelectSection(predictedId);
+    const before = new Set(type.sections.map((s) => s.id));
+    const next = addSection(type);                 // addSection is pure
+    const added = next.sections.find((s) => !before.has(s.id));
+    onUpdateType(() => next);
+    if (added) onSelectSection(added.id);
   };
 
   const handleDelete = async (e: React.MouseEvent, id: string, label: string) => {
