@@ -1,7 +1,6 @@
 import type { AlbumType } from '../../../data/albumTypes';
 import VariantManager from '../VariantManager';
-
-type Confirm = (opts: { message: string; confirmLabel?: string; danger?: boolean }) => Promise<boolean>;
+import { type Confirm } from '../useConfirm';
 
 interface TypeStepProps {
   type: AlbumType;

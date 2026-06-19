@@ -14,8 +14,7 @@ import { pushHistory } from './history';
 import { useConfirm } from './useConfirm';
 import { BTN_SM, clone } from './ui';
 import TypeStep from './steps/TypeStep';
-import SectionsPanel from './SectionsPanel';
-import SectionFields from './SectionFields';
+import SectionsStep from './steps/SectionsStep';
 import TemplateCanvas from './TemplateCanvas';
 import BuilderToolbar from './BuilderToolbar';
 import BuilderRail from './BuilderRail';
@@ -183,12 +182,13 @@ export default function BuilderShell() {
             onUpdateType={updateType} confirm={confirm} />
         )}
         {step === 'sections' && (
-          <div className="builder-two-pane">
-            <SectionsPanel type={type} selectedSectionId={selectedSectionId}
-              onSelectSection={setSelectedSectionId} onUpdateType={updateType} />
-            {section ? <SectionFields type={type} section={section} onUpdateType={updateType} />
-                     : <p style={{ opacity: 0.6 }}>Select or add a section to edit it.</p>}
-          </div>
+          <SectionsStep
+            type={type}
+            selectedSectionId={selectedSectionId}
+            onSelectSection={setSelectedSectionId}
+            onUpdateType={updateType}
+            confirm={confirm}
+          />
         )}
         {step === 'layout' && (
           <>

@@ -1,5 +1,7 @@
 import { useCallback, useState, type ReactNode } from 'react';
 
+export type Confirm = (opts: { message: string; confirmLabel?: string; danger?: boolean }) => Promise<boolean>;
+
 interface ConfirmOpts { message: string; confirmLabel?: string; danger?: boolean; }
 interface Pending extends ConfirmOpts { resolve: (ok: boolean) => void; }
 
