@@ -58,47 +58,55 @@ function commitSha(): string {
   }
 }
 
-export default defineConfig(({ command }) => ({
-  // On GitHub Pages the app is served from /<repo>/; locally from /.
-  base: command === 'build' ? `/${REPO}/` : '/',
-  define: {
-    __APP_VERSION__: JSON.stringify(pkg.version),
-    __APP_COMMIT__: JSON.stringify(commitSha()),
-    __APP_BUILD_TIME__: JSON.stringify(new Date().toISOString()),
-  },
-  plugins: [
-    albumTypesWriter(),
-    react(),
-    VitePWA({
-      // 'prompt' keeps a freshly deployed service worker waiting instead of
-      // silently swapping in, so the app can show a "new version" banner and
-      // reload deterministically (see ReloadPrompt.tsx).
-      registerType: 'prompt',
-      includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
-      manifest: {
-        name: 'Sticker Collector',
-        short_name: 'Sticker Collector',
-        description: 'Track your sticker album, view stats, and organize swaps.',
-        theme_color: '#0b8a4b',
-        background_color: '#0f1115',
-        display: 'standalone',
-        orientation: 'portrait',
-        start_url: '.',
-        scope: '.',
-        icons: [
-          { src: 'pwa-192.png', sizes: '192x192', type: 'image/png' },
-          { src: 'pwa-512.png', sizes: '512x512', type: 'image/png' },
-          {
-            src: 'pwa-512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'maskable',
-          },
-        ],
-      },
-      workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
-      },
-    }),
-  ],
-}));
+export default defineConfig(({ command }) => {
+  // On GitHub Pages the app is served from /<repo>/; locally from /. Resolve the
+  // base once and reuse it for the PWA manifest's start_url/scope. Relative
+  // values like "." resolve inconsistently in an *installed* PWA on a project
+  // sub-path — some platforms launch it at the domain root, which GitHub Pages
+  // answers with a 404 — so these must be the explicit absolute base path.
+  const base = command === 'build' ? `/${REPO}/` : '/';
+
+  return {
+    base,
+    define: {
+      __APP_VERSION__: JSON.stringify(pkg.version),
+      __APP_COMMIT__: JSON.stringify(commitSha()),
+      __APP_BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+    },
+    plugins: [
+      albumTypesWriter(),
+      react(),
+      VitePWA({
+        // 'prompt' keeps a freshly deployed service worker waiting instead of
+        // silently swapping in, so the app can show a "new version" banner and
+        // reload deterministically (see ReloadPrompt.tsx).
+        registerType: 'prompt',
+        includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
+        manifest: {
+          name: 'Sticker Collector',
+          short_name: 'Sticker Collector',
+          description: 'Track your sticker album, view stats, and organize swaps.',
+          theme_color: '#0b8a4b',
+          background_color: '#0f1115',
+          display: 'standalone',
+          orientation: 'portrait',
+          start_url: base,
+          scope: base,
+          icons: [
+            { src: 'pwa-192.png', sizes: '192x192', type: 'image/png' },
+            { src: 'pwa-512.png', sizes: '512x512', type: 'image/png' },
+            {
+              src: 'pwa-512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'maskable',
+            },
+          ],
+        },
+        workbox: {
+          globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
+        },
+      }),
+    ],
+  };
+});
