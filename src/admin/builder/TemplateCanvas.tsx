@@ -97,9 +97,11 @@ export default function TemplateCanvas({
         )}
       </div>
 
-      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+      {/* Two pages per row (left + right) so the canvas mirrors an open album spread;
+          fixed grid columns keep every page the same size regardless of page count. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', columnGap: 10, rowGap: 22, alignItems: 'start', maxWidth: 720 }}>
         {template.pages.map((p, pageIdx) => (
-          <div key={pageIdx} style={{ flex: '1 1 0', maxWidth: 320, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div key={pageIdx} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div
               ref={(el) => (pageRefs.current[pageIdx] = el)}
               className="builder-page"
