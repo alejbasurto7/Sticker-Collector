@@ -86,7 +86,7 @@
 /* Canvas slots (Task 5 uses these classes) */
 .builder-slot { position: absolute; transform: translate(-50%, -50%); display: flex; align-items: center; justify-content: center; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: grab; touch-action: none; user-select: none; }
 .builder-slot.is-real { border: 1px solid var(--blue); background: color-mix(in srgb, var(--blue) 18%, transparent); color: #cfe0ff; }
-.builder-slot.is-decorative { border: 1px dashed var(--text-dim); background: color-mix(in srgb, #ffffff 6%, transparent); color: var(--text-dim); }
+.builder-slot.is-decorative { border: 1px dashed var(--text-dim); background-color: var(--bg); background-image: repeating-linear-gradient(45deg, color-mix(in srgb, var(--text-dim) 22%, transparent) 0, color-mix(in srgb, var(--text-dim) 22%, transparent) 5px, transparent 5px, transparent 11px); color: var(--text-dim); }
 .builder-slot.is-selected { box-shadow: 0 0 0 2px var(--gold); }
 .builder-slot.is-dragging { opacity: 0.85; box-shadow: 0 6px 16px rgba(0,0,0,0.5); z-index: 3; }
 .builder-page { position: relative; width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; }
