@@ -38,7 +38,7 @@ export default function StickerChips({ ids, selected, onToggle, conflicts, readO
                   onClick={() => !readOnly && onToggle?.(s.id)}
                   disabled={readOnly}
                 >
-                  {s.number}
+                  {page.prefixNumbers ? page.code : ''}{s.number}
                   {conflictMsg && <span className="chip-warn" title={conflictMsg}>⚠️</span>}
                 </button>
               );

@@ -13,6 +13,11 @@ interface Props {
   locked?: boolean;
   /** Landscape (wide) cell — used by the album-spread layout for sticker 13. */
   landscape?: boolean;
+  /**
+   * Display-only code prefix (e.g. "CC") shown before the bare number when the
+   * page opts in. The sticker id / export / import always use the bare number.
+   */
+  numberPrefix?: string;
   /** Inline grid placement, supplied by the album-spread layout. */
   style?: CSSProperties;
   onAdd: () => void;
@@ -26,6 +31,7 @@ export default function StickerCell({
   count,
   locked = false,
   landscape = false,
+  numberPrefix = '',
   style,
   onAdd,
   onRemove,
@@ -111,11 +117,11 @@ export default function StickerCell({
       onContextMenu={onContextMenu}
       role="button"
       aria-disabled={locked || undefined}
-      aria-label={`Sticker ${sticker.number}, ${owned ? 'owned' : 'missing'}${
+      aria-label={`Sticker ${numberPrefix}${sticker.number}, ${owned ? 'owned' : 'missing'}${
         swaps ? `, ${swaps} swaps` : ''
       }`}
     >
-      {sticker.number}
+      {numberPrefix}{sticker.number}
       {sticker.special && <span className="star">★</span>}
       {swaps > 0 && <span className="swap-badge">+{swaps}</span>}
     </div>

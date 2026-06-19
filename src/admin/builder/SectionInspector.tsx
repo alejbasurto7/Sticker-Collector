@@ -90,6 +90,16 @@ export default function SectionInspector({ type, section, onUpdateType }: Sectio
             Optional (opt-in section)
           </label>
         </div>
+        <div className="builder-field-row">
+          <label style={{ fontSize: 13 }}>
+            <input
+              type="checkbox"
+              checked={!!section.prefixNumbers}
+              onChange={(e) => patch({ prefixNumbers: e.target.checked || undefined })}
+            />{' '}
+            Prefix numbers with code (display only, e.g. "{section.code}1")
+          </label>
+        </div>
       </div>
 
       {/* Numbers */}

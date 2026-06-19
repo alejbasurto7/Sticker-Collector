@@ -24,6 +24,11 @@ export interface Page {
   /** Human title, e.g. "Mexico". */
   title: string;
   type: PageType;
+  /**
+   * Display only: when true, sticker numbers render code-prefixed (e.g. "CC1").
+   * Sticker ids, list export and import always use the bare number.
+   */
+  prefixNumbers?: boolean;
   /** Sticker ids belonging to this page, in album order. */
   stickerIds: string[];
 }

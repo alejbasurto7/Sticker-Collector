@@ -20,6 +20,7 @@ export interface SectionDef {
   foils: string[];            // subset of `numbers` that are foil/special
   optional?: boolean;         // opt-in section (excluded unless enabled)
   numbersByVariant?: Record<string, string[]>; // per-variant override of `numbers`
+  prefixNumbers?: boolean;    // display only: show numbers code-prefixed (e.g. "CC1")
 }
 
 export interface AlbumType {
@@ -62,6 +63,7 @@ export function buildAlbumFromType(
       emoji: section.emoji,
       title: section.title,
       type: section.type,
+      prefixNumbers: section.prefixNumbers,
       stickerIds,
     });
   }

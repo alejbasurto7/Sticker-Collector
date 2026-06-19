@@ -59,6 +59,9 @@ export default function PageSection({ page, filter, open, onToggle }: Props) {
   const useSpread = Boolean(template) && filter === 'all';
   const bound = template ? bindTemplate(template, page.stickerIds) : null;
 
+  // Display-only: prefix the bare number with the section code (e.g. "CC1").
+  const numberPrefix = page.prefixNumbers ? page.code : '';
+
   const renderCell = (id: string, style?: CSSProperties, landscape?: boolean) => (
     <StickerCell
       key={id}
@@ -66,6 +69,7 @@ export default function PageSection({ page, filter, open, onToggle }: Props) {
       count={counts[id] ?? 0}
       locked={locked}
       landscape={landscape}
+      numberPrefix={numberPrefix}
       style={style}
       onAdd={() => addOne(id)}
       onRemove={() => removeOne(id)}
