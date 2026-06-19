@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   ALBUM_TYPES, ACTIVE_ALBUM_TYPE_ID,
   type AlbumType, type SectionDef,
@@ -6,16 +6,17 @@ import {
 import type { SectionTemplate } from '../../data/layoutGeometry';
 import { realSlotCount } from '../../data/layoutGeometry';
 import {
-  newAlbumType, newTemplate, cloneTemplate, deleteTemplate, copyTemplateToType,
+  newAlbumType, copyTemplateToType,
   type RegistryDraft,
 } from '../registryOps';
 import { albumTypesToSource } from '../serializeTemplates';
 import { pushHistory } from './history';
 import { useConfirm } from './useConfirm';
-import { BTN_SM, clone } from './ui';
+import { clone } from './ui';
 import TypeStep from './steps/TypeStep';
 import SectionsStep from './steps/SectionsStep';
-import TemplateCanvas from './TemplateCanvas';
+import LayoutStep from './steps/LayoutStep';
+import { type SelectedSlot } from './TemplateCanvas';
 import BuilderToolbar from './BuilderToolbar';
 import BuilderRail from './BuilderRail';
 import type { BuilderStep } from './BuilderRail';
@@ -52,6 +53,9 @@ export default function BuilderShell() {
   const [previewVariantId, setPreviewVariantId] = useState<string>('');
   const [selectedSectionId, setSelectedSectionId] = useState<string>('');
   const [step, setStep] = useState<BuilderStep>('type');
+  const [selectedSlot, setSelectedSlot] = useState<SelectedSlot>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const type: AlbumType = draft.types[editingTypeId] ?? Object.values(draft.types)[0];
   // Keep preview/selection valid even after deletes or a stale saved draft.
@@ -105,6 +109,11 @@ export default function BuilderShell() {
     return () => window.removeEventListener('keydown', onKey);
   });
 
+  // Reset slot selection when the user navigates to a different section/template.
+  useEffect(() => {
+    setSelectedSlot(null);
+  }, [section?.id, section?.templateId]);
+
   const updateType = (mut: (t: AlbumType) => AlbumType) =>
     commit({ ...draft, types: { ...draft.types, [editingTypeId]: mut(type) } });
 
@@ -149,6 +158,19 @@ export default function BuilderShell() {
     });
   };
 
+  const showToast = (msg: string) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast(msg);
+    toastTimer.current = setTimeout(() => setToast(null), 2500);
+  };
+
+  const onCopyTemplate = (toId: string) => {
+    if (!section) return;
+    const { types, newId } = copyTemplateToType(draft.types, editingTypeId, section.templateId, toId);
+    commit({ ...draft, types });
+    showToast(`Copied "${section.templateId}" to ${toId} as "${newId}".`);
+  };
+
   const exportRegistry = async () => {
     const src = albumTypesToSource(draft.types, draft.activeId);
     try {
@@ -168,6 +190,7 @@ export default function BuilderShell() {
   return (
     <div className="builder-root">
       {confirmEl}
+      {toast && <div className="builder-toast">{toast}</div>}
       <BuilderToolbar
         types={draft.types} editingTypeId={editingTypeId} previewVariant={previewVariant}
         onSelectType={selectType} onPreviewVariant={setPreviewVariantId}
@@ -191,43 +214,21 @@ export default function BuilderShell() {
           />
         )}
         {step === 'layout' && (
-          <>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10, alignItems: 'center' }}>
-              <button style={BTN_SM} onClick={() => updateType((t) => newTemplate(t, 'template'))}>+ template</button>
-              {section?.templateId && (
-                <>
-                  <button style={BTN_SM}
-                    onClick={() => updateType((t) => cloneTemplate(t, section.templateId, `${section.templateId}-copy`))}>
-                    Clone
-                  </button>
-                  <button style={BTN_SM} onClick={() => updateType((t) => deleteTemplate(t, section.templateId))}>
-                    Delete template
-                  </button>
-                  {ALBUM_TYPES[editingTypeId]?.templates[section.templateId] && (
-                    <button style={BTN_SM} onClick={resetTemplate}>Reset template</button>
-                  )}
-                  {otherTypeIds.length > 0 && (
-                    <label style={{ fontSize: 12 }}>
-                      Copy →{' '}
-                      <select value="" onChange={(e) => {
-                        const to = e.target.value;
-                        if (!to) return;
-                        const { types, newId } = copyTemplateToType(draft.types, editingTypeId, section.templateId, to);
-                        commit({ ...draft, types });
-                        alert(`Copied "${section.templateId}" to ${to} as "${newId}".`);
-                      }}>
-                        <option value="">(album type)</option>
-                        {otherTypeIds.map((id) => (<option key={id} value={id}>{id}</option>))}
-                      </select>
-                    </label>
-                  )}
-                </>
-              )}
-            </div>
-            {section && template
-              ? <TemplateCanvas template={template} numbers={previewNumbers} onChange={onCanvasChange} />
-              : <p style={{ opacity: 0.6 }}>Pick a section with a template in Sections first.</p>}
-          </>
+          <LayoutStep
+            type={type}
+            section={section}
+            template={template}
+            previewNumbers={previewNumbers}
+            editingTypeId={editingTypeId}
+            otherTypeIds={otherTypeIds}
+            selectedSlot={selectedSlot}
+            onSelectSlot={setSelectedSlot}
+            onUpdateType={updateType}
+            onCanvasChange={onCanvasChange}
+            onResetTemplate={resetTemplate}
+            onCopyTemplate={onCopyTemplate}
+            confirm={confirm}
+          />
         )}
         {step === 'export' && (
           <div className="builder-panel"><button className="builder-btn builder-btn--primary" onClick={exportRegistry}>Export registry</button></div>

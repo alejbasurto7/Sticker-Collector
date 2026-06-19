@@ -1,10 +1,12 @@
-import { useRef } from 'react';
-import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
+import { useRef, useState } from 'react';
+import type { PointerEvent as ReactPointerEvent } from 'react';
 import {
   slotBox, bindTemplate, clientToPagePercent,
-  type SectionTemplate, type TemplateSlot,
+  type SectionTemplate,
 } from '../../data/layoutGeometry';
-import { BTN, BTN_SM } from './ui';
+import { snapTo } from './history';
+
+export type SelectedSlot = { pageIdx: number; slotIdx: number } | null;
 
 interface TemplateCanvasProps {
   template: SectionTemplate;
@@ -12,18 +14,28 @@ interface TemplateCanvasProps {
   numbers: string[];
   /** Apply a mutation to the live template (the parent clones + persists). */
   onChange: (mut: (t: SectionTemplate) => void) => void;
+  /** Currently selected slot (lifted to parent). */
+  selected: SelectedSlot;
+  /** Called when a slot is tapped (no drag). */
+  onSelect: (sel: SelectedSlot) => void;
+  /** Snap step in percentage points; 0 = off. */
+  snap: number;
 }
 
-export default function TemplateCanvas({ template, numbers, onChange }: TemplateCanvasProps) {
+export default function TemplateCanvas({
+  template, numbers, onChange, selected, onSelect, snap,
+}: TemplateCanvasProps) {
   const bound = bindTemplate(template, numbers);
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
   const drag = useRef<{ pageIdx: number; slotIdx: number; moved: boolean } | null>(null);
+  const [draggingSlot, setDraggingSlot] = useState<{ pageIdx: number; slotIdx: number } | null>(null);
 
   const onSlotPointerDown =
     (pageIdx: number, slotIdx: number) => (e: ReactPointerEvent) => {
       e.preventDefault();
       (e.target as Element).setPointerCapture?.(e.pointerId);
       drag.current = { pageIdx, slotIdx, moved: false };
+      setDraggingSlot({ pageIdx, slotIdx });
     };
 
   const onSlotPointerMove = (e: ReactPointerEvent) => {
@@ -35,20 +47,18 @@ export default function TemplateCanvas({ template, numbers, onChange }: Template
     d.moved = true;
     onChange((t) => {
       const slot = t.pages[d.pageIdx].slots[d.slotIdx];
-      slot.x = Math.round(x * 10) / 10;
-      slot.y = Math.round(y * 10) / 10;
+      slot.x = snapTo(x, snap);
+      slot.y = snapTo(y, snap);
     });
   };
 
   const onSlotPointerUp = (pageIdx: number, slotIdx: number) => () => {
     const d = drag.current;
     drag.current = null;
+    setDraggingSlot(null);
     if (d && !d.moved) {
-      // A tap (no drag) flips orientation.
-      onChange((t) => {
-        const slot = t.pages[pageIdx].slots[slotIdx];
-        slot.orientation = slot.orientation === 'portrait' ? 'landscape' : 'portrait';
-      });
+      // A tap (no drag) selects the slot.
+      onSelect({ pageIdx, slotIdx });
     }
   };
 
@@ -66,46 +76,18 @@ export default function TemplateCanvas({ template, numbers, onChange }: Template
   const addPage = () => onChange((t) => { t.pages.push({ slots: [] }); });
   const removePage = (pageIdx: number) =>
     onChange((t) => { if (t.pages.length > 1) t.pages.splice(pageIdx, 1); });
-  const setWidth = (v: number) => onChange((t) => { t.stickerWidthPct = v; });
-  const setAspect = (v: number) => onChange((t) => { t.pageAspect = v; });
 
   const labels = (pageIdx: number): string[] =>
     bound.pages[pageIdx].placements.map((pl) =>
       pl.slot.decorative ? '—' : (pl.stickerId ?? '·'),
     );
 
-  const slotStyle = (slot: TemplateSlot): CSSProperties => {
-    const b = slotBox(slot, template);
-    return {
-      position: 'absolute',
-      left: `${b.leftPct}%`, top: `${b.topPct}%`,
-      width: `${b.widthPct}%`, height: `${b.heightPct}%`,
-      transform: 'translate(-50%, -50%)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      border: '1px solid #6aa9ff', borderRadius: 6,
-      background: slot.decorative ? 'rgba(255,255,255,0.06)' : 'rgba(106,169,255,0.18)',
-      borderStyle: slot.decorative ? 'dashed' : 'solid',
-      color: '#cfe0ff', fontWeight: 800, fontSize: 12,
-      cursor: 'grab', touchAction: 'none', userSelect: 'none',
-    };
-  };
-
   return (
     <div>
-      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12, fontSize: 13 }}>
-        <label>
-          Sticker size: {template.stickerWidthPct.toFixed(1)}%{' '}
-          <input type="range" min={10} max={40} step={0.25}
-            value={template.stickerWidthPct} onChange={(e) => setWidth(Number(e.target.value))} />
-        </label>
-        <label>
-          Page aspect: {template.pageAspect.toFixed(3)}{' '}
-          <input type="range" min={0.6} max={1.4} step={0.001}
-            value={template.pageAspect} onChange={(e) => setAspect(Number(e.target.value))} />
-        </label>
-        <button style={BTN} onClick={addPage}>+ page</button>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
+        <button className="builder-btn builder-btn--sm" onClick={addPage}>+ page</button>
         {bound.unplaced.length > 0 && (
-          <span style={{ color: '#f0b450' }}>
+          <span className="builder-validation builder-validation--warn">
             {bound.unplaced.length} sticker(s) unplaced — add slots to place them
           </span>
         )}
@@ -114,28 +96,45 @@ export default function TemplateCanvas({ template, numbers, onChange }: Template
       <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
         {template.pages.map((p, pageIdx) => (
           <div key={pageIdx} style={{ flex: '1 1 0', maxWidth: 320, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <div ref={(el) => (pageRefs.current[pageIdx] = el)}
-              style={{ position: 'relative', width: '100%', aspectRatio: String(template.pageAspect),
-                background: '#11161d', border: '1px solid #2a3340', borderRadius: 8 }}>
-              {p.slots.map((slot, slotIdx) => (
-                <div key={slotIdx} style={slotStyle(slot)}
-                  onPointerDown={onSlotPointerDown(pageIdx, slotIdx)}
-                  onPointerMove={onSlotPointerMove}
-                  onPointerUp={onSlotPointerUp(pageIdx, slotIdx)}>
-                  {labels(pageIdx)[slotIdx]}
-                  <button onPointerDown={(e) => e.stopPropagation()}
-                    onClick={(e) => { e.stopPropagation(); removeSlot(pageIdx, slotIdx); }}
-                    style={{ position: 'absolute', top: -8, right: -8, width: 18, height: 18, borderRadius: 9,
-                      border: 'none', background: '#c0392b', color: '#fff', fontSize: 11, lineHeight: '18px',
-                      padding: 0, cursor: 'pointer' }}
-                    aria-label="Remove slot">✕</button>
-                </div>
-              ))}
+            <div
+              ref={(el) => (pageRefs.current[pageIdx] = el)}
+              className="builder-page"
+              style={{ aspectRatio: String(template.pageAspect) }}
+              onPointerMove={onSlotPointerMove}
+            >
+              {p.slots.map((slot, slotIdx) => {
+                const b = slotBox(slot, template);
+                const isSelected = selected?.pageIdx === pageIdx && selected?.slotIdx === slotIdx;
+                const isDragging =
+                  draggingSlot?.pageIdx === pageIdx && draggingSlot?.slotIdx === slotIdx;
+                return (
+                  <div
+                    key={slotIdx}
+                    className={`builder-slot ${slot.decorative ? 'is-decorative' : 'is-real'} ${isSelected ? 'is-selected' : ''} ${isDragging ? 'is-dragging' : ''}`}
+                    style={{
+                      left: `${b.leftPct}%`,
+                      top: `${b.topPct}%`,
+                      width: `${b.widthPct}%`,
+                      height: `${b.heightPct}%`,
+                    }}
+                    onPointerDown={onSlotPointerDown(pageIdx, slotIdx)}
+                    onPointerUp={onSlotPointerUp(pageIdx, slotIdx)}
+                  >
+                    {labels(pageIdx)[slotIdx]}
+                    <button
+                      className="builder-slot-remove"
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={(e) => { e.stopPropagation(); removeSlot(pageIdx, slotIdx); }}
+                      aria-label="Remove slot"
+                    >✕</button>
+                  </div>
+                );
+              })}
             </div>
             <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-              <button style={BTN_SM} onClick={() => addSlot(pageIdx, false)}>+ sticker</button>
-              <button style={BTN_SM} onClick={() => addSlot(pageIdx, true)}>+ photo</button>
-              <button style={BTN_SM} onClick={() => removePage(pageIdx)}>✕ page</button>
+              <button className="builder-btn builder-btn--sm" onClick={() => addSlot(pageIdx, false)}>+ slot</button>
+              <button className="builder-btn builder-btn--sm" onClick={() => addSlot(pageIdx, true)}>+ decorative</button>
+              <button className="builder-btn builder-btn--sm" onClick={() => removePage(pageIdx)}>✕ page</button>
             </div>
           </div>
         ))}
