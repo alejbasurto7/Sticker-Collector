@@ -1,4 +1,10 @@
+import { useEffect, useState } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
+
+// While the app stays open, re-check for a freshly deployed service worker on
+// this cadence (plus whenever the tab regains focus) so a long-lived session
+// still surfaces the update banner without a manual reload.
+const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 
 /**
  * Watches the service worker for a newly deployed build and, when one is
@@ -11,10 +17,34 @@ import { useRegisterSW } from 'virtual:pwa-register/react';
  * removing the doubt about whether a deploy has actually taken effect.
  */
 export default function ReloadPrompt() {
+  const [registration, setRegistration] = useState<ServiceWorkerRegistration | null>(null);
   const {
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
-  } = useRegisterSW();
+  } = useRegisterSW({
+    onRegisteredSW(_swScriptUrl, reg) {
+      if (reg) setRegistration(reg);
+    },
+  });
+
+  // Poll for a new build, and re-check whenever the tab becomes visible again.
+  // `registration.update()` is a cheap conditional request; if a new worker
+  // exists it installs and — because we register with `prompt` — waits, which
+  // flips needRefresh and shows the banner below.
+  useEffect(() => {
+    if (!registration) return;
+    const check = () => {
+      if (registration.installing || ('onLine' in navigator && !navigator.onLine)) return;
+      registration.update().catch(() => { /* offline / transient — retry next tick */ });
+    };
+    const intervalId = window.setInterval(check, UPDATE_CHECK_INTERVAL_MS);
+    const onVisible = () => { if (document.visibilityState === 'visible') check(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [registration]);
 
   if (!needRefresh) return null;
 

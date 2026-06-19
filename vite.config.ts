@@ -90,6 +90,10 @@ export default defineConfig(({ command }) => {
           background_color: '#0f1115',
           display: 'standalone',
           orientation: 'portrait',
+          // Stable app identity (resolved against the origin). Pinning this keeps
+          // any future manifest tweak an *update* of the same installed app
+          // rather than risking a new-identity install.
+          id: base,
           start_url: base,
           scope: base,
           icons: [
