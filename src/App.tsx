@@ -32,19 +32,17 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
-  // Prevent iOS PWA window-drag on the header and tab bar. iOS ignores
-  // touch-action:none alone; the passive:false listener is required.
+  // Prevent iOS PWA window-drag everywhere except the two scrollable surfaces
+  // (.content and .modal). iOS ignores touch-action:none alone; the
+  // passive:false document listener is required to call preventDefault().
   useEffect(() => {
-    const noDrag = (e: Event) => e.preventDefault();
-    const opts: AddEventListenerOptions = { passive: false };
-    const header = document.querySelector<HTMLElement>('.app-header');
-    const tabbar = document.querySelector<HTMLElement>('.tabbar');
-    header?.addEventListener('touchmove', noDrag, opts);
-    tabbar?.addEventListener('touchmove', noDrag, opts);
-    return () => {
-      header?.removeEventListener('touchmove', noDrag, opts);
-      tabbar?.removeEventListener('touchmove', noDrag, opts);
+    const preventWindowDrag = (e: Event) => {
+      const target = e.target as Element | null;
+      if (target?.closest('.content, .modal')) return;
+      e.preventDefault();
     };
+    document.addEventListener('touchmove', preventWindowDrag, { passive: false });
+    return () => document.removeEventListener('touchmove', preventWindowDrag);
   }, []);
 
   // edition/trackCC are deps so totals recompute when the album layout changes.

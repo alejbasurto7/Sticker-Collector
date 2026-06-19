@@ -154,6 +154,7 @@ button {
 .content {
   flex: 1;
   overflow-y: auto;
+  touch-action: pan-y;
   padding: 14px 14px 20px;
 }
 
@@ -940,6 +941,7 @@ button {
   max-width: 720px;
   max-height: 92vh;
   overflow-y: auto;
+  touch-action: pan-y;
   background: var(--bg-elev);
   border: 1px solid var(--border);
   border-radius: 18px 18px 0 0;
