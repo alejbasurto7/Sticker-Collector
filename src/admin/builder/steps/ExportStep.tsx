@@ -36,6 +36,20 @@ export default function ExportStep({ source }: ExportStepProps) {
     showToast('Downloaded albumTypes.generated.ts');
   };
 
+  const handleWrite = async () => {
+    try {
+      const res = await fetch('/__write-album-types', {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: source,
+      });
+      if (res.ok) showToast('Wrote src/data/albumTypesData.ts ✓ — hot-reloading');
+      else showToast(`Write failed (${res.status}) — dev server only`);
+    } catch {
+      showToast('Write failed — only works under npm run dev');
+    }
+  };
+
   return (
     <div className="builder-panel">
       <h3 style={{ margin: '0 0 12px' }}>Export registry</h3>
@@ -61,13 +75,15 @@ export default function ExportStep({ source }: ExportStepProps) {
       </p>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        <button className="builder-btn builder-btn--primary" onClick={handleWrite}>Write to project</button>
         <button className="builder-btn" onClick={handleCopy}>Copy</button>
-        <button className="builder-btn builder-btn--primary" onClick={handleDownload}>Download</button>
+        <button className="builder-btn" onClick={handleDownload}>Download</button>
       </div>
 
       <p style={{ margin: 0, fontSize: 13 }}>
-        Paste this over the <code>ALBUM_TYPES</code> and <code>ACTIVE_ALBUM_TYPE_ID</code> exports
-        in <code>src/data/albumTypes.ts</code>, then commit.
+        <strong>Write to project</strong> saves this straight to <code>src/data/albumTypesData.ts</code>{' '}
+        (works under <code>npm run dev</code>; the app hot-reloads) — then review &amp; commit.
+        Copy / Download produce the same module if you'd rather paste it yourself.
       </p>
 
       {toast && <div className="builder-toast">{toast}</div>}

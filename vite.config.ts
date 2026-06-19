@@ -1,11 +1,48 @@
 import { execSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { defineConfig } from 'vite';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 // Repo name for GitHub Pages project-site base path.
 const REPO = 'Sticker-Collector';
+
+// Dev-only: lets the in-app album-type builder (#/admin/templates) write its
+// Export straight to src/data/albumTypesData.ts. The builder POSTs the generated
+// module source to /__write-album-types and Vite writes the file (Vite then
+// hot-reloads it). `apply: 'serve'` keeps this out of `vite build`, so a
+// production build never gets a write endpoint.
+function albumTypesWriter(): Plugin {
+  return {
+    name: 'album-types-writer',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use('/__write-album-types', (req, res) => {
+        if (req.method !== 'POST') {
+          res.statusCode = 405;
+          res.end('method not allowed');
+          return;
+        }
+        let body = '';
+        req.setEncoding('utf8');
+        req.on('data', (chunk) => { body += chunk; });
+        req.on('end', () => {
+          try {
+            const target = resolve(server.config.root, 'src/data/albumTypesData.ts');
+            writeFileSync(target, body, 'utf8');
+            res.statusCode = 200;
+            res.setHeader('content-type', 'application/json');
+            res.end(JSON.stringify({ ok: true, path: 'src/data/albumTypesData.ts' }));
+          } catch (err) {
+            res.statusCode = 500;
+            res.end(String(err));
+          }
+        });
+      });
+    },
+  };
+}
 
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf-8'));
 
@@ -30,6 +67,7 @@ export default defineConfig(({ command }) => ({
     __APP_BUILD_TIME__: JSON.stringify(new Date().toISOString()),
   },
   plugins: [
+    albumTypesWriter(),
     react(),
     VitePWA({
       // 'prompt' keeps a freshly deployed service worker waiting instead of
