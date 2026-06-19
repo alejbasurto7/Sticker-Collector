@@ -5,17 +5,17 @@ import type { AlbumType } from './albumTypes';
 export const ALBUM_TYPES: Record<string, AlbumType> = {
   "2026-fwc": {
     "id": "2026-fwc",
-    "name": "Usa Mex Can 26",
+    "name": "🇺🇸🇲🇽🇨🇦 Panini FIFA World Cup 2026",
     "variants": [
       {
         "id": "na",
-        "label": "North America",
-        "region": "🇺🇸🇲🇽🇨🇦 NA edition"
+        "label": "🇬🇧 English edition",
+        "region": ""
       },
       {
         "id": "latam",
-        "label": "Latin America",
-        "region": "🌎 LATAM edition"
+        "label": "🇪🇸 Spanish edition",
+        "region": ""
       }
     ],
     "defaultVariant": "latam",
@@ -1691,8 +1691,8 @@ export const ALBUM_TYPES: Record<string, AlbumType> = {
       {
         "id": "FWC-scroll",
         "code": "FWC",
-        "emoji": "📜",
-        "title": "History",
+        "emoji": "🏅",
+        "title": "FIFA World Cup History",
         "type": "intro",
         "templateId": "fwc-history",
         "numbers": [
