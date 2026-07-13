@@ -192,20 +192,25 @@ console.log('Reservation-aware candidates');
 const partyNeedsBra: ParsedList = { needs: ['BRA-3'], swaps: ['ARG-10'], swapQty: {}, unmatched: [] };
 // I hold exactly one spare of BRA-3 (count 2) and am missing ARG-10.
 const myC: Record<string, number> = { 'BRA-3': 2, 'ARG-10': 0 };
-// That one spare is already promised to another open swap -> not offerable again.
+// That one spare is already promised to another OPEN swap. It is still OFFERED (the
+// open swap hasn't settled) but flagged as reserved so the UI can warn of a double-book.
 const fullyReserved = computeReservations([
   { id: 'x', name: 'X', createdAt: 1, status: 'open', theirNeeds: [], theirSwaps: [], giving: ['BRA-3'], receiving: ['ARG-10'] },
 ]);
 const candR = computeCandidates(myC, partyNeedsBra, fullyReserved);
-assert(!candR.youGive.includes('BRA-3'), 'fully-reserved spare is NOT offered to a second swap');
-assert(!candR.youGet.includes('ARG-10'), 'a sticker already being received is NOT offered again');
-// With two spares (count 3) and one reserved, one copy is still offerable.
+assert(candR.youGive.includes('BRA-3'), 'fully-reserved spare is still OFFERED to a second open swap');
+assert(candR.giveReserved.has('BRA-3'), 'fully-reserved spare is FLAGGED as already promised');
+assert(candR.youGet.includes('ARG-10'), 'a sticker already being received is still offered');
+assert(candR.getReserved.has('ARG-10'), 'a sticker already being received is FLAGGED');
+// With two spares (count 3) and one reserved, a free copy remains -> offered, not flagged.
 const myC2: Record<string, number> = { 'BRA-3': 3, 'ARG-10': 0 };
 const candR2 = computeCandidates(myC2, partyNeedsBra, fullyReserved);
 assert(candR2.youGive.includes('BRA-3'), 'partially-reserved spare is still offerable');
-// Backward compatible: no reservations -> original behaviour.
+assert(!candR2.giveReserved.has('BRA-3'), 'partially-reserved spare with a free copy is NOT flagged');
+// Backward compatible: no reservations -> plain overlap, nothing flagged.
 const candPlain = computeCandidates(myC, partyNeedsBra);
 assert(candPlain.youGive.includes('BRA-3') && candPlain.youGet.includes('ARG-10'), 'no reservations behaves as before');
+assert(candPlain.giveReserved.size === 0 && candPlain.getReserved.size === 0, 'no reservations flags nothing');
 
 // --- Give floor at settlement (never empties owned, protects others' reservations) ---
 console.log('quantityAfterGive floor');

@@ -570,6 +570,13 @@ button {
   font-size: 13px;
   padding: 4px 14px 16px;
 }
+.reserved-note {
+  color: #f3b4a8;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 2px 2px;
+  line-height: 1.4;
+}
 
 /* ---------- Stats ---------- */
 .stats-hero {
