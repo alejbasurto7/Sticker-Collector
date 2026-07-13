@@ -11,6 +11,9 @@ import ShareCard from './ShareCard';
 
 const PACK_SIZE = 5;
 
+type PageSort = 'album' | 'pct-desc' | 'az';
+type PageFilter = 'all' | 'incomplete' | 'complete';
+
 export default function StatsView() {
   const counts = useCollection((s) => s.counts);
   const swaps = useCollection((s) => s.swaps);
@@ -45,6 +48,23 @@ export default function StatsView() {
   );
   const shareRef = useRef<HTMLDivElement>(null);
   const [sharing, setSharing] = useState(false);
+  const [pageSort, setPageSort] = useState<PageSort>('album');
+  const [pageFilter, setPageFilter] = useState<PageFilter>('all');
+
+  // "Progress by page" list, reshaped by the sort/filter controls. Album order
+  // is the natural order of stats.pages, so we only re-sort for the other modes.
+  const visiblePages = useMemo(() => {
+    let pages = stats.pages;
+    if (pageFilter === 'incomplete') pages = pages.filter((p) => !p.complete);
+    else if (pageFilter === 'complete') pages = pages.filter((p) => p.complete);
+
+    if (pageSort === 'pct-desc') {
+      pages = [...pages].sort((a, b) => b.pct - a.pct);
+    } else if (pageSort === 'az') {
+      pages = [...pages].sort((a, b) => a.code.localeCompare(b.code));
+    }
+    return pages;
+  }, [stats.pages, pageSort, pageFilter]);
 
   // Simple completion projection: as the album fills up, new packs yield fewer
   // needed stickers. Estimate remaining packs with a coupon-collector-style factor.
@@ -159,8 +179,34 @@ export default function StatsView() {
       </div>
 
       <div className="section-title">Progress by page</div>
+      <div className="page-controls">
+        <select
+          className="sort-select"
+          aria-label="Sort pages"
+          value={pageSort}
+          onChange={(e) => setPageSort(e.target.value as PageSort)}
+        >
+          <option value="album">Album order</option>
+          <option value="pct-desc">Percentage</option>
+          <option value="az">Alphabetical</option>
+        </select>
+        <select
+          className="sort-select"
+          aria-label="Filter pages"
+          value={pageFilter}
+          onChange={(e) => setPageFilter(e.target.value as PageFilter)}
+        >
+          <option value="all">All pages</option>
+          <option value="incomplete">Not completed</option>
+          <option value="complete">Completed</option>
+        </select>
+      </div>
       <div className="card">
-        <BarChart pages={stats.pages} />
+        {visiblePages.length ? (
+          <BarChart pages={visiblePages} />
+        ) : (
+          <p className="empty-note">No pages match this filter.</p>
+        )}
       </div>
 
       {/* Off-screen card rendered for image export — portaled to body so it
