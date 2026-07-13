@@ -5,10 +5,16 @@ import type { ParsedList } from './import';
  * Candidate stickers for a potential trade between the user and another collector.
  * - youGive: user's duplicates that the other collector needs.
  * - youGet: other collector's duplicates that the user is missing.
+ * - giveReserved: subset of youGive whose only spare copies are already promised in
+ *   another OPEN swap. Still offered (an open swap hasn't settled, the sticker is
+ *   physically in hand) but flagged so the UI can warn about the double-booking.
+ * - getReserved: subset of youGet the user is already lined up to receive elsewhere.
  */
 export interface SwapCandidates {
   youGive: string[];
   youGet: string[];
+  giveReserved: Set<string>;
+  getReserved: Set<string>;
 }
 
 /**
@@ -55,10 +61,14 @@ export function computeReservations(swaps: Swap[], excludeSwapId?: string): Rese
 }
 
 /**
- * Reservation-aware two-way overlap. Spares already promised in other open swaps are
- * excluded from `youGive`, and stickers already lined up to receive are excluded from
- * `youGet` — so a spare is never double-promised and you never chase a sticker you are
- * already getting. With no `reservations` it falls back to the plain overlap.
+ * Reservation-aware two-way overlap. Every spare the other collector needs is offered
+ * in `youGive`, and every spare of theirs the user is missing is offered in `youGet`.
+ * Reservations from other OPEN swaps no longer hide a candidate — an open swap has not
+ * settled, so the sticker is still physically in hand — they only flag it (`giveReserved`
+ * / `getReserved`) as already promised, so the UI can warn about the double-booking
+ * instead of silently reporting "no matches". A closed swap has already been settled
+ * into `counts`, so it drops the spare naturally. With no `reservations`, nothing is
+ * flagged and the result is the plain overlap.
  */
 export function computeCandidates(
   counts: Counts,
@@ -72,19 +82,25 @@ export function computeCandidates(
 
   const youGive: string[] = [];
   const youGet: string[] = [];
+  const giveReserved = new Set<string>();
+  const getReserved = new Set<string>();
 
-  // My spares they need, minus copies already promised elsewhere (offerable >= 1).
+  // My spares they need. A copy already promised in another open swap is still offered
+  // but flagged when no free spare is left for a second swap (committed >= spare).
   for (const id of otherNeeds) {
     const spare = Math.max((counts[id] ?? 0) - 1, 0);
-    const offerable = spare - (committedGive?.get(id) ?? 0);
-    if (offerable >= 1) youGive.push(id);
+    if (spare < 1) continue;
+    youGive.push(id);
+    if ((committedGive?.get(id) ?? 0) >= spare) giveReserved.add(id);
   }
-  // Their spares I'm missing, unless I'm already receiving that sticker.
+  // Their spares I'm missing. Flagged when I'm already lined up to receive it elsewhere.
   for (const id of otherSwaps) {
-    if ((counts[id] ?? 0) === 0 && !committedGet?.has(id)) youGet.push(id);
+    if ((counts[id] ?? 0) !== 0) continue;
+    youGet.push(id);
+    if (committedGet?.has(id)) getReserved.add(id);
   }
 
-  return { youGive, youGet };
+  return { youGive, youGet, giveReserved, getReserved };
 }
 
 /**

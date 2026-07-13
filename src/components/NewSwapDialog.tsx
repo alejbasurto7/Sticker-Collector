@@ -68,9 +68,29 @@ export default function NewSwapDialog({ onClose, initialText, editSwap }: Props)
     const p = parseExport(text);
     setParsed(p);
     const c = computeCandidates(counts, p, reservations);
-    setGive(new Set(c.youGive));
-    setGet(new Set(c.youGet));
+    // Auto-select the freely available matches; leave anything already promised in
+    // another open swap unselected so double-booking is an opt-in (the ⚠️ flags it).
+    setGive(new Set(c.youGive.filter((id) => !c.giveReserved.has(id))));
+    setGet(new Set(c.youGet.filter((id) => !c.getReserved.has(id))));
   };
+
+  // Tooltip maps that mark candidates already spoken for in another open swap, so the
+  // chips show a ⚠️ instead of the sticker just going missing from the results.
+  const giveConflicts = useMemo(() => {
+    const m = new Map<string, string>();
+    candidates?.giveReserved.forEach((id) =>
+      m.set(id, 'Your spare is already promised in another open swap.'),
+    );
+    return m;
+  }, [candidates]);
+
+  const getConflicts = useMemo(() => {
+    const m = new Map<string, string>();
+    candidates?.getReserved.forEach((id) =>
+      m.set(id, "You're already lined up to receive this in another open swap."),
+    );
+    return m;
+  }, [candidates]);
 
   const toggle = (set: Set<string>, setSet: (s: Set<string>) => void, id: string) => {
     const next = new Set(set);
@@ -137,7 +157,15 @@ export default function NewSwapDialog({ onClose, initialText, editSwap }: Props)
               ids={displayIds(candidates.youGive, give)}
               selected={give}
               onToggle={(id) => toggle(give, setGive, id)}
+              conflicts={giveConflicts}
             />
+            {candidates.giveReserved.size > 0 && (
+              <p className="reserved-note">
+                ⚠️ {candidates.giveReserved.size} spare
+                {candidates.giveReserved.size > 1 ? 's are' : ' is'} already promised in
+                another open swap. Tap to include and double-book anyway.
+              </p>
+            )}
 
             <div className="section-title">
               You can get ({get.size}/{candidates.youGet.length})
@@ -146,7 +174,15 @@ export default function NewSwapDialog({ onClose, initialText, editSwap }: Props)
               ids={displayIds(candidates.youGet, get)}
               selected={get}
               onToggle={(id) => toggle(get, setGet, id)}
+              conflicts={getConflicts}
             />
+            {candidates.getReserved.size > 0 && (
+              <p className="reserved-note">
+                ⚠️ {candidates.getReserved.size} sticker
+                {candidates.getReserved.size > 1 ? 's are' : ' is'} already coming from
+                another open swap. Tap to include if you want a backup.
+              </p>
+            )}
 
             {candidates.youGive.length === 0 && candidates.youGet.length === 0 && (
               <p className="empty-note">No matching stickers with this collector.</p>
