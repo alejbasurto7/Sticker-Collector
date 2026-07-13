@@ -989,6 +989,56 @@ button {
   margin-bottom: 14px;
 }
 
+/* ---------- "How it works?" help icon + sheet ---------- */
+.help-btn {
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.help-modal {
+  text-align: center;
+}
+.help-title {
+  text-align: center;
+  font-size: 24px;
+  margin: 6px 0 24px;
+}
+.help-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  margin-bottom: 8px;
+}
+.help-step-label {
+  color: var(--text-dim);
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 14px;
+}
+.help-demo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+/* Fixed-size, non-interactive demo cells so the illustration reads clearly
+   regardless of the album grid the real cells normally size to. */
+.help-demo .cell {
+  width: 64px;
+  height: 64px;
+  aspect-ratio: auto;
+  font-size: 20px;
+  cursor: default;
+}
+.help-demo .cell:active {
+  transform: none;
+}
+.help-arrow {
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
 /* Share-list sheet ("Select stickers to share") */
 .share-options {
   display: flex;
