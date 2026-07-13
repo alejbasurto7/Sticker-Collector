@@ -4,6 +4,8 @@ import { CC_EMOJI, EDITION_INFO } from '../data/sampleAlbum';
 import { ALBUM_TYPE } from '../config';
 import { VERSION_LABEL } from '../version';
 import type { Edition } from '../types';
+import { buildListExport } from '../utils/listExport';
+import { copyToClipboard } from '../utils/share';
 import ImportDialog from './ImportDialog';
 
 interface Props {
@@ -26,10 +28,12 @@ export default function EditionDialog({ onClose }: Props) {
   const createAlbum = useCollection((s) => s.createAlbum);
   const switchAlbum = useCollection((s) => s.switchAlbum);
   const deleteAlbum = useCollection((s) => s.deleteAlbum);
+  const counts = useCollection((s) => s.counts);
 
   const [draft, setDraft] = useState(albumName);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [exported, setExported] = useState(false);
 
   // The album name changes out from under us when the user creates or switches
   // albums, so keep the editable draft mirrored to the active album's name.
@@ -52,6 +56,18 @@ export default function EditionDialog({ onClose }: Props) {
     deleteAlbum(activeAlbumId);
     setConfirmingDelete(false);
     onClose();
+  }
+
+  // Copy the whole collection to the clipboard in the exact "Figuritas App - List"
+  // format the Import dialog consumes, so it can be transferred to another app or
+  // kept as a backup. Both sections + swap quantities make the export lossless.
+  async function handleExport() {
+    const text = buildListExport(counts, albumName, 'both', true);
+    const ok = await copyToClipboard(text);
+    if (ok) {
+      setExported(true);
+      window.setTimeout(() => setExported(false), 1800);
+    }
   }
 
   return (
@@ -99,11 +115,24 @@ export default function EditionDialog({ onClose }: Props) {
           </div>
 
           <div className="settings-actions">
-            <button type="button" className="btn full" onClick={() => createAlbum()}>
+            <button
+              type="button"
+              className="btn full"
+              style={{ gridColumn: '1 / -1' }}
+              onClick={() => createAlbum()}
+            >
               ➕ New Album
             </button>
             <button type="button" className="btn full" onClick={() => setImportOpen(true)}>
-              ⬆ Import list
+              ⬇ Import…
+            </button>
+            <button
+              type="button"
+              className="btn full"
+              onClick={handleExport}
+              aria-live="polite"
+            >
+              {exported ? '✓ Copied' : '⬆ Export'}
             </button>
           </div>
         </section>
