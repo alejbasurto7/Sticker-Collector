@@ -97,6 +97,8 @@ interface CollectionState {
       giving?: string[];
       receiving?: string[];
       name?: string;
+      theirNeeds?: string[];
+      theirSwaps?: string[];
       deselectedGiving?: string[];
       deselectedReceiving?: string[];
     },
@@ -390,6 +392,8 @@ export const useCollection = create<CollectionState>()(
                   ...(patch.giving ? { giving: patch.giving } : {}),
                   ...(patch.receiving ? { receiving: patch.receiving } : {}),
                   ...(patch.name !== undefined ? { name: patch.name } : {}),
+                  ...(patch.theirNeeds ? { theirNeeds: patch.theirNeeds } : {}),
+                  ...(patch.theirSwaps ? { theirSwaps: patch.theirSwaps } : {}),
                   ...(patch.deselectedGiving ? { deselectedGiving: patch.deselectedGiving } : {}),
                   ...(patch.deselectedReceiving
                     ? { deselectedReceiving: patch.deselectedReceiving }

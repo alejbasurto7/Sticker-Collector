@@ -1,12 +1,16 @@
 import { useMemo, useState } from 'react';
 import { useCollection } from '../store/collectionStore';
 import { parseExport } from '../utils/import';
+import { buildListFromIds } from '../utils/listExport';
 import { computeCandidates, computeReservations } from '../utils/swap';
+import type { Swap } from '../types';
 import StickerChips from './StickerChips';
 
 interface Props {
   onClose: () => void;
   initialText?: string;
+  /** When set, the dialog edits this existing swap instead of creating a new one. */
+  editSwap?: Swap;
 }
 
 const SAMPLE = `Figuritas App - List
@@ -16,20 +20,44 @@ BRA 🇧🇷: 3, 4, 5
 To Swap
 MEX 🇲🇽: 7, 8`;
 
-export default function NewSwapDialog({ onClose, initialText }: Props) {
+/** Candidate ids to render: fresh candidates first, then any still-selected ids
+ *  no longer offered (e.g. an existing pick whose spare situation has changed). */
+const displayIds = (candidateIds: string[], selected: Set<string>) => {
+  const extra = [...selected].filter((id) => !candidateIds.includes(id));
+  return [...candidateIds, ...extra];
+};
+
+export default function NewSwapDialog({ onClose, initialText, editSwap }: Props) {
   const counts = useCollection((s) => s.counts);
   const swaps = useCollection((s) => s.swaps);
+  const albumName = useCollection((s) => s.albumName);
   const createSwap = useCollection((s) => s.createSwap);
+  const updateSwap = useCollection((s) => s.updateSwap);
 
-  const [name, setName] = useState('');
-  const [text, setText] = useState(initialText ?? '');
-  const [parsed, setParsed] = useState<ReturnType<typeof parseExport> | null>(null);
-  const [give, setGive] = useState<Set<string>>(new Set());
-  const [get, setGet] = useState<Set<string>>(new Set());
+  const isEdit = !!editSwap;
+
+  const [name, setName] = useState(editSwap?.name ?? '');
+  const [text, setText] = useState(
+    editSwap
+      ? buildListFromIds(editSwap.theirNeeds, editSwap.theirSwaps, albumName)
+      : initialText ?? '',
+  );
+  // In edit mode, seed straight from the saved swap so its matches show without a re-scan.
+  const [parsed, setParsed] = useState<ReturnType<typeof parseExport> | null>(
+    editSwap
+      ? { needs: editSwap.theirNeeds, swaps: editSwap.theirSwaps, swapQty: {}, unmatched: [] }
+      : null,
+  );
+  const [give, setGive] = useState<Set<string>>(() => new Set(editSwap?.giving ?? []));
+  const [get, setGet] = useState<Set<string>>(() => new Set(editSwap?.receiving ?? []));
 
   // Live reservations across all open swaps, so spares already promised elsewhere are
-  // never offered here and a sticker already being received is never chased again.
-  const reservations = useMemo(() => computeReservations(swaps), [swaps]);
+  // never offered here and a sticker already being received is never chased again. When
+  // editing, exclude this swap so its own promises don't count against itself.
+  const reservations = useMemo(
+    () => computeReservations(swaps, editSwap?.id),
+    [swaps, editSwap?.id],
+  );
 
   const candidates = useMemo(
     () => (parsed ? computeCandidates(counts, parsed, reservations) : null),
@@ -53,20 +81,30 @@ export default function NewSwapDialog({ onClose, initialText }: Props) {
 
   const save = () => {
     if (!parsed) return;
-    createSwap({
-      name,
-      theirNeeds: parsed.needs,
-      theirSwaps: parsed.swaps,
-      giving: [...give],
-      receiving: [...get],
-    });
+    if (editSwap) {
+      updateSwap(editSwap.id, {
+        name,
+        theirNeeds: parsed.needs,
+        theirSwaps: parsed.swaps,
+        giving: [...give],
+        receiving: [...get],
+      });
+    } else {
+      createSwap({
+        name,
+        theirNeeds: parsed.needs,
+        theirSwaps: parsed.swaps,
+        giving: [...give],
+        receiving: [...get],
+      });
+    }
     onClose();
   };
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h2>New swap</h2>
+        <h2>{isEdit ? 'Edit swap' : 'New swap'}</h2>
         <p className="modal-sub">
           Name the swap and paste the other collector's exported list to find matches.
         </p>
@@ -96,7 +134,7 @@ export default function NewSwapDialog({ onClose, initialText }: Props) {
               You can give ({give.size}/{candidates.youGive.length})
             </div>
             <StickerChips
-              ids={candidates.youGive}
+              ids={displayIds(candidates.youGive, give)}
               selected={give}
               onToggle={(id) => toggle(give, setGive, id)}
             />
@@ -105,7 +143,7 @@ export default function NewSwapDialog({ onClose, initialText }: Props) {
               You can get ({get.size}/{candidates.youGet.length})
             </div>
             <StickerChips
-              ids={candidates.youGet}
+              ids={displayIds(candidates.youGet, get)}
               selected={get}
               onToggle={(id) => toggle(get, setGet, id)}
             />
@@ -121,7 +159,7 @@ export default function NewSwapDialog({ onClose, initialText }: Props) {
             Cancel
           </button>
           <button className="btn primary full" onClick={save} disabled={!parsed}>
-            Save swap
+            {isEdit ? 'Save changes' : 'Save swap'}
           </button>
         </div>
       </div>
