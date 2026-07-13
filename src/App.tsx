@@ -8,6 +8,7 @@ import AlbumView from './components/AlbumView';
 import SwapsView from './components/SwapsView';
 import StatsView from './components/StatsView';
 import EditionDialog from './components/EditionDialog';
+import HelpDialog from './components/HelpDialog';
 import ShareListDialog from './components/ShareListDialog';
 import AchievementToaster from './components/AchievementToaster';
 import ReloadPrompt from './components/ReloadPrompt';
@@ -16,6 +17,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('album');
   const [editionOpen, setEditionOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const counts = useCollection((s) => s.counts);
   const swaps = useCollection((s) => s.swaps);
   const edition = useCollection((s) => s.edition);
@@ -85,6 +87,14 @@ export default function App() {
             <button className="icon-btn" onClick={() => setEditionOpen(true)} aria-label="Settings">
               ⚙️
             </button>
+            <button
+              className="icon-btn help-btn"
+              onClick={() => setHelpOpen(true)}
+              aria-label="How it works"
+              title="How it works"
+            >
+              ?
+            </button>
           </div>
         </div>
         <div className="subtitle">{ALBUM_TYPE}</div>
@@ -110,6 +120,7 @@ export default function App() {
 
       {shareOpen && <ShareListDialog onClose={() => setShareOpen(false)} />}
       {editionOpen && <EditionDialog onClose={() => setEditionOpen(false)} />}
+      {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} />}
 
       <AchievementToaster />
       <ReloadPrompt />
