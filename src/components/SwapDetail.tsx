@@ -4,6 +4,7 @@ import { useCollection } from '../store/collectionStore';
 import { computeConflicts } from '../utils/swap';
 import StickerChips from './StickerChips';
 import SwapClose from './SwapClose';
+import NewSwapDialog from './NewSwapDialog';
 
 /** Same membership, order-independent — used to tell saved state from edited state. */
 const sameMembers = (set: Set<string>, arr: string[]) =>
@@ -21,6 +22,7 @@ export default function SwapDetail({ swap, onClose }: Props) {
   const rollbackSwap = useCollection((s) => s.rollbackSwap);
   const updateSwap = useCollection((s) => s.updateSwap);
   const [closing, setClosing] = useState(false);
+  const [editing, setEditing] = useState(false);
   // Seed from what's already saved so reopening shows prior edits.
   const [deselectedGiving, setDeselectedGiving] = useState(() => new Set(swap.deselectedGiving ?? []));
   const [deselectedReceiving, setDeselectedReceiving] = useState(() => new Set(swap.deselectedReceiving ?? []));
@@ -179,6 +181,11 @@ export default function SwapDetail({ swap, onClose }: Props) {
               ↩ Rollback
             </button>
           )}
+          {isOpen && (
+            <button className="btn" onClick={() => setEditing(true)}>
+              ✎ Edit
+            </button>
+          )}
           <button className="btn" onClick={onClose}>
             Close
           </button>
@@ -198,6 +205,8 @@ export default function SwapDetail({ swap, onClose }: Props) {
             }}
           />
         )}
+
+        {editing && <NewSwapDialog editSwap={swap} onClose={() => setEditing(false)} />}
       </div>
     </div>
   );

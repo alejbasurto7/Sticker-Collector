@@ -49,3 +49,36 @@ export function buildListExport(
   if (scope !== 'needs' && swapLines.length > 0) parts.push('To Swap', ...swapLines);
   return parts.join('\n');
 }
+
+/**
+ * Rebuild a collector's list text from explicit needs/swaps sticker-id arrays,
+ * in the same "Figuritas App - List" format buildListExport() produces and
+ * parseExport() consumes. Used to re-populate the "Their list" field when
+ * editing a saved swap, whose parsed needs/swaps are all that's kept.
+ */
+export function buildListFromIds(needs: string[], swaps: string[], albumName: string): string {
+  const needSet = new Set(needs);
+  const swapSet = new Set(swaps);
+  const needLines: string[] = [];
+  const swapLines: string[] = [];
+
+  for (const page of album.pages) {
+    const needNums: string[] = [];
+    const swapNums: string[] = [];
+
+    for (const stickerId of page.stickerIds) {
+      const sticker = stickerById[stickerId];
+      if (!sticker) continue;
+      if (needSet.has(stickerId)) needNums.push(sticker.number);
+      if (swapSet.has(stickerId)) swapNums.push(sticker.number);
+    }
+
+    if (needNums.length > 0) needLines.push(`${page.code} ${page.emoji}: ${needNums.join(', ')}`);
+    if (swapNums.length > 0) swapLines.push(`${page.code} ${page.emoji}: ${swapNums.join(', ')}`);
+  }
+
+  const parts: string[] = ['Figuritas App - List', albumName];
+  if (needLines.length > 0) parts.push('I need', ...needLines);
+  if (swapLines.length > 0) parts.push('To Swap', ...swapLines);
+  return parts.join('\n');
+}
