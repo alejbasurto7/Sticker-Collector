@@ -70,3 +70,28 @@ describe('parseExport section headers', () => {
     expect(p.swapQty['CAN-1']).toBe(2);
   });
 });
+
+describe('parseExport additive tally (all)', () => {
+  it('counts every listed copy regardless of section, using (×N) quantities', () => {
+    const p = parseExport('I need\nMEX: 8\nTo Swap\nCAN: 1(2x), 5');
+    // Needs and swaps alike contribute their copies to the merge tally.
+    expect(p.all['MEX-8']).toBe(1);
+    expect(p.all['CAN-1']).toBe(2); // the (2x) suffix
+    expect(p.all['CAN-5']).toBe(1);
+  });
+
+  it('sums repeats of the same sticker', () => {
+    const p = parseExport('To Swap\nMEX: 1(2x), 1');
+    expect(p.all['MEX-1']).toBe(3); // 2 + 1
+  });
+
+  it('tallies stickers listed with no section header at all', () => {
+    const p = parseExport('MEX: 1, 2(×3)');
+    // No header, so the Replace-facing lists stay empty…
+    expect(p.needs).toHaveLength(0);
+    expect(p.swaps).toHaveLength(0);
+    // …but the additive tally still picks them up.
+    expect(p.all['MEX-1']).toBe(1);
+    expect(p.all['MEX-2']).toBe(3);
+  });
+});
