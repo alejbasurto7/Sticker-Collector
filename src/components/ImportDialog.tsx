@@ -21,27 +21,40 @@ export default function ImportDialog({ onClose }: Props) {
   const [result, setResult] = useState<string | null>(null);
   const importCounts = useCollection((s) => s.importCounts);
 
+  const skipped = (parsed: ReturnType<typeof parseExport>) =>
+    parsed.unmatched.length
+      ? ` Skipped ${parsed.unmatched.length} unknown: ${parsed.unmatched.slice(0, 6).join(', ')}${parsed.unmatched.length > 6 ? '…' : ''}`
+      : '';
+
   const apply = () => {
     const parsed = parseExport(text);
+
+    if (mode === 'merge') {
+      // Merge adds every listed copy on top of the current counts, regardless
+      // of which section (or none) each sticker sat under.
+      const stickers = Object.keys(parsed.all).length;
+      if (stickers === 0) {
+        setResult('No stickers found. Check the numbers match this album.');
+        return;
+      }
+      const copies = Object.values(parsed.all).reduce((sum, n) => sum + n, 0);
+      importCounts(parsed.all, 'merge');
+      setResult(
+        `Merged: +${copies} ${copies === 1 ? 'copy' : 'copies'} across ${stickers} ${stickers === 1 ? 'sticker' : 'stickers'}.` +
+          skipped(parsed),
+      );
+      return;
+    }
+
     if (parsed.needs.length === 0 && parsed.swaps.length === 0) {
       setResult('No stickers found. Check the format (sections like "I need" / "To Swap").');
       return;
     }
     const allIds = album.stickers.map((s) => s.id);
-    if (mode === 'replace') {
-      importCounts(parsedToCounts(parsed, allIds), 'replace');
-    } else {
-      // Merge: only adjust the stickers mentioned in the export.
-      const map: Record<string, number> = {};
-      for (const id of parsed.needs) map[id] = 0;
-      for (const id of parsed.swaps) map[id] = 1 + (parsed.swapQty[id] ?? 1);
-      importCounts(map, 'merge');
-    }
-    const parts = [`Imported: ${parsed.needs.length} missing, ${parsed.swaps.length} swaps.`];
-    if (parsed.unmatched.length) {
-      parts.push(`Skipped ${parsed.unmatched.length} unknown: ${parsed.unmatched.slice(0, 6).join(', ')}${parsed.unmatched.length > 6 ? '…' : ''}`);
-    }
-    setResult(parts.join(' '));
+    importCounts(parsedToCounts(parsed, allIds), 'replace');
+    setResult(
+      `Imported: ${parsed.needs.length} missing, ${parsed.swaps.length} swaps.` + skipped(parsed),
+    );
   };
 
   return (
@@ -49,8 +62,10 @@ export default function ImportDialog({ onClose }: Props) {
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h2>Import collection</h2>
         <p className="modal-sub">
-          Paste a Figuritas export. "I need" stickers become missing; "To Swap" become
-          duplicates. In Replace mode everything else is marked owned.
+          Paste a Figuritas export. <strong>Replace</strong> rebuilds the album from the list:
+          "I need" stickers become missing, "To Swap" become duplicates, everything else owned.
+          <strong> Merge</strong> just adds every listed copy on top of your current counts —
+          the section headers don't matter.
         </p>
 
         <textarea

@@ -354,8 +354,11 @@ export const useCollection = create<CollectionState>()(
             mode === 'replace'
               ? { ...map }
               : (() => {
+                  // Merge is additive: each map entry is a COPY DELTA added on
+                  // top of the current count, never an absolute overwrite.
                   const merged = { ...s.counts };
-                  for (const [id, n] of Object.entries(map)) merged[id] = clampCount(n);
+                  for (const [id, n] of Object.entries(map))
+                    merged[id] = clampCount((merged[id] ?? 0) + n);
                   return merged;
                 })();
           // Bump the import marker so the achievement banner can recognise this

@@ -7,6 +7,13 @@ export interface ParsedList {
   swaps: string[];
   /** Spare copies per swap sticker id, e.g. "2 (×3)" -> 3. Defaults to 1. */
   swapQty: Record<string, number>;
+  /**
+   * Total copies listed per sticker id across the ENTIRE list, ignoring which
+   * section (or none) each line sat under. Every listed number contributes its
+   * quantity (1, or N for a "(×N)" suffix); repeats sum. This is what an
+   * additive Merge adds on top of the current counts.
+   */
+  all: Record<string, number>;
   /** Raw tokens that could not be matched to a sticker. */
   unmatched: string[];
 }
@@ -64,6 +71,7 @@ export function parseExport(text: string): ParsedList {
   const needs: string[] = [];
   const swaps: string[] = [];
   const swapQty: Record<string, number> = {};
+  const all: Record<string, number> = {};
   const unmatched: string[] = [];
   let section: Section = null;
 
@@ -78,8 +86,6 @@ export function parseExport(text: string): ParsedList {
       // right side the comma-separated numbers.
       const label = match[1].trim();
 
-      if (!section) continue; // numbers before any section header → ignore
-
       for (const piece of match[2].split(',')) {
         const token = piece.trim();
         if (!token) continue;
@@ -93,12 +99,19 @@ export function parseExport(text: string): ParsedList {
         if (!/^\d+$/.test(number)) continue;
         const id = resolveStickerIdFromLabel(label, number);
         if (!id) {
-          unmatched.push(`${label} ${number}`.trim());
+          // Only flag unknowns that sit under a real section header. Stray
+          // numbers in the pre-list preamble (album name, edition) aren't
+          // stickers and shouldn't be reported as skipped.
+          if (section) unmatched.push(`${label} ${number}`.trim());
           continue;
         }
+        // Additive-merge tally: every listed copy counts, whatever section (or
+        // none) it appeared under.
+        all[id] = (all[id] ?? 0) + qty;
+        // The needs/swaps split still honours the header, for Replace mode.
         if (section === 'needs') {
           needs.push(id);
-        } else {
+        } else if (section === 'swaps') {
           swaps.push(id);
           swapQty[id] = qty;
         }
@@ -115,6 +128,7 @@ export function parseExport(text: string): ParsedList {
     needs: [...new Set(needs)],
     swaps: [...new Set(swaps)],
     swapQty,
+    all,
     unmatched,
   };
 }

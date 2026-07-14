@@ -45,7 +45,7 @@ export default function NewSwapDialog({ onClose, initialText, editSwap }: Props)
   // In edit mode, seed straight from the saved swap so its matches show without a re-scan.
   const [parsed, setParsed] = useState<ReturnType<typeof parseExport> | null>(
     editSwap
-      ? { needs: editSwap.theirNeeds, swaps: editSwap.theirSwaps, swapQty: {}, unmatched: [] }
+      ? { needs: editSwap.theirNeeds, swaps: editSwap.theirSwaps, swapQty: {}, all: {}, unmatched: [] }
       : null,
   );
   const [give, setGive] = useState<Set<string>>(() => new Set(editSwap?.giving ?? []));
