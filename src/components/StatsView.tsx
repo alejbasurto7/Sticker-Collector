@@ -9,8 +9,6 @@ import BarChart from './BarChart';
 import Achievements from './Achievements';
 import ShareCard from './ShareCard';
 
-const PACK_SIZE = 5;
-
 type PageSort = 'album' | 'pct-desc' | 'az';
 type PageFilter = 'all' | 'incomplete' | 'complete';
 
@@ -66,17 +64,6 @@ export default function StatsView() {
     return pages;
   }, [stats.pages, pageSort, pageFilter]);
 
-  // Simple completion projection: as the album fills up, new packs yield fewer
-  // needed stickers. Estimate remaining packs with a coupon-collector-style factor.
-  const projection = useMemo(() => {
-    if (stats.missing === 0) return null;
-    const fillRatio = stats.ownedUnique / stats.totalStickers;
-    // Probability a given new sticker is one you still need shrinks as you fill up.
-    const usefulPerSticker = Math.max(1 - fillRatio, 0.03);
-    const stickersNeeded = stats.missing / usefulPerSticker;
-    return Math.ceil(stickersNeeded / PACK_SIZE);
-  }, [stats]);
-
   const onShare = async () => {
     if (!shareRef.current) return;
     setSharing(true);
@@ -88,7 +75,6 @@ export default function StatsView() {
   };
 
   const md = stats.mostDuplicated;
-  const topPage = [...stats.pages].sort((a, b) => b.pct - a.pct)[0];
 
   return (
     <div>
@@ -138,16 +124,6 @@ export default function StatsView() {
           <div className="h-main">
             {md ? `${md.emoji} ${md.code} ${md.number} ×${md.extra + 1}` : '—'}
           </div>
-        </div>
-        <div className="highlight">
-          <div className="h-top">Top page</div>
-          <div className="h-main">
-            {topPage ? `${topPage.emoji} ${topPage.code} ${Math.round(topPage.pct * 100)}%` : '—'}
-          </div>
-        </div>
-        <div className="highlight">
-          <div className="h-top">Projection to finish</div>
-          <div className="h-main">{projection === null ? '🎉 Done!' : `≈ ${projection} packs`}</div>
         </div>
         <div className="highlight">
           <div className="h-top">Current streak</div>
