@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Swap } from '../types';
 import { useCollection } from '../store/collectionStore';
 import { computeConflicts } from '../utils/swap';
+import { buildSwapExport } from '../utils/listExport';
+import { copyToClipboard } from '../utils/share';
 import StickerChips from './StickerChips';
 import SwapClose from './SwapClose';
 import NewSwapDialog from './NewSwapDialog';
@@ -27,10 +29,13 @@ export default function SwapDetail({ swap, onClose }: Props) {
   const [deselectedGiving, setDeselectedGiving] = useState(() => new Set(swap.deselectedGiving ?? []));
   const [deselectedReceiving, setDeselectedReceiving] = useState(() => new Set(swap.deselectedReceiving ?? []));
   const [justSaved, setJustSaved] = useState(false);
+  const [justCopied, setJustCopied] = useState(false);
   const savedTimer = useRef<number | null>(null);
+  const copiedTimer = useRef<number | null>(null);
   useEffect(
     () => () => {
       if (savedTimer.current) clearTimeout(savedTimer.current);
+      if (copiedTimer.current) clearTimeout(copiedTimer.current);
     },
     [],
   );
@@ -102,6 +107,15 @@ export default function SwapDetail({ swap, onClose }: Props) {
     savedTimer.current = window.setTimeout(() => setJustSaved(false), 1500);
   };
 
+  const exportList = async () => {
+    const text = buildSwapExport([...giving], [...receiving]);
+    const ok = await copyToClipboard(text);
+    if (!ok) return;
+    setJustCopied(true);
+    if (copiedTimer.current) clearTimeout(copiedTimer.current);
+    copiedTimer.current = window.setTimeout(() => setJustCopied(false), 1500);
+  };
+
   const remove = () => {
     if (confirm(`Delete swap “${swap.name}”? This won't change your collection.`)) {
       deleteSwap(swap.id);
@@ -161,10 +175,18 @@ export default function SwapDetail({ swap, onClose }: Props) {
           readOnly={!isOpen}
         />
 
+        <button
+          className={`btn full ${justCopied ? 'success' : ''}`}
+          style={{ marginTop: 14 }}
+          onClick={exportList}
+        >
+          {justCopied ? '✓ Copied to clipboard' : 'Export'}
+        </button>
+
         {isOpen && (
           <button
             className={`btn full ${justSaved ? 'success' : 'primary'}`}
-            style={{ marginTop: 14 }}
+            style={{ marginTop: 10 }}
             onClick={save}
             disabled={!dirty && !justSaved}
           >

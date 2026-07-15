@@ -1,5 +1,6 @@
 import type { Counts } from '../types';
 import { album, stickerById } from '../data/sampleAlbum';
+import { groupByPage } from './group';
 
 /** Which sections to include in the exported list. */
 export type ListExportScope = 'both' | 'needs' | 'swaps';
@@ -48,6 +49,25 @@ export function buildListExport(
   if (scope !== 'swaps' && needLines.length > 0) parts.push('I need', ...needLines);
   if (scope !== 'needs' && swapLines.length > 0) parts.push('To Swap', ...swapLines);
   return parts.join('\n');
+}
+
+/**
+ * Build a plain-text summary of a single swap in the same "You give / You get"
+ * shape the SwapDetail screen shows: each side is a heading followed by one
+ * `emoji CODE: n, n, n` line per album page, in album order. An empty side reads
+ * "Nothing here." to mirror the on-screen empty state.
+ */
+export function buildSwapExport(giving: string[], receiving: string[]): string {
+  const sideLines = (ids: string[]): string[] => {
+    const groups = groupByPage(ids);
+    if (groups.length === 0) return ['Nothing here.'];
+    return groups.map(
+      ({ page, stickers }) =>
+        `${page.emoji} ${page.code}: ${stickers.map((s) => s.number).join(', ')}`,
+    );
+  };
+
+  return ['You give:', ...sideLines(giving), '', 'You get:', ...sideLines(receiving)].join('\n');
 }
 
 /**
