@@ -6,8 +6,10 @@ documents were removed because they described an abandoned server-side architect
 was never built.)
 
 **Sticker Collector** is a client-only React PWA for tracking a Panini-style
-sticker album, viewing collection stats, and organizing swaps with other collectors. There
-is **no backend**: all data lives in the browser's `localStorage`.
+sticker album, viewing collection stats, and organizing swaps with other collectors. All data
+lives in the browser's `localStorage`; there is **no app server**. An **optional** cross-device
+sync layer mirrors the collection to a Supabase-hosted row (see [Cross-device sync](#cross-device-sync)),
+enabled only when the build carries Supabase credentials — otherwise the app is purely local.
 
 ---
 
@@ -149,6 +151,30 @@ not merely flagged.
 
 ---
 
+## Cross-device sync ([src/sync/](../src/sync), [src/lib/](../src/lib), [src/store/syncStore.ts](../src/store/syncStore.ts))
+
+**Optional**, offline-first sync so one collection can live on multiple devices. `localStorage`
+stays the working copy; the whole persisted blob is mirrored to a single Supabase row.
+
+- **Backend:** one table `collections(code_hash, data jsonb, writer_id, version, updated_at)`,
+  RLS-locked with **no direct anon access** — all reads/writes go through two `SECURITY DEFINER`
+  RPCs, `sync_pull(code_hash)` and `sync_push(code_hash, data, writer, base_version)`. The full
+  SQL + setup lives in [docs/SUPABASE_SETUP.md](SUPABASE_SETUP.md).
+- **Pairing = a sync code.** `src/lib/syncCode.ts` generates a 12-char Crockford-base32 code;
+  the raw code never leaves the device — only its SHA-256 hash keys the row. `src/lib/supabase.ts`
+  exposes the client (or `null`) and `isSyncConfigured`; the whole feature self-hides when unset.
+- **Engine** ([src/sync/engine.ts](../src/sync/engine.ts)): debounced push on store changes,
+  pull on load/focus/visibility + a light foreground poll (Realtime deferred). An `applyingRemote`
+  flag + per-device `writer_id` break the push/pull echo loop. Remote snapshots are applied via a
+  new `applyRemoteState` store action that reruns the same reconciliation as `onRehydrateStorage`.
+- **Conflict resolution:** whole-document **last-write-wins**, guarded by the server-incremented
+  `version` (optimistic concurrency in `sync_push`). A field/album merge would be *wrong* here —
+  `counts` legitimately decrease (removals, swap settlement) — so LWW is the simplest correct rule.
+- **Metadata** (`code`, `codeHash`, `writerId`, `lastVersion`, status) lives in a **separate**
+  persisted store ([src/store/syncStore.ts](../src/store/syncStore.ts), key `figuritas-sync-v1`)
+  so the link/identity is never part of the synced blob. UI: `SyncSection` in the ⚙️ dialog +
+  `SyncDialog` (create/enter code, QR via `qrcode`, scan via `jsqr`).
+
 ## Import / export ([src/utils/import.ts](../src/utils/import.ts), [src/utils/qr.ts](../src/utils/qr.ts))
 
 `parseExport(text)` → `{ needs[], swaps[], swapQty, unmatched[] }`, tolerant of how lists
@@ -242,8 +268,9 @@ npm run preview   # serve the production build
 
 ## Notable characteristics & limitations
 
-- **Local-only, single-device.** No accounts, no sync; clearing site data wipes the
-  collection. Swaps store the other collector's pasted list, not a real user.
+- **Local-first.** Clearing site data wipes the local collection. Optional cross-device sync
+  (above) adds a cloud copy keyed by a sync code — no user accounts. Swaps store the other
+  collector's pasted list, not a real user.
 - **Editions share counts.** Switching NA/LATAM only resizes the Coca-Cola page; your
   counts persist (CC stickers 13–14 simply have no tiles in NA).
 - **No automated CI tests.** Only the manual `test-logic.ts` script guards the core logic;

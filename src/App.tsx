@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ALBUM_TYPE } from './config';
 import { useCollection } from './store/collectionStore';
+import { useSyncBoot } from './sync/useSync';
 import { computeStats } from './utils/stats';
 import TabBar, { type Tab } from './components/TabBar';
 import ProgressBar from './components/ProgressBar';
@@ -27,6 +28,9 @@ export default function App() {
   const theme = useCollection((s) => s.theme);
   const locked = useCollection((s) => s.locked);
   const toggleLocked = useCollection((s) => s.toggleLocked);
+
+  // Boot cross-device sync (no-op unless Supabase is configured and a link exists).
+  useSyncBoot();
 
   // Mirror the chosen colour scheme onto the document root so the light-mode
   // CSS variable overrides (see styles.css) take effect app-wide.

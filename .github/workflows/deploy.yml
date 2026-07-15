@@ -26,6 +26,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+        env:
+          # Optional cross-device sync. Set these as repo Actions secrets
+          # (Settings → Secrets and variables → Actions). If unset, the build
+          # simply omits sync and the app runs local-only.
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
       - uses: actions/upload-pages-artifact@v5
         with:
           path: dist

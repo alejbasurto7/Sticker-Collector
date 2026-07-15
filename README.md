@@ -4,8 +4,9 @@
 **Album**, **Stats**, and **Swaps**. It adds reservation-aware swap matching, multi-album
 support, achievements, and shareable stats — and it reads and writes the **Figuritas app's
 text export format**, so lists shared by collectors who use that app drop straight in. Built
-with React + Vite + TypeScript, fully offline-capable, installable on desktop and mobile. All
-data lives in your browser — no backend.
+with React + Vite + TypeScript, fully offline-capable, installable on desktop and mobile. Data
+lives in your browser by default, with **optional cross-device sync** (see below) so the same
+collection can follow you between your phone and computer.
 
 The bundled album is the real **"Usa Mex Can 26"** (2026 48-team World Cup): an FWC
 intro section, 48 national teams, and a Coca-Cola extras page. Pick your **edition** from
@@ -50,6 +51,25 @@ stickers, 992 total); switching preserves all your existing stickers.
   from that app drop straight in.
 - Toggle **Coca-Cola tracking** and pick your **edition** (Latin America / North America).
 - **Light / dark** theme.
+- **Sync** (when configured) — pair devices with a sync code; see below.
+
+## Cross-device sync
+
+The same collection can live on your **iOS PWA** and a **desktop browser** at once, synced
+automatically. Sync is **optional and offline-first**: your browser stays the working copy, and
+a small cloud copy (a free [Supabase](https://supabase.com) database) mirrors it and pulls
+changes on the other device.
+
+- **Pairing uses a sync code — no accounts, no passwords.** On one device: **Settings → Sync →
+  Create a sync code**. On the other: **Settings → Sync → Enter a code** (type it or scan the
+  QR). Both devices now share one collection.
+- **How it stays secure:** the code is the only secret and never leaves your device — only its
+  hash is stored — so whoever holds the code can access that one collection. Keep it to yourself.
+- **Conflict rule:** whole-collection **last-write-wins**. Avoid editing both devices at the
+  same time while one is offline, or the later save wins.
+- **Setup:** sync only appears when the app is built with Supabase credentials. See
+  [docs/SUPABASE_SETUP.md](docs/SUPABASE_SETUP.md) for the one-time ~5-minute setup. Without it,
+  the app works exactly as before (local-only) and the Sync section is hidden.
 
 ## Using it with a friend / a second user
 
@@ -68,8 +88,9 @@ send it over, and have them paste it into a new swap in the **Swaps** tab — an
 people sharing the *same browser on the same phone* would share one collection — for that
 case use a separate device/browser, or the in-app multi-album feature.
 
-**Caveat:** data is local-only. There's no cross-device sync, and clearing your browser's
-site data (or uninstalling the app) erases that collection — there is no cloud backup.
+**Caveat:** by default data is local-only — clearing your browser's site data (or uninstalling
+the app) erases that collection. Turn on **cross-device sync** (above) to keep a cloud copy that
+also serves as an off-device backup shared across your own devices.
 
 ## Export / import format
 
