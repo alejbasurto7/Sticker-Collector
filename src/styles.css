@@ -1526,3 +1526,95 @@ textarea {
 :root[data-theme='light'] .conflict-banner {
   color: #a8341f;
 }
+
+/* ---------- Cross-device sync (Settings → Sync) ---------- */
+.sync-status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.sync-chip {
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1.5px solid var(--border);
+  color: var(--text-dim);
+}
+.sync-chip.sync-synced {
+  color: var(--green-bright);
+  border-color: var(--green);
+}
+.sync-chip.sync-syncing {
+  color: var(--gold);
+  border-color: var(--gold);
+}
+.sync-chip.sync-offline,
+.sync-chip.sync-error {
+  color: var(--red);
+  border-color: var(--red);
+}
+.sync-time {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+.sync-code-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sync-code {
+  flex: 1;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1rem;
+  letter-spacing: 0.08em;
+  padding: 8px 10px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  white-space: nowrap;
+  overflow-x: auto;
+}
+.sync-code-display {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-align: center;
+  padding: 14px;
+  margin: 4px 0 14px;
+  border: 2px solid var(--green);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  user-select: all;
+}
+.sync-qr {
+  display: block;
+  width: 220px;
+  max-width: 70%;
+  height: auto;
+  margin: 0 auto 14px;
+  border-radius: var(--radius-sm);
+  background: #fff;
+  padding: 8px;
+}
+.qr-scan-wrap {
+  margin: 10px 0;
+}
+.qr-video {
+  width: 100%;
+  max-height: 260px;
+  border-radius: var(--radius-sm);
+  background: #000;
+  object-fit: cover;
+  margin-bottom: 8px;
+}
+.sync-error {
+  color: var(--red);
+  font-size: 0.85rem;
+  margin: 10px 0 0;
+}

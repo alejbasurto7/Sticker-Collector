@@ -7,6 +7,7 @@ import type { Edition } from '../types';
 import { buildListExport } from '../utils/listExport';
 import { copyToClipboard } from '../utils/share';
 import ImportDialog from './ImportDialog';
+import SyncSection from './SyncSection';
 
 interface Props {
   onClose: () => void;
@@ -136,6 +137,9 @@ export default function EditionDialog({ onClose }: Props) {
             </button>
           </div>
         </section>
+
+        {/* ---------- Sync (self-hides when Supabase isn't configured) ---------- */}
+        <SyncSection />
 
         {/* ---------- Appearance ---------- */}
         <section className="settings-section">
