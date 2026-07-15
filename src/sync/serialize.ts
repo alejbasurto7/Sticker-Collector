@@ -46,6 +46,23 @@ export function pickSyncState(s: SyncPayload): SyncPayload {
   };
 }
 
+const anyOwned = (c?: Record<string, number>) => !!c && Object.values(c).some((n) => n > 0);
+
+/**
+ * Does this collection hold anything worth protecting? Drives the join-time
+ * safety check: a device WITH data must never be silently overwritten by a pull
+ * (it's asked which side to keep instead); an empty device can safely auto-pull.
+ * "Has data" = any owned sticker, any swap, or more than the single default album.
+ */
+export function hasCollectionData(
+  s: Pick<SyncPayload, 'counts' | 'swaps' | 'albums'>,
+): boolean {
+  if (anyOwned(s.counts)) return true;
+  if (s.swaps.length > 0) return true;
+  if (s.albums.length > 1) return true;
+  return s.albums.some((a) => anyOwned(a.counts) || a.swaps.length > 0);
+}
+
 const isObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 

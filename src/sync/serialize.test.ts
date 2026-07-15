@@ -1,5 +1,27 @@
 import { describe, it, expect } from 'vitest';
-import { pickSyncState, sanitizeRemote, type SyncPayload } from './serialize';
+import { pickSyncState, sanitizeRemote, hasCollectionData, type SyncPayload } from './serialize';
+
+/** A pristine, brand-new install: one default album, nothing owned. */
+function emptyState(): Pick<SyncPayload, 'counts' | 'swaps' | 'albums'> {
+  return {
+    counts: {},
+    swaps: [],
+    albums: [
+      {
+        id: 'usa-mex-can-26',
+        albumName: 'My Album',
+        counts: {},
+        swaps: [],
+        edition: 'latam',
+        trackCC: true,
+        locked: false,
+        activityDays: [],
+        completedOn: null,
+        unlockedAchievements: {},
+      },
+    ],
+  };
+}
 
 function samplePayload(): SyncPayload {
   return {
@@ -55,6 +77,40 @@ describe('pickSyncState', () => {
     const picked = pickSyncState(withExtra);
     expect('addOne' in picked).toBe(false);
     expect('junk' in picked).toBe(false);
+  });
+});
+
+describe('hasCollectionData (join-wipe guard)', () => {
+  it('is false for a pristine empty install (safe to auto-pull)', () => {
+    expect(hasCollectionData(emptyState())).toBe(false);
+  });
+
+  it('is true when a sticker is owned at the top level', () => {
+    expect(hasCollectionData({ ...emptyState(), counts: { 'MEX-1': 1 } })).toBe(true);
+  });
+
+  it('is true when an owned sticker lives only in a parked album', () => {
+    const s = emptyState();
+    s.albums[0].counts = { 'ARG-3': 2 };
+    expect(hasCollectionData(s)).toBe(true);
+  });
+
+  it('is true when there are swaps', () => {
+    const s = emptyState();
+    s.swaps = [
+      { id: 'x', name: 'n', createdAt: 1, status: 'open', theirNeeds: [], theirSwaps: [], giving: [], receiving: [] },
+    ];
+    expect(hasCollectionData(s)).toBe(true);
+  });
+
+  it('is true when more than the single default album exists', () => {
+    const s = emptyState();
+    s.albums = [...s.albums, { ...s.albums[0], id: 'second', albumName: 'Second' }];
+    expect(hasCollectionData(s)).toBe(true);
+  });
+
+  it('treats zero counts as no data', () => {
+    expect(hasCollectionData({ ...emptyState(), counts: { 'MEX-1': 0, 'ARG-3': 0 } })).toBe(false);
   });
 });
 

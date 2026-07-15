@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import QRCode from 'qrcode';
-import { createLink, enterLink } from '../sync/engine';
+import { createLink, peekRemote, linkWithRemote, linkWithLocal, type PeekOk } from '../sync/engine';
 import { formatSyncCode } from '../lib/syncCode';
 import { copyToClipboard } from '../utils/share';
 import QrScanner from './QrScanner';
@@ -9,7 +9,7 @@ interface Props {
   onClose: () => void;
 }
 
-type Mode = 'choose' | 'create' | 'enter';
+type Mode = 'choose' | 'create' | 'enter' | 'direction';
 
 const QR_PREFIX = 'sticker-sync:';
 
@@ -22,6 +22,7 @@ export default function SyncDialog({ onClose }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [peek, setPeek] = useState<PeekOk | null>(null);
 
   async function handleCreate() {
     setBusy(true);
@@ -41,19 +42,44 @@ export default function SyncDialog({ onClose }: Props) {
   async function handleJoin(raw: string) {
     setBusy(true);
     setError('');
-    const res = await enterLink(raw);
-    setBusy(false);
-    if (res.ok) {
+    const res = await peekRemote(raw);
+    if (!res.ok) {
+      setBusy(false);
+      setError(
+        res.reason === 'not-found'
+          ? 'No collection found for that code. Double-check it, or create the code on your other device first.'
+          : res.reason === 'invalid'
+            ? 'That code doesn’t look right — it should be 12 letters/numbers.'
+            : 'Sync failed. Check your connection and try again.',
+      );
+      return;
+    }
+    // Safe path: this device is empty, so pulling the shared collection loses nothing.
+    if (!res.localHasData) {
+      linkWithRemote(res);
+      setBusy(false);
       onClose();
       return;
     }
-    setError(
-      res.reason === 'not-found'
-        ? 'No collection found for that code. Double-check it, or create the code on your other device first.'
-        : res.reason === 'invalid'
-          ? 'That code doesn’t look right — it should be 12 letters/numbers.'
-          : 'Sync failed. Check your connection and try again.',
-    );
+    // This device already has a collection — never overwrite it silently. Ask.
+    setPeek(res);
+    setBusy(false);
+    setMode('direction');
+  }
+
+  function keepLocal() {
+    if (!peek) return;
+    setBusy(true);
+    void linkWithLocal(peek).finally(() => {
+      setBusy(false);
+      onClose();
+    });
+  }
+
+  function useShared() {
+    if (!peek) return;
+    linkWithRemote(peek);
+    onClose();
   }
 
   function handleScan(text: string) {
@@ -122,8 +148,8 @@ export default function SyncDialog({ onClose }: Props) {
           <>
             <h2>Enter sync code</h2>
             <p className="modal-sub">
-              Type the code shown on your other device. This will replace this device’s current
-              collection with the shared one.
+              Type the code shown on your other device. If this device already has stickers,
+              you’ll choose which collection to keep before anything changes.
             </p>
             <input
               type="text"
@@ -160,6 +186,35 @@ export default function SyncDialog({ onClose }: Props) {
               </button>
               <button className="btn full" disabled={busy || !entry} onClick={() => handleJoin(entry)}>
                 {busy ? 'Linking…' : 'Link device'}
+              </button>
+            </div>
+          </>
+        )}
+
+        {mode === 'direction' && (
+          <>
+            <h2>Which collection do you want to keep?</h2>
+            <p className="modal-sub">
+              This device already has its own collection, and so does the code you entered.
+              Linking merges them onto one shared collection — pick which one to keep.
+              <strong> The other will be replaced.</strong>
+            </p>
+            <div className="btn-row" style={{ flexDirection: 'column' }}>
+              <button className="btn full" disabled={busy} onClick={keepLocal}>
+                {busy ? 'Linking…' : '📱 Keep THIS device’s collection'}
+              </button>
+              <button className="btn danger full" disabled={busy} onClick={useShared}>
+                ☁️ Use the shared collection (replace this device)
+              </button>
+            </div>
+            <p className="modal-sub" style={{ margin: '10px 0 0', fontSize: '0.82rem' }}>
+              Tip: keep the device that has the collection you care about. The other device will
+              then update to match it.
+            </p>
+            {error && <p className="sync-error">{error}</p>}
+            <div className="btn-row">
+              <button className="btn full" disabled={busy} onClick={() => { setPeek(null); setMode('enter'); }}>
+                Cancel
               </button>
             </div>
           </>

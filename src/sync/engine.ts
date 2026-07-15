@@ -2,7 +2,7 @@ import { supabase } from '../lib/supabase';
 import { useCollection } from '../store/collectionStore';
 import { useSyncMeta } from '../store/syncStore';
 import { generateSyncCode, hashSyncCode, isValidSyncCode, formatSyncCode } from '../lib/syncCode';
-import { pickSyncState, sanitizeRemote } from './serialize';
+import { pickSyncState, sanitizeRemote, hasCollectionData } from './serialize';
 
 // --- module singletons -------------------------------------------------------
 
@@ -22,7 +22,7 @@ interface Row {
   data: unknown;
   writer_id: string;
   version: number;
-  updated_at: string;
+  updated_at?: string;
 }
 
 /** The RPCs return either a single row object or a one-element array. */
@@ -167,28 +167,79 @@ export async function createLink(): Promise<string> {
   return code;
 }
 
-export type EnterResult = { ok: true } | { ok: false; reason: 'invalid' | 'not-found' | 'network' | 'unconfigured' };
+/**
+ * Does THIS device hold a collection worth protecting? Used to decide whether
+ * joining a code can safely auto-pull (empty device) or must ask the user which
+ * side to keep (so we never silently overwrite real data — the join-wipe bug).
+ */
+function localHasData(): boolean {
+  return hasCollectionData(useCollection.getState());
+}
 
-/** Join an existing collection by its code, replacing this device's data with it. */
-export async function enterLink(input: string): Promise<EnterResult> {
+export interface PeekOk {
+  ok: true;
+  code: string;
+  codeHash: string;
+  remoteVersion: number;
+  remoteData: unknown;
+  /** True when this device already has a collection that a plain pull would overwrite. */
+  localHasData: boolean;
+}
+export type PeekResult = PeekOk | { ok: false; reason: 'invalid' | 'not-found' | 'network' | 'unconfigured' };
+
+/**
+ * Look up a code's cloud collection WITHOUT changing anything locally. The UI
+ * uses the result to decide: auto-pull (local empty) or ask the user which side
+ * to keep (local has data). Nothing is linked or overwritten here.
+ */
+export async function peekRemote(input: string): Promise<PeekResult> {
   if (!supabase) return { ok: false, reason: 'unconfigured' };
   if (!isValidSyncCode(input)) return { ok: false, reason: 'invalid' };
   const code = formatSyncCode(input);
   const codeHash = await hashSyncCode(code);
-  const writerId = newWriterId();
   try {
     const { data, error } = await supabase.rpc('sync_pull', { p_code_hash: codeHash });
     if (error) return { ok: false, reason: 'network' };
     const row = firstRow(data);
     if (!row) return { ok: false, reason: 'not-found' };
-    // Link first (lastVersion 0 so handleRow applies the pulled row), then apply.
-    useSyncMeta.getState().setLink({ code, codeHash, writerId });
-    handleRow(row);
-    startEngine();
-    return { ok: true };
+    return {
+      ok: true,
+      code,
+      codeHash,
+      remoteVersion: row.version,
+      remoteData: row.data,
+      localHasData: localHasData(),
+    };
   } catch {
     return { ok: false, reason: 'network' };
   }
+}
+
+/** Join a code and REPLACE this device's data with the shared (cloud) collection. */
+export function linkWithRemote(peek: PeekOk): void {
+  useSyncMeta.getState().setLink({ code: peek.code, codeHash: peek.codeHash, writerId: newWriterId() });
+  // lastVersion is 0 after setLink, so this remote row (version > 0) is applied.
+  handleRow({
+    code_hash: peek.codeHash,
+    data: peek.remoteData,
+    writer_id: '(remote)',
+    version: peek.remoteVersion,
+  });
+  startEngine();
+}
+
+/**
+ * Join a code but KEEP this device's collection, pushing it up as the shared one
+ * (so the other device receives it). Used when the joining device is the one that
+ * actually holds the data.
+ */
+export async function linkWithLocal(peek: PeekOk): Promise<void> {
+  useSyncMeta.getState().setLink({ code: peek.code, codeHash: peek.codeHash, writerId: newWriterId() });
+  // Base our push on the remote's current version so the optimistic-concurrency
+  // update succeeds and OUR local data wins.
+  useSyncMeta.setState({ lastVersion: peek.remoteVersion });
+  await doPush();
+  startEngine();
 }
 
 /** Stop syncing on this device. Local data is untouched. */
