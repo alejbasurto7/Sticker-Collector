@@ -51,6 +51,16 @@ export interface CollectionHistory {
   completedOn: string | null;
 }
 
+/**
+ * Percent (0..1) as a whole number for display. Only reads 100 when the value is
+ * genuinely complete; anything short of 1.0 floors, so 976/980 shows 99% instead
+ * of a misleading 100% while stickers are still missing.
+ */
+export function displayPct(pct: number): number {
+  const clamped = Math.min(Math.max(pct, 0), 1);
+  return clamped >= 1 ? 100 : Math.floor(clamped * 100);
+}
+
 const MS_PER_DAY = 86_400_000;
 
 /** Local calendar date key (YYYY-MM-DD) for a timestamp. */
