@@ -69,14 +69,16 @@ function nameKey(s: string): string {
 function findSection(label: string, number: string): SectionDef | undefined {
   const sections = activeType.sections;
   const num = number.trim();
+  const holdsNumber = (s: SectionDef) => Boolean(stickerById[`${s.id}-${num}`]);
+  // The label's ASCII letters (GHA🇬🇭 → GHA, "Congo DR" → CONGODR).
+  const code = label.replace(/[^a-z]/gi, '').toUpperCase();
 
   // 1. Flag/emoji — does the label contain a section's emoji verbatim?
   let candidates = sections.filter((s) => s.emoji && label.includes(s.emoji));
 
-  // 2. Country code — the label's ASCII letters (GHA🇬🇭 → GHA, "Congo DR" → CONGODR).
-  if (candidates.length === 0) {
-    const code = label.replace(/[^a-z]/gi, '').toUpperCase();
-    if (code) candidates = sections.filter((s) => s.code.toUpperCase() === code);
+  // 2. Country code.
+  if (candidates.length === 0 && code) {
+    candidates = sections.filter((s) => s.code.toUpperCase() === code);
   }
 
   // 3. Country name — order/accent-insensitive title match.
@@ -85,9 +87,21 @@ function findSection(label: string, number: string): SectionDef | undefined {
     if (key) candidates = sections.filter((s) => nameKey(s.title) === key);
   }
 
+  // The FWC intro pages share code "FWC" but each carries a distinct emoji and a
+  // disjoint number range (trophy 00–4, ball 5–8, history 9–19). A hand-typed
+  // list often files every FWC special under one emoji ("FWC 🏆: 1, 6, 14"), so
+  // an emoji/name match can land on a single section that doesn't hold the
+  // number — dropping it. When no current candidate holds the number, widen to
+  // every same-code section and let the number, which is unambiguous across the
+  // siblings, decide.
+  if (code && !candidates.some(holdsNumber)) {
+    const sameCode = sections.filter((s) => s.code.toUpperCase() === code);
+    if (sameCode.length > 1 && sameCode.some(holdsNumber)) candidates = sameCode;
+  }
+
   if (candidates.length <= 1) return candidates[0];
   // Shared code/emoji (FWC intros): pick whichever section holds the number.
-  return candidates.find((s) => stickerById[`${s.id}-${num}`]) ?? candidates[0];
+  return candidates.find(holdsNumber) ?? candidates[0];
 }
 
 /**
