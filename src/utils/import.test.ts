@@ -60,6 +60,32 @@ describe('parseExport label forms (flags / names / codes)', () => {
     const p = parseExport('I need\nMEX 🇲🇽: 1, 2');
     expect(p.needs).toEqual(expect.arrayContaining(['MEX-1', 'MEX-2']));
   });
+
+  it('routes FWC numbers to the right intro page even when the emoji points elsewhere', () => {
+    // The FWC intro pages share code "FWC" with distinct emojis and disjoint
+    // number ranges (trophy 00–4, ball 5–8, history 9–19). A hand-typed list may
+    // file every special under one emoji; the number must still win.
+    const p = parseExport('To Swap\nFWC 🏆: 1, 6, 14');
+    expect(p.swaps).toEqual(
+      expect.arrayContaining(['FWC-trophy-1', 'FWC-world-6', 'FWC-scroll-14']),
+    );
+    expect(p.unmatched).toHaveLength(0);
+  });
+
+  it('keeps matching FWC lines whose emoji already fits the number', () => {
+    const p = parseExport('To Swap\nFWC 🏆: 1\nFWC ⚽: 6\nFWC 🏅: 14');
+    expect(p.swaps).toEqual(
+      expect.arrayContaining(['FWC-trophy-1', 'FWC-world-6', 'FWC-scroll-14']),
+    );
+    expect(p.unmatched).toHaveLength(0);
+  });
+
+  it('still reports a genuinely out-of-range number as unmatched', () => {
+    // 99 is not an FWC number under any intro page, so widening must not invent one.
+    const p = parseExport('To Swap\nFWC 🏆: 99');
+    expect(p.swaps).toHaveLength(0);
+    expect(p.unmatched).toContain('FWC 🏆 99');
+  });
 });
 
 describe('parseExport section headers', () => {
