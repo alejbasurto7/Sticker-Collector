@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useCollection } from '../store/collectionStore';
-import { computeStats, computeAchievements } from '../utils/stats';
+import { computeStats, computeAchievements, displayPct } from '../utils/stats';
 import { shareNodeAsImage } from '../utils/share';
 import ProgressRing from './ProgressRing';
 import ProgressBar from './ProgressBar';
@@ -84,7 +84,7 @@ export default function StatsView() {
           <div className="big">
             {stats.ownedUnique}/{stats.totalStickers}
           </div>
-          <div className="sub">stickers collected · {Math.round(stats.completionPct * 100)}% complete</div>
+          <div className="sub">stickers collected · {displayPct(stats.completionPct)}% complete</div>
         </div>
       </div>
 
@@ -148,7 +148,7 @@ export default function StatsView() {
           <ProgressBar
             key={t.type}
             label={`${t.emoji} ${t.label}`}
-            value={`${t.owned}/${t.total} · ${Math.round(t.pct * 100)}%`}
+            value={`${t.owned}/${t.total} · ${displayPct(t.pct)}%`}
             pct={t.pct}
           />
         ))}

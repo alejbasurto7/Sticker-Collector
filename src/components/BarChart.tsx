@@ -1,4 +1,4 @@
-import type { PageProgress } from '../utils/stats';
+import { displayPct, type PageProgress } from '../utils/stats';
 
 interface Props {
   pages: PageProgress[];
@@ -15,7 +15,7 @@ export default function BarChart({ pages }: Props) {
           <span className="track">
             <span style={{ width: `${Math.round(p.pct * 100)}%` }} />
           </span>
-          <span className="pct">{Math.round(p.pct * 100)}%</span>
+          <span className="pct">{displayPct(p.pct)}%</span>
         </div>
       ))}
     </div>

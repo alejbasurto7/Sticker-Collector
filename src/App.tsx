@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ALBUM_TYPE } from './config';
 import { useCollection } from './store/collectionStore';
 import { useSyncBoot } from './sync/useSync';
-import { computeStats } from './utils/stats';
+import { computeStats, displayPct } from './utils/stats';
 import TabBar, { type Tab } from './components/TabBar';
 import ProgressBar from './components/ProgressBar';
 import AlbumView from './components/AlbumView';
@@ -105,8 +105,8 @@ export default function App() {
         <div className="header-progress">
           <ProgressBar
             label="Album progress"
-            value={`${stats.ownedUnique}/${stats.totalStickers} · ${Math.round(
-              stats.completionPct * 100,
+            value={`${stats.ownedUnique}/${stats.totalStickers} · ${displayPct(
+              stats.completionPct,
             )}%`}
             pct={stats.completionPct}
           />

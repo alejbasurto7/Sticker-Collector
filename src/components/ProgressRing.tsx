@@ -1,3 +1,5 @@
+import { displayPct } from '../utils/stats';
+
 interface Props {
   pct: number; // 0..1
   size?: number;
@@ -41,7 +43,7 @@ export default function ProgressRing({ pct, size = 96, stroke = 10 }: Props) {
         fontWeight="800"
         fill="currentColor"
       >
-        {Math.round(clamped * 100)}%
+        {displayPct(clamped)}%
       </text>
     </svg>
   );
