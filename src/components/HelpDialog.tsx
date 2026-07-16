@@ -3,6 +3,20 @@ interface Props {
 }
 
 /**
+ * True on the desktop build (mouse-primary): a fine pointer that can hover.
+ * Touch devices — the installed PWA on a phone or tablet — report a coarse
+ * pointer and no hover, so they fall through to the tap / long-press wording.
+ * The gestures themselves live in StickerCell, which already handles both
+ * mouse and touch at runtime; this only picks the instructions to show.
+ */
+function isDesktop() {
+  return (
+    typeof window !== 'undefined' &&
+    window.matchMedia?.('(hover: hover) and (pointer: fine)').matches === true
+  );
+}
+
+/**
  * A demo sticker cell mirroring the real album cell states, used purely to
  * illustrate the tap / long-press gestures — it is not interactive.
  */
@@ -36,6 +50,15 @@ function Arrow() {
 }
 
 export default function HelpDialog({ onClose }: Props) {
+  const desktop = isDesktop();
+  const addLabel = desktop
+    ? 'Click to add it to your collection'
+    : 'Tap to add it to your collection';
+  const swapLabel = desktop
+    ? 'Click it again to mark it as a swap'
+    : 'Tap it again to mark it as a swap';
+  const removeLabel = desktop ? 'Right-click to remove it' : 'Long press to remove it';
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal help-modal" onClick={(e) => e.stopPropagation()}>
@@ -43,7 +66,7 @@ export default function HelpDialog({ onClose }: Props) {
 
         <div className="help-steps">
           <section className="help-step">
-            <p className="help-step-label">Tap to add it to your collection</p>
+            <p className="help-step-label">{addLabel}</p>
             <div className="help-demo">
               <DemoCell />
               <Arrow />
@@ -52,7 +75,7 @@ export default function HelpDialog({ onClose }: Props) {
           </section>
 
           <section className="help-step">
-            <p className="help-step-label">Tap it again to mark it as a swap</p>
+            <p className="help-step-label">{swapLabel}</p>
             <div className="help-demo">
               <DemoCell owned />
               <Arrow />
@@ -61,7 +84,7 @@ export default function HelpDialog({ onClose }: Props) {
           </section>
 
           <section className="help-step">
-            <p className="help-step-label">Long press to remove it</p>
+            <p className="help-step-label">{removeLabel}</p>
             <div className="help-demo">
               <DemoCell owned swap />
               <Arrow />
