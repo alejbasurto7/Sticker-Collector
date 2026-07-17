@@ -143,6 +143,15 @@ describe('normalizeRemote', () => {
     expect(a.counts).toEqual({ 'MEX-1': 3 });
     expect((out as any).albums.map((x: any) => x.id).sort()).toEqual(['A', 'B']);
   });
+  it('rejects a legacy blob whose swaps is missing/not an array (defense-in-depth)', () => {
+    const base = {
+      counts: {}, edition: 'latam', trackCC: true, albumName: 'X', locked: false,
+      activityDays: [], completedOn: null, unlockedAchievements: {},
+      activeAlbumId: 'A', albums: [snap('A')],
+    };
+    expect(normalizeRemote(base)).toBeNull(); // no swaps key at all
+    expect(normalizeRemote({ ...base, swaps: 'nope' })).toBeNull(); // swaps not an array
+  });
   it('rejects junk', () => {
     expect(normalizeRemote(null)).toBeNull();
     expect(normalizeRemote('nope')).toBeNull();

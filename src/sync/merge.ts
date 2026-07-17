@@ -49,7 +49,7 @@ export function scalar3<T extends string | number | boolean>(
 }
 
 /** Structural equality for plain JSON-ish values (swaps: scalars, arrays, records). */
-function deepEqual(a: unknown, b: unknown): boolean {
+export function deepEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (typeof a !== typeof b || a === null || b === null) return false;
   if (Array.isArray(a) || Array.isArray(b)) {

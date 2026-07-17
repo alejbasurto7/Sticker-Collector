@@ -11,7 +11,7 @@ import {
   normalizeRemote,
   type SliceState,
 } from './serialize';
-import { mergeAlbum, mergeCollection } from './merge';
+import { mergeAlbum, mergeCollection, deepEqual } from './merge';
 import { PAYLOAD_V, type AlbumPayload, type CollectionPayload, type ChannelPayload } from './payload';
 
 // --- channel model ------------------------------------------------------------
@@ -238,7 +238,7 @@ function applyPulledRow(channel: Channel, row: Row | null): void {
       const local = localSlice(channel);
       const merged = readOnlyJoiner || !local ? remote : mergeFor(channel, baseFor(channel), local, remote);
       applyMerged(channel, merged);
-      if (JSON.stringify(merged) === JSON.stringify(remote)) {
+      if (deepEqual(merged, remote)) {
         useSyncMeta.getState().setBase(channel.key, merged); // nothing unconfirmed folded in -> safe
       } else if (isWritable(channel)) {
         schedulePush(channel.key); // confirm our folded-in contribution before recording it as base
@@ -315,7 +315,7 @@ async function doPushChannel(key: string, attempt = 0): Promise<void> {
     if (resultRow.writer_id === channel.writerId) {
       // Our write landed.
       useSyncMeta.getState().setBase(key, merged);
-      if (JSON.stringify(merged) !== JSON.stringify(local)) applyMerged(channel, merged);
+      if (!deepEqual(merged, local)) applyMerged(channel, merged);
       useSyncMeta.getState().markChannelSynced(key, resultRow.version);
       return;
     }

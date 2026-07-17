@@ -91,7 +91,7 @@ const isObject = (v: unknown): v is Record<string, unknown> =>
 
 /** Coerce a header-less legacy whole-collection blob into a CollectionPayload. */
 export function legacyToCollection(data: unknown): CollectionPayload | null {
-  if (!isObject(data) || !Array.isArray(data.albums) || typeof data.activeAlbumId !== 'string') return null;
+  if (!isObject(data) || !Array.isArray(data.albums) || !Array.isArray(data.swaps) || typeof data.activeAlbumId !== 'string') return null;
   if (!isObject(data.counts)) return null;
   const s = data as unknown as SliceState;
   return { kind: 'collection', v: PAYLOAD_V, albums: allAlbums(s) };
