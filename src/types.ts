@@ -48,6 +48,8 @@ export type SwapStatus = 'open' | 'closed';
 export interface Swap {
   id: string;
   name: string;
+  /** Free-text notes about the swap (the other collector, meeting plans, etc.). */
+  notes?: string;
   createdAt: number;
   closedAt?: number;
   status: SwapStatus;

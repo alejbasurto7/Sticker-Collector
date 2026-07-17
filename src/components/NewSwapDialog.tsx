@@ -44,6 +44,7 @@ export default function NewSwapDialog({ onClose, initialText, editSwap }: Props)
   const isEdit = !!editSwap;
 
   const [name, setName] = useState(editSwap?.name ?? '');
+  const [notes, setNotes] = useState(editSwap?.notes ?? '');
   const [text, setText] = useState(
     editSwap
       ? buildListFromIds(editSwap.theirNeeds, editSwap.theirSwaps, albumName, editSwap.theirNeedsQty)
@@ -128,6 +129,7 @@ export default function NewSwapDialog({ onClose, initialText, editSwap }: Props)
     }
     const common = {
       name,
+      notes,
       theirNeeds: parsed.needs,
       theirSwaps: parsed.swaps,
       theirNeedsQty: parsed.needQty,
@@ -209,6 +211,14 @@ export default function NewSwapDialog({ onClose, initialText, editSwap }: Props)
             )}
           </>
         )}
+
+        <div className="field-label">Notes</div>
+        <textarea
+          className="notes-input"
+          value={notes}
+          placeholder="Anything to remember about this swap…"
+          onChange={(e) => setNotes(e.target.value)}
+        />
 
         <div className="btn-row">
           <button className="btn full" onClick={onClose}>

@@ -1262,10 +1262,26 @@ input[type='text'] {
 textarea {
   min-height: 160px;
 }
+/* Notes are a secondary, optional field — a shorter box than the pasted list. */
+textarea.notes-input {
+  min-height: 72px;
+}
 .field-label {
   font-size: 13px;
   font-weight: 700;
   margin: 12px 0 6px;
+}
+/* Read-only notes shown on the swap detail, preserving typed line breaks. */
+.swap-notes {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-dim);
 }
 .radio-row {
   display: flex;
