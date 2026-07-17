@@ -87,6 +87,7 @@ interface CollectionState {
   // Swap actions
   createSwap: (input: {
     name: string;
+    notes?: string;
     theirNeeds: string[];
     theirSwaps: string[];
     giving: string[];
@@ -100,6 +101,7 @@ interface CollectionState {
       giving?: string[];
       receiving?: string[];
       name?: string;
+      notes?: string;
       theirNeeds?: string[];
       theirSwaps?: string[];
       theirNeedsQty?: Record<string, number>;
@@ -387,6 +389,7 @@ export const useCollection = create<CollectionState>()(
         const swap: Swap = {
           id,
           name: input.name.trim() || 'Untitled swap',
+          notes: input.notes?.trim() || undefined,
           createdAt: Date.now(),
           status: 'open',
           theirNeeds: input.theirNeeds,
@@ -409,6 +412,7 @@ export const useCollection = create<CollectionState>()(
                   ...(patch.giving ? { giving: patch.giving } : {}),
                   ...(patch.receiving ? { receiving: patch.receiving } : {}),
                   ...(patch.name !== undefined ? { name: patch.name } : {}),
+                  ...(patch.notes !== undefined ? { notes: patch.notes.trim() || undefined } : {}),
                   ...(patch.theirNeeds ? { theirNeeds: patch.theirNeeds } : {}),
                   ...(patch.theirSwaps ? { theirSwaps: patch.theirSwaps } : {}),
                   ...(patch.theirNeedsQty ? { theirNeedsQty: patch.theirNeedsQty } : {}),

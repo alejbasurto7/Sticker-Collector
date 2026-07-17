@@ -7,6 +7,7 @@ import { copyToClipboard } from '../utils/share';
 import StickerChips from './StickerChips';
 import SwapClose from './SwapClose';
 import NewSwapDialog from './NewSwapDialog';
+import EditSwapDetails from './EditSwapDetails';
 
 /** Same membership, order-independent — used to tell saved state from edited state. */
 const sameMembers = (set: Set<string>, arr: string[]) =>
@@ -25,6 +26,7 @@ export default function SwapDetail({ swap, onClose }: Props) {
   const updateSwap = useCollection((s) => s.updateSwap);
   const [closing, setClosing] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [editingDetails, setEditingDetails] = useState(false);
   // Seed from what's already saved so reopening shows prior edits.
   const [deselectedGiving, setDeselectedGiving] = useState(() => new Set(swap.deselectedGiving ?? []));
   const [deselectedReceiving, setDeselectedReceiving] = useState(() => new Set(swap.deselectedReceiving ?? []));
@@ -161,6 +163,13 @@ export default function SwapDetail({ swap, onClose }: Props) {
           </div>
         )}
 
+        {swap.notes && (
+          <>
+            <div className="section-title">Notes</div>
+            <p className="swap-notes">{swap.notes}</p>
+          </>
+        )}
+
         <div className="section-title">You give ({giveCopies})</div>
         <StickerChips
           ids={swap.giving}
@@ -208,6 +217,11 @@ export default function SwapDetail({ swap, onClose }: Props) {
               ↩ Rollback
             </button>
           )}
+          {!isOpen && (
+            <button className="btn" onClick={() => setEditingDetails(true)}>
+              ✎ Edit details
+            </button>
+          )}
           {isOpen && (
             <button className="btn" onClick={() => setEditing(true)}>
               ✎ Edit
@@ -234,6 +248,10 @@ export default function SwapDetail({ swap, onClose }: Props) {
         )}
 
         {editing && <NewSwapDialog editSwap={swap} onClose={() => setEditing(false)} />}
+
+        {editingDetails && (
+          <EditSwapDetails swap={swap} onClose={() => setEditingDetails(false)} />
+        )}
       </div>
     </div>
   );
