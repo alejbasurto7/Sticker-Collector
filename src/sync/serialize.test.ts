@@ -48,6 +48,7 @@ function samplePayload(): SyncPayload {
     unlockedAchievements: { firstSticker: 1000 },
     importSeq: 3,
     theme: 'dark',
+    albumLayout: 'pages',
     albums: [
       {
         id: 'usa-mex-can-26',

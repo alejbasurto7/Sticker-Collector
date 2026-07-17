@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { buildAlbumFromType, editionInfoFor, type AlbumType, activeType, templateFor } from './albumTypes';
+import { buildAlbumFromType, editionInfoFor, type AlbumType, activeType, templateFor, pagesSupportPages } from './albumTypes';
+import { album } from './sampleAlbum';
 
 const FIXTURE: AlbumType = {
   id: 'demo',
@@ -87,5 +88,23 @@ describe('templateFor', () => {
   it('uses cc-latam only at 14 stickers; NA(12) falls back to the flow grid', () => {
     expect(templateFor(pageOf('CC'))!.id).toBe('cc-latam');
     expect(templateFor(pageOfNa('CC'))).toBeUndefined();
+  });
+});
+
+describe('pagesSupportPages', () => {
+  it('is true for the active album (it has templated pages)', () => {
+    expect(pagesSupportPages(album.pages)).toBe(true);
+  });
+
+  it('is false when no page maps to a template', () => {
+    const orphan = {
+      id: 'no-such-section',
+      code: 'N',
+      emoji: '❓',
+      title: 'Nope',
+      type: 'team' as const,
+      stickerIds: ['1'],
+    };
+    expect(pagesSupportPages([orphan])).toBe(false);
   });
 });

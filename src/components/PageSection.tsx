@@ -40,6 +40,7 @@ export default function PageSection({ page, filter, open, onToggle }: Props) {
   const addOne = useCollection((s) => s.addOne);
   const removeOne = useCollection((s) => s.removeOne);
   const locked = useCollection((s) => s.locked);
+  const albumLayout = useCollection((s) => s.albumLayout);
 
   const owned = page.stickerIds.filter((id) => (counts[id] ?? 0) >= 1).length;
   const total = page.stickerIds.length;
@@ -53,10 +54,10 @@ export default function PageSection({ page, filter, open, onToggle }: Props) {
 
   if (filter !== 'all' && visibleIds.length === 0) return null;
 
-  // The printed-album layout only applies under the "all" filter; filtered and
-  // untemplated pages keep the responsive flow grid.
+  // The printed-album layout only applies under the "all" filter AND when the
+  // album's layout preference is "pages"; otherwise fall to the flow grid.
   const template = templateFor(page);
-  const useSpread = Boolean(template) && filter === 'all';
+  const useSpread = Boolean(template) && filter === 'all' && albumLayout === 'pages';
   const bound = template ? bindTemplate(template, page.stickerIds) : null;
 
   // Display-only: prefix the bare number with the section code (e.g. "CC1").
