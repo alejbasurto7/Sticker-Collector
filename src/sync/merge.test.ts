@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { mergeCounts, scalar3 } from './merge';
+import { mergeCounts, scalar3, mergeSwaps } from './merge';
+import type { Swap } from '../types';
 
 describe('mergeCounts', () => {
   it('keeps independent changes from both sides', () => {
@@ -54,5 +55,58 @@ describe('scalar3', () => {
 
   it('with no common ancestor, agreement still wins', () => {
     expect(scalar3(undefined, 'na', 'na')).toBe('na');
+  });
+});
+
+function swap(id: string, over: Partial<Swap> = {}): Swap {
+  return {
+    id,
+    name: `swap ${id}`,
+    createdAt: 100,
+    status: 'open',
+    theirNeeds: [],
+    theirSwaps: [],
+    giving: [],
+    receiving: [],
+    ...over,
+  };
+}
+
+describe('mergeSwaps', () => {
+  it('keeps a swap added on only one side', () => {
+    const s1 = swap('s1');
+    expect(mergeSwaps([], [s1], [])).toEqual([s1]);
+    expect(mergeSwaps([], [], [s1])).toEqual([s1]);
+  });
+
+  it('unions two independently-added swaps (sorted newest-first)', () => {
+    const a = swap('a', { createdAt: 200 });
+    const b = swap('b', { createdAt: 100 });
+    expect(mergeSwaps([], [a], [b])).toEqual([a, b]);
+  });
+
+  it('honors a delete: unchanged local, removed remotely', () => {
+    const s1 = swap('s1');
+    expect(mergeSwaps([s1], [s1], [])).toEqual([]);
+  });
+
+  it('keeps an edit over a concurrent delete', () => {
+    const base = swap('s1', { name: 'old' });
+    const edited = swap('s1', { name: 'new' });
+    expect(mergeSwaps([base], [edited], [])).toEqual([edited]);
+  });
+
+  it('takes the edited side when the other is unchanged', () => {
+    const base = swap('s1', { name: 'old' });
+    const edited = swap('s1', { name: 'new' });
+    expect(mergeSwaps([base], [base], [edited])).toEqual([edited]);
+  });
+
+  it('resolves an edit-vs-edit collision by later closedAt, deterministically', () => {
+    const base = swap('s1', { status: 'open' });
+    const localEdit = swap('s1', { status: 'closed', closedAt: 500, name: 'L' });
+    const remoteEdit = swap('s1', { status: 'closed', closedAt: 900, name: 'R' });
+    expect(mergeSwaps([base], [localEdit], [remoteEdit])).toEqual([remoteEdit]);
+    expect(mergeSwaps([base], [remoteEdit], [localEdit])).toEqual([remoteEdit]);
   });
 });

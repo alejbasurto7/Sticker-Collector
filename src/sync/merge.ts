@@ -1,4 +1,4 @@
-import type { Counts } from '../types';
+import type { Counts, Swap } from '../types';
 
 /**
  * 3-way merge of a counts map. A sticker only one side changed keeps that
@@ -44,4 +44,64 @@ export function scalar3<T extends string | number | boolean>(
     if (remote === base) return local;
   }
   return local >= remote ? local : remote;
+}
+
+/** Structural equality for plain JSON-ish values (swaps: scalars, arrays, records). */
+function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== typeof b || a === null || b === null) return false;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    return a.every((x, i) => deepEqual(x, b[i]));
+  }
+  if (typeof a === 'object') {
+    const ao = a as Record<string, unknown>;
+    const bo = b as Record<string, unknown>;
+    const ak = Object.keys(ao);
+    const bk = Object.keys(bo);
+    if (ak.length !== bk.length) return false;
+    return ak.every((k) => deepEqual(ao[k], bo[k]));
+  }
+  return false;
+}
+
+/** Deterministic winner of a same-id edit-vs-edit collision: later close/create, then id. */
+function laterSwap(a: Swap, b: Swap): Swap {
+  const at = a.closedAt ?? a.createdAt;
+  const bt = b.closedAt ?? b.createdAt;
+  if (at !== bt) return at > bt ? a : b;
+  return a.id >= b.id ? a : b;
+}
+
+/**
+ * 3-way merge of swap lists, keyed by id. A swap added on one side survives; an
+ * edit on one side survives; a delete (in base, gone from one side, unchanged on
+ * the other) is honored; an edit racing a delete keeps the edit; two conflicting
+ * edits resolve via {@link laterSwap}. Output is sorted newest-first, id-stable.
+ */
+export function mergeSwaps(base: Swap[], local: Swap[], remote: Swap[]): Swap[] {
+  const byId = (arr: Swap[]) => new Map(arr.map((s) => [s.id, s]));
+  const b = byId(base);
+  const l = byId(local);
+  const r = byId(remote);
+  const ids = new Set<string>([...l.keys(), ...r.keys()]);
+  const out: Swap[] = [];
+  for (const id of ids) {
+    const bs = b.get(id);
+    const ls = l.get(id);
+    const rs = r.get(id);
+    if (ls && rs) {
+      if (deepEqual(ls, rs)) out.push(ls);
+      else if (bs && deepEqual(ls, bs)) out.push(rs); // only remote edited
+      else if (bs && deepEqual(rs, bs)) out.push(ls); // only local edited
+      else out.push(laterSwap(ls, rs)); // both edited (or both new & differ)
+    } else if (ls && !rs) {
+      if (bs && deepEqual(ls, bs)) continue; // unchanged locally, remote deleted -> drop
+      out.push(ls); // new locally, or edited-vs-delete -> keep
+    } else if (!ls && rs) {
+      if (bs && deepEqual(rs, bs)) continue; // unchanged remotely, local deleted -> drop
+      out.push(rs);
+    }
+  }
+  return out.sort((x, y) => y.createdAt - x.createdAt || (x.id < y.id ? -1 : x.id > y.id ? 1 : 0));
 }
