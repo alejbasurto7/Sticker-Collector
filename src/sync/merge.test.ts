@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { mergeCounts, scalar3, mergeSwaps, mergeAlbum } from './merge';
+import { mergeCounts, scalar3, mergeSwaps, mergeAlbum, mergeCollection } from './merge';
+import { PAYLOAD_V, type CollectionPayload } from './payload';
 import type { Swap } from '../types';
 import type { AlbumSnapshot } from '../store/collectionStore';
 
@@ -183,5 +184,49 @@ describe('mergeAlbum', () => {
     const local = album({ counts: { A: 1 } });
     const remote = album({ counts: { B: 1 } });
     expect(mergeAlbum(undefined, local, remote).counts).toEqual({ A: 1, B: 1 });
+  });
+});
+
+function coll(albums: AlbumSnapshot[], deleted?: string[]): CollectionPayload {
+  return { kind: 'collection', v: PAYLOAD_V, albums, ...(deleted ? { deletedAlbumIds: deleted } : {}) };
+}
+
+describe('mergeCollection', () => {
+  it('3-way merges a managed album present on both sides', () => {
+    const base = coll([album({ id: 'x', counts: { A: 1 } })]);
+    const local = coll([album({ id: 'x', counts: { A: 1, B: 1 } })]);
+    const remote = coll([album({ id: 'x', counts: { A: 1, C: 1 } })]);
+    const m = mergeCollection(base, local, remote, new Set(['x']));
+    expect(m.albums.find((a) => a.id === 'x')!.counts).toEqual({ A: 1, B: 1, C: 1 });
+  });
+
+  it('preserves a remote album this device does not manage (carve-out safety)', () => {
+    const base = coll([]);
+    const local = coll([album({ id: 'mine' })]);
+    const remote = coll([album({ id: 'mine' }), album({ id: 'others' })]);
+    const m = mergeCollection(base, local, remote, new Set(['mine']));
+    expect(m.albums.map((a) => a.id).sort()).toEqual(['mine', 'others']);
+  });
+
+  it('does NOT delete a managed album merely absent from remote', () => {
+    const base = coll([album({ id: 'x' })]);
+    const local = coll([album({ id: 'x' })]);
+    const remote = coll([]); // another device carved x out (no tombstone)
+    const m = mergeCollection(base, local, remote, new Set(['x']));
+    expect(m.albums.map((a) => a.id)).toEqual(['x']);
+  });
+
+  it('adds a newly-created local album to the row', () => {
+    const m = mergeCollection(coll([]), coll([album({ id: 'new' })]), coll([]), new Set(['new']));
+    expect(m.albums.map((a) => a.id)).toEqual(['new']);
+  });
+
+  it('honors a tombstoned deletion across devices', () => {
+    const base = coll([album({ id: 'x' })]);
+    const local = coll([album({ id: 'x' })]); // this device still has x
+    const remote = coll([], ['x']); // other device deleted it (tombstone)
+    const m = mergeCollection(base, local, remote, new Set(['x']));
+    expect(m.albums.map((a) => a.id)).toEqual([]);
+    expect(m.deletedAlbumIds).toEqual(['x']);
   });
 });

@@ -1,5 +1,6 @@
 import type { Counts, Swap } from '../types';
 import type { AlbumSnapshot } from '../store/collectionStore';
+import { PAYLOAD_V, type CollectionPayload } from './payload';
 
 /**
  * 3-way merge of a counts map. A sticker only one side changed keeps that
@@ -152,5 +153,50 @@ export function mergeAlbum(
     activityDays: [...new Set([...local.activityDays, ...remote.activityDays])].sort(),
     completedOn: completedDefs.length ? completedDefs.sort()[0] : null,
     unlockedAchievements,
+  };
+}
+
+/**
+ * 3-way merge of the whole-collection row. `managedIds` are the album ids this
+ * device holds in Cloud mode. Albums the device does not manage are preserved
+ * untouched (so another device not managing an album never deletes it here);
+ * managed albums are 3-way merged. Deletion is honored ONLY via an explicit
+ * tombstone (never inferred from absence), and tombstones union monotonically.
+ */
+export function mergeCollection(
+  base: CollectionPayload,
+  local: CollectionPayload,
+  remote: CollectionPayload,
+  managedIds: Set<string>,
+): CollectionPayload {
+  const tomb = new Set<string>([
+    ...(base.deletedAlbumIds ?? []),
+    ...(local.deletedAlbumIds ?? []),
+    ...(remote.deletedAlbumIds ?? []),
+  ]);
+  const mapOf = (p: CollectionPayload) => new Map(p.albums.map((a) => [a.id, a]));
+  const b = mapOf(base);
+  const l = mapOf(local);
+  const r = mapOf(remote);
+  const out = new Map<string, AlbumSnapshot>();
+
+  // 1. Preserve every remote album this device does not manage (unless deleted).
+  for (const [id, a] of r) {
+    if (!managedIds.has(id) && !tomb.has(id)) out.set(id, a);
+  }
+  // 2. Merge each managed album; deletions come only from tombstones.
+  for (const id of managedIds) {
+    if (tomb.has(id)) continue;
+    const lA = l.get(id);
+    if (!lA) continue; // managed but absent locally: nothing to contribute
+    const rA = r.get(id);
+    out.set(id, rA ? mergeAlbum(b.get(id), lA, rA) : lA);
+  }
+
+  return {
+    kind: 'collection',
+    v: PAYLOAD_V,
+    albums: [...out.values()],
+    ...(tomb.size ? { deletedAlbumIds: [...tomb].sort() } : {}),
   };
 }
