@@ -2,6 +2,7 @@ import type { Counts, Edition, Swap } from '../types';
 // Type-only imports (erased at build) — keeps this module free of the store's
 // runtime (localStorage/zustand), so it's importable in a plain Node test env.
 import type { AlbumSnapshot, Theme } from '../store/collectionStore';
+import { PAYLOAD_V, type AlbumPayload, type CollectionPayload } from './payload';
 
 /**
  * The exact slice of collection state that travels between devices. This is the
@@ -44,6 +45,48 @@ export function pickSyncState(s: SyncPayload): SyncPayload {
     albums: s.albums,
     activeAlbumId: s.activeAlbumId,
   };
+}
+
+/** The read-only slice of collection state the slicers need. */
+export interface SliceState {
+  counts: Counts; swaps: Swap[]; edition: Edition; trackCC: boolean; albumName: string;
+  locked: boolean; firstStickerAt?: number; activityDays: string[]; completedOn: string | null;
+  unlockedAchievements: Record<string, number>;
+  albums: AlbumSnapshot[]; activeAlbumId: string;
+}
+
+/** Build the active album's snapshot from the live top-level fields. */
+export function reconstructActive(s: SliceState): AlbumSnapshot {
+  return {
+    id: s.activeAlbumId, albumName: s.albumName, counts: s.counts, swaps: s.swaps,
+    edition: s.edition, trackCC: s.trackCC, locked: s.locked, firstStickerAt: s.firstStickerAt,
+    activityDays: s.activityDays, completedOn: s.completedOn, unlockedAchievements: s.unlockedAchievements,
+  };
+}
+
+/** Full album list with the active album refreshed from top-level (never the stale parked copy). */
+export function allAlbums(s: SliceState): AlbumSnapshot[] {
+  const active = reconstructActive(s);
+  return s.albums.some((a) => a.id === active.id)
+    ? s.albums.map((a) => (a.id === active.id ? active : a))
+    : [...s.albums, active];
+}
+
+/** Album ids that belong to the Cloud channel: all, minus shared, minus private. */
+export function cloudManagedIds(albumIds: string[], albumLinkIds: string[], privateIds: string[]): Set<string> {
+  const excluded = new Set<string>([...albumLinkIds, ...privateIds]);
+  return new Set(albumIds.filter((id) => !excluded.has(id)));
+}
+
+export function sliceCloudPayload(s: SliceState, managedIds: Set<string>): CollectionPayload {
+  return { kind: 'collection', v: PAYLOAD_V, albums: allAlbums(s).filter((a) => managedIds.has(a.id)) };
+}
+
+export function sliceAlbumPayload(
+  s: SliceState, albumId: string, access: 'collaborative' | 'read-only',
+): AlbumPayload | null {
+  const album = allAlbums(s).find((a) => a.id === albumId);
+  return album ? { kind: 'album', v: PAYLOAD_V, access, album } : null;
 }
 
 const anyOwned = (c?: Record<string, number>) => !!c && Object.values(c).some((n) => n > 0);

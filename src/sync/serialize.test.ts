@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { pickSyncState, sanitizeRemote, hasCollectionData, type SyncPayload } from './serialize';
+import {
+  pickSyncState, sanitizeRemote, hasCollectionData, type SyncPayload,
+  reconstructActive, allAlbums, cloudManagedIds, sliceCloudPayload, sliceAlbumPayload, type SliceState,
+} from './serialize';
 
 /** A pristine, brand-new install: one default album, nothing owned. */
 function emptyState(): Pick<SyncPayload, 'counts' | 'swaps' | 'albums'> {
@@ -127,5 +130,57 @@ describe('sanitizeRemote', () => {
     expect(sanitizeRemote({ counts: {}, albums: 'x', activeAlbumId: 'a', swaps: [] })).toBeNull();
     expect(sanitizeRemote({ counts: {}, albums: [], activeAlbumId: 5, swaps: [] })).toBeNull();
     expect(sanitizeRemote({ counts: [], albums: [], activeAlbumId: 'a', swaps: [] })).toBeNull();
+  });
+});
+
+function state(): SliceState {
+  return {
+    counts: { 'MEX-1': 2 }, swaps: [], edition: 'latam' as const, trackCC: true,
+    albumName: 'Active', locked: false, firstStickerAt: 10, activityDays: ['2026-07-01'],
+    completedOn: null, unlockedAchievements: {},
+    activeAlbumId: 'A',
+    albums: [
+      { id: 'A', albumName: 'stale-A', counts: {}, swaps: [], edition: 'latam' as const, trackCC: true, locked: false, activityDays: [], completedOn: null, unlockedAchievements: {} },
+      { id: 'B', albumName: 'B', counts: { 'ARG-1': 1 }, swaps: [], edition: 'latam' as const, trackCC: true, locked: false, activityDays: [], completedOn: null, unlockedAchievements: {} },
+    ],
+  };
+}
+
+describe('reconstructActive / allAlbums', () => {
+  it('reconstructs the active album from live top-level fields, not the stale parked copy', () => {
+    const a = reconstructActive(state());
+    expect(a.id).toBe('A');
+    expect(a.albumName).toBe('Active');       // top-level, not 'stale-A'
+    expect(a.counts).toEqual({ 'MEX-1': 2 });
+  });
+  it('allAlbums refreshes the active entry and keeps the rest', () => {
+    const all = allAlbums(state());
+    expect(all.find((x) => x.id === 'A')!.albumName).toBe('Active');
+    expect(all.find((x) => x.id === 'B')!.counts).toEqual({ 'ARG-1': 1 });
+  });
+});
+
+describe('cloudManagedIds', () => {
+  it('excludes shared and private albums', () => {
+    expect([...cloudManagedIds(['A', 'B', 'C'], ['B'], ['C'])].sort()).toEqual(['A']);
+  });
+});
+
+describe('sliceCloudPayload / sliceAlbumPayload', () => {
+  it('slices only managed albums into a collection payload', () => {
+    const p = sliceCloudPayload(state(), new Set(['A']));
+    expect(p.kind).toBe('collection');
+    expect(p.albums.map((a) => a.id)).toEqual(['A']);
+    expect(p.albums[0].albumName).toBe('Active');
+  });
+  it('slices a single album into an album payload with access', () => {
+    const p = sliceAlbumPayload(state(), 'B', 'read-only');
+    expect(p).not.toBeNull();
+    expect(p!.kind).toBe('album');
+    expect(p!.access).toBe('read-only');
+    expect(p!.album.id).toBe('B');
+  });
+  it('returns null for a missing album', () => {
+    expect(sliceAlbumPayload(state(), 'ZZZ', 'collaborative')).toBeNull();
   });
 });
