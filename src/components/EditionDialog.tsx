@@ -22,7 +22,7 @@ export default function EditionDialog({ onClose }: Props) {
   const trackCC = useCollection((s) => s.trackCC);
   const setTrackCC = useCollection((s) => s.setTrackCC);
   const theme = useCollection((s) => s.theme);
-  const toggleTheme = useCollection((s) => s.toggleTheme);
+  const setTheme = useCollection((s) => s.setTheme);
   const albumLayout = useCollection((s) => s.albumLayout);
   const setAlbumLayout = useCollection((s) => s.setAlbumLayout);
   const albumName = useCollection((s) => s.albumName);
@@ -151,43 +151,74 @@ export default function EditionDialog({ onClose }: Props) {
         {/* ---------- Appearance ---------- */}
         <section className="settings-section">
           <h3 className="settings-heading">Appearance</h3>
-          <button
-            type="button"
-            className="setting-toggle"
-            role="switch"
-            aria-checked={theme === 'light'}
-            aria-label="Toggle light mode"
-            onClick={toggleTheme}
-          >
-            <span className="setting-label">{theme === 'light' ? '☀️ Light mode' : '🌙 Dark mode'}</span>
-            <span className={`switch theme-switch${theme === 'light' ? ' on' : ''}`} aria-hidden="true">
-              <span className="knob">{theme === 'light' ? '☀️' : '🌙'}</span>
-            </span>
-          </button>
-
-          <div className="settings-field" style={{ marginTop: 12 }}>
-            <label className="settings-field-label" id="layout-label">
-              Layout
-            </label>
-            <div className="settings-segment" role="group" aria-labelledby="layout-label">
-              {(['compact', 'pages'] as const).map((opt) => (
-                <button
-                  key={opt}
-                  type="button"
-                  className={albumLayout === opt ? 'active' : ''}
-                  aria-pressed={albumLayout === opt}
-                  disabled={!supportsPages}
-                  onClick={() => setAlbumLayout(opt)}
-                >
-                  {opt === 'compact' ? 'Compact' : 'Pages'}
-                </button>
-              ))}
+          <div className="settings-card">
+            {/* Theme */}
+            <div className="setting-row">
+              <span className="setting-row-ico" aria-hidden="true">
+                {theme === 'light' ? '☀️' : '🌙'}
+              </span>
+              <span className="setting-row-text">
+                <span className="setting-row-title" id="theme-label">
+                  Theme
+                </span>
+              </span>
+              <span className="mini-seg" role="group" aria-labelledby="theme-label">
+                {(['light', 'dark'] as const).map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    className={theme === opt ? 'on' : ''}
+                    aria-pressed={theme === opt}
+                    onClick={() => setTheme(opt)}
+                  >
+                    {opt === 'light' ? 'Light' : 'Dark'}
+                  </button>
+                ))}
+              </span>
             </div>
-            {!supportsPages && (
-              <p className="modal-sub" style={{ margin: '8px 0 0' }}>
-                Pages view isn't available for this album.
-              </p>
-            )}
+
+            {/* Layout of the All-filter view */}
+            <div className="setting-row">
+              <span className="setting-row-ico" aria-hidden="true">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect x="3" y="3" width="7" height="7" rx="1" />
+                  <rect x="14" y="3" width="7" height="7" rx="1" />
+                  <rect x="3" y="14" width="7" height="7" rx="1" />
+                  <rect x="14" y="14" width="7" height="7" rx="1" />
+                </svg>
+              </span>
+              <span className="setting-row-text">
+                <span className="setting-row-title" id="layout-label">
+                  Layout
+                </span>
+                <span className="setting-row-sub">
+                  {supportsPages ? 'The All view' : "Pages view isn't available for this album."}
+                </span>
+              </span>
+              <span className="mini-seg" role="group" aria-labelledby="layout-label">
+                {(['compact', 'pages'] as const).map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    className={albumLayout === opt ? 'on' : ''}
+                    aria-pressed={albumLayout === opt}
+                    disabled={!supportsPages}
+                    onClick={() => setAlbumLayout(opt)}
+                  >
+                    {opt === 'compact' ? 'Compact' : 'Pages'}
+                  </button>
+                ))}
+              </span>
+            </div>
           </div>
         </section>
 
