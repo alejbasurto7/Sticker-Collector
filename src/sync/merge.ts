@@ -1,4 +1,5 @@
 import type { Counts, Swap } from '../types';
+import type { AlbumSnapshot } from '../store/collectionStore';
 
 /**
  * 3-way merge of a counts map. A sticker only one side changed keeps that
@@ -116,4 +117,40 @@ export function mergeSwaps(base: Swap[], local: Swap[], remote: Swap[]): Swap[] 
     }
   }
   return out.sort((x, y) => y.createdAt - x.createdAt || (x.id < y.id ? -1 : x.id > y.id ? 1 : 0));
+}
+
+/**
+ * 3-way merge of a full album snapshot, field by field (see the spec's merge
+ * table). Independent edits on any field survive; only same-key collisions
+ * tie-break, always deterministically. `base === undefined` means a first join:
+ * counts/swaps union, scalars fall straight to the collision rule.
+ */
+export function mergeAlbum(
+  base: AlbumSnapshot | undefined,
+  local: AlbumSnapshot,
+  remote: AlbumSnapshot,
+): AlbumSnapshot {
+  const firstDefs = [local.firstStickerAt, remote.firstStickerAt].filter(
+    (x): x is number => typeof x === 'number',
+  );
+  const completedDefs = [local.completedOn, remote.completedOn].filter(
+    (x): x is string => !!x,
+  );
+  const unlockedAchievements: Record<string, number> = { ...remote.unlockedAchievements };
+  for (const [k, v] of Object.entries(local.unlockedAchievements)) {
+    unlockedAchievements[k] = unlockedAchievements[k] == null ? v : Math.min(unlockedAchievements[k], v);
+  }
+  return {
+    id: local.id,
+    albumName: scalar3(base?.albumName, local.albumName, remote.albumName),
+    counts: mergeCounts(base?.counts ?? {}, local.counts, remote.counts),
+    swaps: mergeSwaps(base?.swaps ?? [], local.swaps, remote.swaps),
+    edition: scalar3(base?.edition, local.edition, remote.edition),
+    trackCC: scalar3(base?.trackCC, local.trackCC, remote.trackCC),
+    locked: scalar3(base?.locked, local.locked, remote.locked),
+    firstStickerAt: firstDefs.length ? Math.min(...firstDefs) : undefined,
+    activityDays: [...new Set([...local.activityDays, ...remote.activityDays])].sort(),
+    completedOn: completedDefs.length ? completedDefs.sort()[0] : null,
+    unlockedAchievements,
+  };
 }

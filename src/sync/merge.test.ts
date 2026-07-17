@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { mergeCounts, scalar3, mergeSwaps } from './merge';
+import { mergeCounts, scalar3, mergeSwaps, mergeAlbum } from './merge';
 import type { Swap } from '../types';
+import type { AlbumSnapshot } from '../store/collectionStore';
 
 describe('mergeCounts', () => {
   it('keeps independent changes from both sides', () => {
@@ -72,6 +73,22 @@ function swap(id: string, over: Partial<Swap> = {}): Swap {
   };
 }
 
+function album(over: Partial<AlbumSnapshot> = {}): AlbumSnapshot {
+  return {
+    id: 'alb1',
+    albumName: 'My Album',
+    counts: {},
+    swaps: [],
+    edition: 'latam',
+    trackCC: true,
+    locked: false,
+    activityDays: [],
+    completedOn: null,
+    unlockedAchievements: {},
+    ...over,
+  };
+}
+
 describe('mergeSwaps', () => {
   it('keeps a swap added on only one side', () => {
     const s1 = swap('s1');
@@ -125,5 +142,46 @@ describe('mergeSwaps', () => {
     const remoteEdit = swap('s1', { name: 'new' });
     // local is a semantic no-op vs base; remote made a genuine edit -> remote must survive.
     expect(mergeSwaps([base], [rolledBack], [remoteEdit])).toEqual([remoteEdit]);
+  });
+});
+
+describe('mergeAlbum', () => {
+  it('merges counts and swaps and unions activity days', () => {
+    const base = album({ counts: { A: 1 }, activityDays: ['2026-07-01'] });
+    const local = album({ counts: { A: 1, B: 1 }, activityDays: ['2026-07-02'] });
+    const remote = album({ counts: { A: 1, C: 1 }, activityDays: ['2026-07-03'] });
+    const m = mergeAlbum(base, local, remote);
+    expect(m.counts).toEqual({ A: 1, B: 1, C: 1 });
+    expect(m.activityDays).toEqual(['2026-07-02', '2026-07-03']);
+  });
+
+  it('keeps the earliest achievement timestamp and earliest first-sticker time', () => {
+    const local = album({ firstStickerAt: 500, unlockedAchievements: { first: 500 } });
+    const remote = album({ firstStickerAt: 300, unlockedAchievements: { first: 900, streak: 700 } });
+    const m = mergeAlbum(album(), local, remote);
+    expect(m.firstStickerAt).toBe(300);
+    expect(m.unlockedAchievements).toEqual({ first: 500, streak: 700 });
+  });
+
+  it('takes the earliest non-null completedOn', () => {
+    const local = album({ completedOn: '2026-07-10' });
+    const remote = album({ completedOn: '2026-07-05' });
+    expect(mergeAlbum(album(), local, remote).completedOn).toBe('2026-07-05');
+    expect(mergeAlbum(album(), album(), album()).completedOn).toBeNull();
+  });
+
+  it('resolves a name collision deterministically and keeps local id', () => {
+    const base = album({ albumName: 'Base' });
+    const local = album({ id: 'localId', albumName: 'Alpha' });
+    const remote = album({ id: 'remoteId', albumName: 'Zeta' });
+    const m = mergeAlbum(base, local, remote);
+    expect(m.albumName).toBe('Zeta'); // 'Zeta' >= 'Alpha'
+    expect(m.id).toBe('localId');
+  });
+
+  it('first join (no base) unions both sides counts', () => {
+    const local = album({ counts: { A: 1 } });
+    const remote = album({ counts: { B: 1 } });
+    expect(mergeAlbum(undefined, local, remote).counts).toEqual({ A: 1, B: 1 });
   });
 });
