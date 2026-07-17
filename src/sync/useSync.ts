@@ -3,16 +3,13 @@ import { isSyncConfigured } from '../lib/supabase';
 import { useSyncMeta } from '../store/syncStore';
 import { startEngine, stopEngine } from './engine';
 
-/**
- * Boot the sync engine for the app's lifetime. Call once (from App). Starts the
- * engine when a link exists and configured, restarts it if the link changes,
- * and stops it on unlink/unmount. No-op when sync isn't configured.
- */
+/** Boot the sync engine for the app's lifetime. Restarts when the set of active channels changes. */
 export function useSyncBoot() {
-  const codeHash = useSyncMeta((s) => s.codeHash);
+  const hasCollection = useSyncMeta((s) => s.collection !== null);
+  const albumLinkKey = useSyncMeta((s) => Object.keys(s.albumLinks).sort().join(','));
   useEffect(() => {
-    if (!isSyncConfigured || !codeHash) return;
+    if (!isSyncConfigured || (!hasCollection && !albumLinkKey)) return;
     startEngine();
     return () => stopEngine();
-  }, [codeHash]);
+  }, [hasCollection, albumLinkKey]);
 }
