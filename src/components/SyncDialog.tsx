@@ -197,19 +197,19 @@ export default function SyncDialog({ onClose }: Props) {
             <p className="modal-sub">
               This device already has its own collection, and so does the code you entered.
               Linking merges them onto one shared collection — pick which one to keep.
-              <strong> The other will be replaced.</strong>
+              <strong> Nothing is lost — the two are merged together.</strong>
             </p>
             <div className="btn-row" style={{ flexDirection: 'column' }}>
               <button className="btn full" disabled={busy} onClick={keepLocal}>
                 {busy ? 'Linking…' : '📱 Keep THIS device’s collection'}
               </button>
               <button className="btn danger full" disabled={busy} onClick={useShared}>
-                ☁️ Use the shared collection (replace this device)
+                ☁️ Use the shared collection
               </button>
             </div>
             <p className="modal-sub" style={{ margin: '10px 0 0', fontSize: '0.82rem' }}>
-              Tip: keep the device that has the collection you care about. The other device will
-              then update to match it.
+              Tip: keep the device that has the collection you care about. Both devices will then
+              show the combined collection.
             </p>
             {error && <p className="sync-error">{error}</p>}
             <div className="btn-row">

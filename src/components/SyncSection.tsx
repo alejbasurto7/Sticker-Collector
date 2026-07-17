@@ -29,9 +29,10 @@ function relTime(ts: number): string {
  * sync isn't configured for this build, so the app degrades to local-only.
  */
 export default function SyncSection() {
-  const code = useSyncMeta((s) => s.code);
-  const status = useSyncMeta((s) => s.status);
-  const lastSyncedAt = useSyncMeta((s) => s.lastSyncedAt);
+  const collection = useSyncMeta((s) => s.collection);
+  const code = collection?.code ?? null;
+  const status = collection?.status ?? 'unlinked';
+  const lastSyncedAt = collection?.lastSyncedAt ?? null;
   const [dialogOpen, setDialogOpen] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [confirmingUnlink, setConfirmingUnlink] = useState(false);
@@ -39,7 +40,7 @@ export default function SyncSection() {
 
   if (!isSyncConfigured) return null;
 
-  const linked = Boolean(code);
+  const linked = Boolean(collection);
 
   async function handleCopy() {
     if (code && (await copyToClipboard(code))) {

@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Counts, Edition, Swap } from '../types';
-import type { SyncPayload } from '../sync/serialize';
 import type { CollectionPayload } from '../sync/payload';
 import { album, applyEdition, DEFAULT_EDITION, DEFAULT_TRACK_CC } from '../data/sampleAlbum';
 import { computeReservations, settleSwapCounts, reverseSettlement } from '../utils/swap';
@@ -119,10 +118,6 @@ interface CollectionState {
 
   // Achievements
   markUnlocked: (keys: string[]) => void;
-
-  // Cross-device sync: replace the whole collection with a snapshot pulled from
-  // the cloud, reconciling exactly like a fresh page load (see onRehydrateStorage).
-  applyRemoteState: (payload: SyncPayload) => void;
 
   // Per-album sync: apply a merged collection (cloud albums replaced, non-cloud preserved).
   applyMergedCollection: (payload: CollectionPayload, nonCloudIds: Set<string>) => void;
@@ -497,27 +492,6 @@ export const useCollection = create<CollectionState>()(
             }
           }
           return changed ? { unlockedAchievements } : s;
-        }),
-
-      applyRemoteState: (payload) =>
-        set(() => {
-          // Rebuild the album layout to match the incoming edition/CC tracking,
-          // then reconcile the album list — the same steps onRehydrateStorage runs
-          // so a remote pull behaves identically to loading the app fresh.
-          applyEdition(payload.edition ?? DEFAULT_EDITION, payload.trackCC ?? DEFAULT_TRACK_CC);
-          const next: Partial<CollectionState> = { ...payload };
-          if (!next.activeAlbumId) next.activeAlbumId = DEFAULT_ALBUM_ID;
-          const asState = next as CollectionState;
-          if (!Array.isArray(next.albums) || next.albums.length === 0) {
-            next.albums = [snapshotActive(asState)];
-          } else if (!next.albums.some((a) => a.id === next.activeAlbumId)) {
-            next.albums = [...next.albums, snapshotActive(asState)];
-          } else {
-            next.albums = next.albums.map((a) =>
-              a.id === next.activeAlbumId ? { ...a, albumName: next.albumName ?? a.albumName } : a,
-            );
-          }
-          return next;
         }),
 
       applyMergedCollection: (payload, nonCloudIds) =>

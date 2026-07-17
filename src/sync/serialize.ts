@@ -27,26 +27,6 @@ export interface SyncPayload {
   activeAlbumId: string;
 }
 
-/** Extract the syncable payload from the (superset) collection store state. */
-export function pickSyncState(s: SyncPayload): SyncPayload {
-  return {
-    counts: s.counts,
-    swaps: s.swaps,
-    edition: s.edition,
-    trackCC: s.trackCC,
-    albumName: s.albumName,
-    locked: s.locked,
-    firstStickerAt: s.firstStickerAt,
-    activityDays: s.activityDays,
-    completedOn: s.completedOn,
-    unlockedAchievements: s.unlockedAchievements,
-    importSeq: s.importSeq,
-    theme: s.theme,
-    albums: s.albums,
-    activeAlbumId: s.activeAlbumId,
-  };
-}
-
 /** The read-only slice of collection state the slicers need. */
 export interface SliceState {
   counts: Counts; swaps: Swap[]; edition: Edition; trackCC: boolean; albumName: string;
@@ -108,21 +88,6 @@ export function hasCollectionData(
 
 const isObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
-
-/**
- * Defensively validate a blob pulled from the server before applying it to the
- * live store. Returns the payload if it has the core shape, else null (so a
- * corrupt/foreign row can never crash or wipe the app). Only the essentials are
- * checked; the store's own reconciliation fills any gaps.
- */
-export function sanitizeRemote(data: unknown): SyncPayload | null {
-  if (!isObject(data)) return null;
-  if (!isObject(data.counts)) return null;
-  if (!Array.isArray(data.albums)) return null;
-  if (typeof data.activeAlbumId !== 'string') return null;
-  if (!Array.isArray(data.swaps)) return null;
-  return data as unknown as SyncPayload;
-}
 
 /** Coerce a header-less legacy whole-collection blob into a CollectionPayload. */
 export function legacyToCollection(data: unknown): CollectionPayload | null {
