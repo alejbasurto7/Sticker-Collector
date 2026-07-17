@@ -28,6 +28,21 @@ describe('applyMergedCollection', () => {
     useCollection.getState().applyMergedCollection(payload, new Set(['S']));
     expect(useCollection.getState().albums.map((a) => a.id).sort()).toEqual(['A', 'NEW', 'S']);
   });
+  it('promotes a fallback when the active album vanishes from the merged set', () => {
+    const payload = { kind: 'collection' as const, v: 1, albums: [snap('B', { albumName: 'B2', counts: { 'ARG-1': 3 } })] };
+    useCollection.getState().applyMergedCollection(payload, new Set()); // 'A' absent from payload and nonCloudIds -> vanishes
+    const st = useCollection.getState();
+    expect(st.activeAlbumId).toBe('B');
+    expect(st.albumName).toBe('B2');
+    expect(st.counts).toEqual({ 'ARG-1': 3 });
+  });
+  it('does not crash when the merged album set is empty (keeps active id unchanged)', () => {
+    const before = useCollection.getState().activeAlbumId;
+    useCollection.getState().applyMergedCollection({ kind: 'collection', v: 1, albums: [] }, new Set());
+    const st = useCollection.getState();
+    expect(st.albums).toEqual([]);
+    expect(st.activeAlbumId).toBe(before);
+  });
 });
 
 describe('applyMergedAlbum', () => {
