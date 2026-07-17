@@ -1,7 +1,7 @@
 import type { Counts, Edition, Swap } from '../types';
 // Type-only imports (erased at build) — keeps this module free of the store's
 // runtime (localStorage/zustand), so it's importable in a plain Node test env.
-import type { AlbumSnapshot, Theme } from '../store/collectionStore';
+import type { AlbumSnapshot, Theme, AlbumLayout } from '../store/collectionStore';
 
 /**
  * The exact slice of collection state that travels between devices. This is the
@@ -22,6 +22,7 @@ export interface SyncPayload {
   unlockedAchievements: Record<string, number>;
   importSeq: number;
   theme: Theme;
+  albumLayout: AlbumLayout;
   albums: AlbumSnapshot[];
   activeAlbumId: string;
 }
@@ -41,6 +42,7 @@ export function pickSyncState(s: SyncPayload): SyncPayload {
     unlockedAchievements: s.unlockedAchievements,
     importSeq: s.importSeq,
     theme: s.theme,
+    albumLayout: s.albumLayout,
     albums: s.albums,
     activeAlbumId: s.activeAlbumId,
   };
