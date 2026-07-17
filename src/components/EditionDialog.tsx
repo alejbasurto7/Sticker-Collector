@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useCollection } from '../store/collectionStore';
-import { CC_EMOJI, EDITION_INFO } from '../data/sampleAlbum';
+import { album, CC_EMOJI, EDITION_INFO } from '../data/sampleAlbum';
 import { ALBUM_TYPE } from '../config';
 import { VERSION_LABEL } from '../version';
 import type { Edition } from '../types';
@@ -8,6 +8,7 @@ import { buildListExport } from '../utils/listExport';
 import { copyToClipboard } from '../utils/share';
 import ImportDialog from './ImportDialog';
 import SyncSection from './SyncSection';
+import { pagesSupportPages } from '../data/layouts';
 
 interface Props {
   onClose: () => void;
@@ -22,6 +23,8 @@ export default function EditionDialog({ onClose }: Props) {
   const setTrackCC = useCollection((s) => s.setTrackCC);
   const theme = useCollection((s) => s.theme);
   const toggleTheme = useCollection((s) => s.toggleTheme);
+  const albumLayout = useCollection((s) => s.albumLayout);
+  const setAlbumLayout = useCollection((s) => s.setAlbumLayout);
   const albumName = useCollection((s) => s.albumName);
   const setAlbumName = useCollection((s) => s.setAlbumName);
   const albums = useCollection((s) => s.albums);
@@ -35,6 +38,10 @@ export default function EditionDialog({ onClose }: Props) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [exported, setExported] = useState(false);
+
+  // Pages layout only differs from Compact when some page has a matching template.
+  // Recompute when the edition / CC tracking changes the album's sticker counts.
+  const supportsPages = useMemo(() => pagesSupportPages(album.pages), [edition, trackCC]);
 
   // The album name changes out from under us when the user creates or switches
   // albums, so keep the editable draft mirrored to the active album's name.
@@ -157,6 +164,31 @@ export default function EditionDialog({ onClose }: Props) {
               <span className="knob">{theme === 'light' ? '☀️' : '🌙'}</span>
             </span>
           </button>
+
+          <div className="settings-field" style={{ marginTop: 12 }}>
+            <label className="settings-field-label" id="layout-label">
+              Layout
+            </label>
+            <div className="settings-segment" role="group" aria-labelledby="layout-label">
+              {(['compact', 'pages'] as const).map((opt) => (
+                <button
+                  key={opt}
+                  type="button"
+                  className={albumLayout === opt ? 'active' : ''}
+                  aria-pressed={albumLayout === opt}
+                  disabled={!supportsPages}
+                  onClick={() => setAlbumLayout(opt)}
+                >
+                  {opt === 'compact' ? 'Compact' : 'Pages'}
+                </button>
+              ))}
+            </div>
+            {!supportsPages && (
+              <p className="modal-sub" style={{ margin: '8px 0 0' }}>
+                Pages view isn't available for this album.
+              </p>
+            )}
+          </div>
         </section>
 
         {/* ---------- Coca-Cola tracking ---------- */}

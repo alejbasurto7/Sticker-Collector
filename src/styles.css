@@ -1202,6 +1202,34 @@ button {
   margin-bottom: 6px;
   font-size: 13px;
 }
+/* Two-option segmented control (Layout: Compact | Pages), mirrors .filterbar. */
+.settings-segment {
+  display: flex;
+  gap: 6px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px;
+}
+.settings-segment button {
+  flex: 1;
+  border: none;
+  background: none;
+  color: var(--text-dim);
+  padding: 8px 6px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+.settings-segment button.active {
+  background: var(--green);
+  color: #fff;
+}
+.settings-segment button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .settings-input,
 .settings-select {
   width: 100%;
