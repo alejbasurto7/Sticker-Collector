@@ -54,9 +54,23 @@ export interface Swap {
   /** Parsed from the other collector's export. */
   theirNeeds: string[];
   theirSwaps: string[];
+  /**
+   * Copies the other collector needs per sticker id (their "(×N)" quantities),
+   * for the ids in `theirNeeds`. Absent/1 means a single copy. Kept so editing a
+   * swap can re-offer the right number of copies without re-typing the list.
+   */
+  theirNeedsQty?: Record<string, number>;
   /** Promised sticker ids in each direction. */
   giving: string[];
   receiving: string[];
+  /**
+   * Copies promised to give per sticker id, for the ids in `giving`. A collector
+   * can need — and you can hand over — more than one copy of the same sticker.
+   * Absent, or any id missing/≤1, means a single copy (back-compat with swaps
+   * created before multi-copy giving). `receiving` is always one copy per id (you
+   * only ever miss a sticker once), so it needs no quantity map.
+   */
+  givingQty?: Record<string, number>;
   /**
    * Ids the user has unselected in the detail modal — still part of the swap but
    * parked out of the active trade. Absent/empty means everything is selected.

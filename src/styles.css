@@ -1393,6 +1393,13 @@ textarea {
   right: -7px;
   font-size: 12px;
 }
+.chip .chip-qty {
+  margin-left: 3px;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--green);
+  vertical-align: super;
+}
 .chip-group-row {
   display: flex;
   align-items: flex-start;

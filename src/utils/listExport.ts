@@ -57,17 +57,30 @@ export function buildListExport(
  * `emoji CODE: n, n, n` line per album page, in album order. An empty side reads
  * "Nothing here." to mirror the on-screen empty state.
  */
-export function buildSwapExport(giving: string[], receiving: string[]): string {
-  const sideLines = (ids: string[]): string[] => {
+export function buildSwapExport(
+  giving: string[],
+  receiving: string[],
+  giveQty?: Record<string, number>,
+): string {
+  const sideLines = (ids: string[], qty?: Record<string, number>): string[] => {
     const groups = groupByPage(ids);
     if (groups.length === 0) return ['Nothing here.'];
-    return groups.map(
-      ({ page, stickers }) =>
-        `${page.emoji} ${page.code}: ${stickers.map((s) => s.number).join(', ')}`,
-    );
+    return groups.map(({ page, stickers }) => {
+      const nums = stickers.map((s) => {
+        const n = qty?.[s.id] ?? 1;
+        return n > 1 ? `${s.number} (×${n})` : s.number;
+      });
+      return `${page.emoji} ${page.code}: ${nums.join(', ')}`;
+    });
   };
 
-  return ['You give:', ...sideLines(giving), '', 'You get:', ...sideLines(receiving)].join('\n');
+  return [
+    'You give:',
+    ...sideLines(giving, giveQty),
+    '',
+    'You get:',
+    ...sideLines(receiving),
+  ].join('\n');
 }
 
 /**
@@ -76,7 +89,12 @@ export function buildSwapExport(giving: string[], receiving: string[]): string {
  * parseExport() consumes. Used to re-populate the "Their list" field when
  * editing a saved swap, whose parsed needs/swaps are all that's kept.
  */
-export function buildListFromIds(needs: string[], swaps: string[], albumName: string): string {
+export function buildListFromIds(
+  needs: string[],
+  swaps: string[],
+  albumName: string,
+  needQty?: Record<string, number>,
+): string {
   const needSet = new Set(needs);
   const swapSet = new Set(swaps);
   const needLines: string[] = [];
@@ -89,7 +107,11 @@ export function buildListFromIds(needs: string[], swaps: string[], albumName: st
     for (const stickerId of page.stickerIds) {
       const sticker = stickerById[stickerId];
       if (!sticker) continue;
-      if (needSet.has(stickerId)) needNums.push(sticker.number);
+      if (needSet.has(stickerId)) {
+        // Preserve "(×N)" so re-parsing an edited swap re-offers every copy.
+        const n = needQty?.[stickerId] ?? 1;
+        needNums.push(n > 1 ? `${sticker.number} (×${n})` : sticker.number);
+      }
       if (swapSet.has(stickerId)) swapNums.push(sticker.number);
     }
 

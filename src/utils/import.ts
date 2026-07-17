@@ -8,6 +8,12 @@ export interface ParsedList {
   /** Spare copies per swap sticker id, e.g. "2 (×3)" -> 3. Defaults to 1. */
   swapQty: Record<string, number>;
   /**
+   * Copies the collector needs per need sticker id, e.g. "1 (×2)" -> 2; repeats
+   * of the same number sum. Defaults to 1. Lets a swap offer more than one copy
+   * of a sticker the other collector needs multiple of.
+   */
+  needQty: Record<string, number>;
+  /**
    * Total copies listed per sticker id across the ENTIRE list, ignoring which
    * section (or none) each line sat under. Every listed number contributes its
    * quantity (1, or N for a "(×N)" suffix); repeats sum. This is what an
@@ -71,6 +77,7 @@ export function parseExport(text: string): ParsedList {
   const needs: string[] = [];
   const swaps: string[] = [];
   const swapQty: Record<string, number> = {};
+  const needQty: Record<string, number> = {};
   const all: Record<string, number> = {};
   const unmatched: string[] = [];
   let section: Section = null;
@@ -111,6 +118,8 @@ export function parseExport(text: string): ParsedList {
         // The needs/swaps split still honours the header, for Replace mode.
         if (section === 'needs') {
           needs.push(id);
+          // Sum copies so "1 (×2)" (or a number repeated) offers every copy.
+          needQty[id] = (needQty[id] ?? 0) + qty;
         } else if (section === 'swaps') {
           swaps.push(id);
           swapQty[id] = qty;
@@ -128,6 +137,7 @@ export function parseExport(text: string): ParsedList {
     needs: [...new Set(needs)],
     swaps: [...new Set(swaps)],
     swapQty,
+    needQty,
     all,
     unmatched,
   };
