@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useCollection } from '../store/collectionStore';
-import { activeGiving, activeReceiving, computeConflicts } from '../utils/swap';
+import { activeReceiving, computeConflicts, totalGiving } from '../utils/swap';
 import type { Swap } from '../types';
 import NewSwapDialog from './NewSwapDialog';
 import SwapDetail from './SwapDetail';
@@ -76,7 +76,7 @@ function SwapCard({
         <span className={`pill ${swap.status}`}>{swap.status}</span>
       </div>
       <div className="swap-summary">
-        <span className="give">↑ Give {activeGiving(swap).length}</span>
+        <span className="give">↑ Give {totalGiving(swap)}</span>
         <span className="get">↓ Get {activeReceiving(swap).length}</span>
       </div>
       {conflicts > 0 && (

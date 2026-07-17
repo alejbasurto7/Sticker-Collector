@@ -13,8 +13,24 @@ import type { ParsedList } from './import';
 export interface SwapCandidates {
   youGive: string[];
   youGet: string[];
+  /**
+   * Copies you can hand over per giving id: min(copies they need, your spares).
+   * Every entry is ≥1. Ids absent from the map (and everything in `youGet`) are a
+   * single copy.
+   */
+  giveQty: Record<string, number>;
   giveReserved: Set<string>;
   getReserved: Set<string>;
+}
+
+/** Copies promised to give for one sticker id. Missing/≤1 means a single copy. */
+export function giveQtyOf(sw: Swap, id: string): number {
+  return Math.max(1, sw.givingQty?.[id] ?? 1);
+}
+
+/** Total copies actively promised on the giving side (sums per-sticker quantities). */
+export function totalGiving(sw: Swap): number {
+  return activeGiving(sw).reduce((n, id) => n + giveQtyOf(sw, id), 0);
 }
 
 /**
@@ -53,7 +69,9 @@ export function computeReservations(swaps: Swap[], excludeSwapId?: string): Rese
 
   for (const sw of swaps) {
     if (sw.status !== 'open' || sw.id === excludeSwapId) continue;
-    for (const id of activeGiving(sw)) committedGive.set(id, (committedGive.get(id) ?? 0) + 1);
+    // Each open swap earmarks as many copies as it promises to give (default 1).
+    for (const id of activeGiving(sw))
+      committedGive.set(id, (committedGive.get(id) ?? 0) + giveQtyOf(sw, id));
     for (const id of activeReceiving(sw)) committedGet.add(id);
   }
 
@@ -82,15 +100,18 @@ export function computeCandidates(
 
   const youGive: string[] = [];
   const youGet: string[] = [];
+  const giveQty: Record<string, number> = {};
   const giveReserved = new Set<string>();
   const getReserved = new Set<string>();
 
   // My spares they need. A copy already promised in another open swap is still offered
-  // but flagged when no free spare is left for a second swap (committed >= spare).
+  // but flagged when no free spare is left for a second swap (committed >= spare). When
+  // they need several copies of the same sticker, offer as many as I have spare for.
   for (const id of otherNeeds) {
     const spare = Math.max((counts[id] ?? 0) - 1, 0);
     if (spare < 1) continue;
     youGive.push(id);
+    giveQty[id] = Math.min(other.needQty?.[id] ?? 1, spare);
     if ((committedGive?.get(id) ?? 0) >= spare) giveReserved.add(id);
   }
   // Their spares I'm missing. Flagged when I'm already lined up to receive it elsewhere.
@@ -100,18 +121,22 @@ export function computeCandidates(
     if (committedGet?.has(id)) getReserved.add(id);
   }
 
-  return { youGive, youGet, giveReserved, getReserved };
+  return { youGive, youGet, giveQty, giveReserved, getReserved };
 }
 
 /**
- * Quantity after physically giving one copy at settlement. Never drops below 1 owned
- * plus the copies still reserved by OTHER open swaps (the spec's `1 + committed` floor),
- * and never invents a copy the user doesn't hold.
+ * Quantity after physically giving `giveN` copies at settlement. Never drops below 1
+ * owned plus the copies still reserved by OTHER open swaps (the spec's `1 + committed`
+ * floor), and never invents a copy the user doesn't hold.
  */
-export function quantityAfterGive(current: number, committedByOthers: number): number {
+export function quantityAfterGive(
+  current: number,
+  committedByOthers: number,
+  giveN = 1,
+): number {
   if (current <= 0) return 0;
   const floor = committedByOthers > 0 ? committedByOthers + 1 : 0;
-  return Math.min(current, Math.max(current - 1, floor));
+  return Math.min(current, Math.max(current - Math.max(giveN, 1), floor));
 }
 
 /**
@@ -122,14 +147,16 @@ export function quantityAfterGive(current: number, committedByOthers: number): n
  */
 export function settleSwapCounts(
   counts: Counts,
-  settled: { givenIds: string[]; receivedIds: string[] },
+  settled: { givenIds: string[]; receivedIds: string[]; giveQty?: Record<string, number> },
   committedGive: Map<string, number>,
 ): { counts: Counts; delta: Record<string, number> } {
   const next: Counts = { ...counts };
   const delta: Record<string, number> = {};
   for (const gid of settled.givenIds) {
     const before = next[gid] ?? 0;
-    const after = quantityAfterGive(before, committedGive.get(gid) ?? 0);
+    // Hand over every promised copy of this sticker in one settlement (default 1).
+    const giveN = Math.max(1, settled.giveQty?.[gid] ?? 1);
+    const after = quantityAfterGive(before, committedGive.get(gid) ?? 0, giveN);
     next[gid] = after;
     if (after !== before) delta[gid] = (delta[gid] ?? 0) + (after - before);
   }
@@ -153,7 +180,7 @@ export function reverseSettlement(counts: Counts, swap: Swap): Counts {
       next[id] = Math.max(0, (next[id] ?? 0) - d);
     }
   } else {
-    for (const id of swap.giving) next[id] = Math.max(0, (next[id] ?? 0) + 1);
+    for (const id of swap.giving) next[id] = Math.max(0, (next[id] ?? 0) + giveQtyOf(swap, id));
     for (const id of swap.receiving) next[id] = Math.max(0, (next[id] ?? 0) - 1);
   }
   return next;
@@ -161,9 +188,10 @@ export function reverseSettlement(counts: Counts, swap: Swap): Counts {
 
 /**
  * Cross-swap conflict sets across all OPEN swaps.
- * - giving: sticker promised to give in more open swaps than the user has spares for.
+ * - giving: sticker whose promised copies across open swaps exceed the user's spares.
  * - receiving: missing sticker (count=0) expected from 2+ open swaps (you only need one).
- * - giveSwapCounts: how many open swaps each conflicted giving sticker appears in.
+ * - giveSwapCounts: total copies promised across open swaps per giving sticker (a single
+ *   swap may promise several copies of the same sticker).
  * - recvSwapCounts: how many open swaps each conflicted receiving sticker appears in.
  */
 export interface ConflictSets {
@@ -179,7 +207,9 @@ export function computeConflicts(swaps: Swap[], counts: Counts): ConflictSets {
 
   for (const sw of swaps) {
     if (sw.status !== 'open') continue;
-    for (const id of activeGiving(sw)) giveCounts.set(id, (giveCounts.get(id) ?? 0) + 1);
+    // Count promised copies, so needing 2 spares for a 2-copy give isn't a conflict.
+    for (const id of activeGiving(sw))
+      giveCounts.set(id, (giveCounts.get(id) ?? 0) + giveQtyOf(sw, id));
     for (const id of activeReceiving(sw)) recvCounts.set(id, (recvCounts.get(id) ?? 0) + 1);
   }
 

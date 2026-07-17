@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Swap } from '../types';
 import { useCollection } from '../store/collectionStore';
-import { computeConflicts } from '../utils/swap';
+import { computeConflicts, giveQtyOf } from '../utils/swap';
 import { buildSwapExport } from '../utils/listExport';
 import { copyToClipboard } from '../utils/share';
 import StickerChips from './StickerChips';
@@ -55,8 +55,9 @@ export default function SwapDetail({ swap, onClose }: Props) {
     for (const id of swap.giving) {
       if (conflicts.giving.has(id)) {
         const spares = Math.max(0, (counts[id] ?? 0) - 1);
+        // giveSwapCounts sums promised copies across open swaps (a swap may want several).
         const n = conflicts.giveSwapCounts.get(id) ?? 0;
-        map.set(id, `Promised in ${n} swap${n !== 1 ? 's' : ''} · ${spares} spare${spares !== 1 ? 's' : ''} available`);
+        map.set(id, `${n} cop${n !== 1 ? 'ies' : 'y'} promised · ${spares} spare${spares !== 1 ? 's' : ''} available`);
       }
     }
     return map;
@@ -77,6 +78,9 @@ export default function SwapDetail({ swap, onClose }: Props) {
 
   const giving = new Set(swap.giving.filter((id) => !deselectedGiving.has(id)));
   const receiving = new Set(swap.receiving.filter((id) => !deselectedReceiving.has(id)));
+  // Copies (not distinct stickers) actively promised to give, and a lookup for chips.
+  const giveQty = new Map(swap.giving.map((id) => [id, giveQtyOf(swap, id)]));
+  const giveCopies = [...giving].reduce((n, id) => n + giveQtyOf(swap, id), 0);
 
   const toggleGiving = (id: string) => {
     setJustSaved(false);
@@ -108,7 +112,7 @@ export default function SwapDetail({ swap, onClose }: Props) {
   };
 
   const exportList = async () => {
-    const text = buildSwapExport([...giving], [...receiving]);
+    const text = buildSwapExport([...giving], [...receiving], swap.givingQty);
     const ok = await copyToClipboard(text);
     if (!ok) return;
     setJustCopied(true);
@@ -157,11 +161,12 @@ export default function SwapDetail({ swap, onClose }: Props) {
           </div>
         )}
 
-        <div className="section-title">You give ({giving.size})</div>
+        <div className="section-title">You give ({giveCopies})</div>
         <StickerChips
           ids={swap.giving}
           selected={giving}
           conflicts={giveConflicts}
+          quantities={giveQty}
           onToggle={toggleGiving}
           readOnly={!isOpen}
         />

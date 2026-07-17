@@ -97,6 +97,25 @@ describe('parseExport section headers', () => {
   });
 });
 
+describe('parseExport need quantities (needQty)', () => {
+  it('captures "(×N)" copies on the need side and defaults bare numbers to 1', () => {
+    const p = parseExport('I need\nMEX: 1 (×2), 9');
+    expect(p.needs).toEqual(expect.arrayContaining(['MEX-1', 'MEX-9']));
+    expect(p.needQty['MEX-1']).toBe(2);
+    expect(p.needQty['MEX-9']).toBe(1);
+  });
+
+  it('sums repeats of the same needed sticker', () => {
+    const p = parseExport('I need\nMEX: 1 (×2), 1');
+    expect(p.needQty['MEX-1']).toBe(3);
+  });
+
+  it('only counts needs under a need header, not swaps', () => {
+    const p = parseExport('To Swap\nMEX: 1 (×2)');
+    expect(p.needQty['MEX-1']).toBeUndefined();
+  });
+});
+
 describe('parseExport additive tally (all)', () => {
   it('counts every listed copy regardless of section, using (×N) quantities', () => {
     const p = parseExport('I need\nMEX: 8\nTo Swap\nCAN: 1(2x), 5');

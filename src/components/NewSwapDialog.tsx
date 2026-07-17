@@ -27,6 +27,13 @@ const displayIds = (candidateIds: string[], selected: Set<string>) => {
   return [...candidateIds, ...extra];
 };
 
+/** Total copies across a selection, reading per-sticker quantities (default 1). */
+const sumCopies = (ids: Iterable<string>, qty: Map<string, number>) => {
+  let n = 0;
+  for (const id of ids) n += qty.get(id) ?? 1;
+  return n;
+};
+
 export default function NewSwapDialog({ onClose, initialText, editSwap }: Props) {
   const counts = useCollection((s) => s.counts);
   const swaps = useCollection((s) => s.swaps);
@@ -39,17 +46,28 @@ export default function NewSwapDialog({ onClose, initialText, editSwap }: Props)
   const [name, setName] = useState(editSwap?.name ?? '');
   const [text, setText] = useState(
     editSwap
-      ? buildListFromIds(editSwap.theirNeeds, editSwap.theirSwaps, albumName)
+      ? buildListFromIds(editSwap.theirNeeds, editSwap.theirSwaps, albumName, editSwap.theirNeedsQty)
       : initialText ?? '',
   );
   // In edit mode, seed straight from the saved swap so its matches show without a re-scan.
   const [parsed, setParsed] = useState<ReturnType<typeof parseExport> | null>(
     editSwap
-      ? { needs: editSwap.theirNeeds, swaps: editSwap.theirSwaps, swapQty: {}, all: {}, unmatched: [] }
+      ? {
+          needs: editSwap.theirNeeds,
+          swaps: editSwap.theirSwaps,
+          swapQty: {},
+          needQty: editSwap.theirNeedsQty ?? {},
+          all: {},
+          unmatched: [],
+        }
       : null,
   );
   const [give, setGive] = useState<Set<string>>(() => new Set(editSwap?.giving ?? []));
   const [get, setGet] = useState<Set<string>>(() => new Set(editSwap?.receiving ?? []));
+  // Copies to give per sticker id — seeded from the saved swap, refreshed on each scan.
+  const [giveQty, setGiveQty] = useState<Map<string, number>>(
+    () => new Map(Object.entries(editSwap?.givingQty ?? {})),
+  );
 
   // Live reservations across all open swaps, so spares already promised elsewhere are
   // never offered here and a sticker already being received is never chased again. When
@@ -72,6 +90,7 @@ export default function NewSwapDialog({ onClose, initialText, editSwap }: Props)
     // another open swap unselected so double-booking is an opt-in (the ⚠️ flags it).
     setGive(new Set(c.youGive.filter((id) => !c.giveReserved.has(id))));
     setGet(new Set(c.youGet.filter((id) => !c.getReserved.has(id))));
+    setGiveQty(new Map(Object.entries(c.giveQty)));
   };
 
   // Tooltip maps that mark candidates already spoken for in another open swap, so the
@@ -101,23 +120,23 @@ export default function NewSwapDialog({ onClose, initialText, editSwap }: Props)
 
   const save = () => {
     if (!parsed) return;
-    if (editSwap) {
-      updateSwap(editSwap.id, {
-        name,
-        theirNeeds: parsed.needs,
-        theirSwaps: parsed.swaps,
-        giving: [...give],
-        receiving: [...get],
-      });
-    } else {
-      createSwap({
-        name,
-        theirNeeds: parsed.needs,
-        theirSwaps: parsed.swaps,
-        giving: [...give],
-        receiving: [...get],
-      });
+    // Persist only the copies for stickers still selected to give.
+    const givingQty: Record<string, number> = {};
+    for (const id of give) {
+      const q = giveQty.get(id) ?? 1;
+      if (q > 1) givingQty[id] = q;
     }
+    const common = {
+      name,
+      theirNeeds: parsed.needs,
+      theirSwaps: parsed.swaps,
+      theirNeedsQty: parsed.needQty,
+      giving: [...give],
+      receiving: [...get],
+      givingQty,
+    };
+    if (editSwap) updateSwap(editSwap.id, common);
+    else createSwap(common);
     onClose();
   };
 
@@ -151,13 +170,14 @@ export default function NewSwapDialog({ onClose, initialText, editSwap }: Props)
         {candidates && (
           <>
             <div className="section-title">
-              You can give ({give.size}/{candidates.youGive.length})
+              You can give ({sumCopies(give, giveQty)}/{sumCopies(candidates.youGive, giveQty)})
             </div>
             <StickerChips
               ids={displayIds(candidates.youGive, give)}
               selected={give}
               onToggle={(id) => toggle(give, setGive, id)}
               conflicts={giveConflicts}
+              quantities={giveQty}
             />
             {candidates.giveReserved.size > 0 && (
               <p className="reserved-note">

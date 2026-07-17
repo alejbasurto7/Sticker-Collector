@@ -91,6 +91,8 @@ interface CollectionState {
     theirSwaps: string[];
     giving: string[];
     receiving: string[];
+    theirNeedsQty?: Record<string, number>;
+    givingQty?: Record<string, number>;
   }) => string;
   updateSwap: (
     id: string,
@@ -100,11 +102,16 @@ interface CollectionState {
       name?: string;
       theirNeeds?: string[];
       theirSwaps?: string[];
+      theirNeedsQty?: Record<string, number>;
+      givingQty?: Record<string, number>;
       deselectedGiving?: string[];
       deselectedReceiving?: string[];
     },
   ) => void;
-  closeSwap: (id: string, settled: { givenIds: string[]; receivedIds: string[] }) => void;
+  closeSwap: (
+    id: string,
+    settled: { givenIds: string[]; receivedIds: string[]; giveQty?: Record<string, number> },
+  ) => void;
   rollbackSwap: (id: string) => void;
   deleteSwap: (id: string) => void;
   undoLastTrade: () => void;
@@ -384,8 +391,10 @@ export const useCollection = create<CollectionState>()(
           status: 'open',
           theirNeeds: input.theirNeeds,
           theirSwaps: input.theirSwaps,
+          theirNeedsQty: input.theirNeedsQty,
           giving: input.giving,
           receiving: input.receiving,
+          givingQty: input.givingQty,
         };
         set((s) => ({ swaps: [swap, ...s.swaps] }));
         return id;
@@ -402,6 +411,8 @@ export const useCollection = create<CollectionState>()(
                   ...(patch.name !== undefined ? { name: patch.name } : {}),
                   ...(patch.theirNeeds ? { theirNeeds: patch.theirNeeds } : {}),
                   ...(patch.theirSwaps ? { theirSwaps: patch.theirSwaps } : {}),
+                  ...(patch.theirNeedsQty ? { theirNeedsQty: patch.theirNeedsQty } : {}),
+                  ...(patch.givingQty ? { givingQty: patch.givingQty } : {}),
                   ...(patch.deselectedGiving ? { deselectedGiving: patch.deselectedGiving } : {}),
                   ...(patch.deselectedReceiving
                     ? { deselectedReceiving: patch.deselectedReceiving }
@@ -425,6 +436,8 @@ export const useCollection = create<CollectionState>()(
                   closedAt: Date.now(),
                   giving: settled.givenIds,
                   receiving: settled.receivedIds,
+                  // Preserve how many copies of each sticker were actually handed over.
+                  givingQty: settled.giveQty,
                   // Exact per-sticker change, so rollbackSwap can reverse it precisely.
                   settledDelta: delta,
                   // Settlement rewrites the lists to exactly what was traded, so any
@@ -459,9 +472,9 @@ export const useCollection = create<CollectionState>()(
             .filter((sw) => sw.status === 'closed')
             .sort((a, b) => (b.closedAt ?? 0) - (a.closedAt ?? 0))[0];
           if (!last) return s;
-          const counts = { ...s.counts };
-          for (const id of last.giving) counts[id] = clampCount((counts[id] ?? 0) + 1);
-          for (const id of last.receiving) counts[id] = clampCount((counts[id] ?? 0) - 1);
+          // Reverse the exact settlement (multi-copy gives and floored gives included),
+          // then drop the swap. Falls back to a naive per-copy reversal for old swaps.
+          const counts = reverseSettlement(s.counts, last);
           return { counts, swaps: s.swaps.filter((sw) => sw.id !== last.id) };
         }),
 

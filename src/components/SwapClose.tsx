@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Swap } from '../types';
 import { useCollection } from '../store/collectionStore';
-import { activeGiving, activeReceiving } from '../utils/swap';
+import { activeGiving, activeReceiving, giveQtyOf } from '../utils/swap';
 import StickerChips from './StickerChips';
 
 interface Props {
@@ -24,8 +24,22 @@ export default function SwapClose({ swap, onClose }: Props) {
     setSet(next);
   };
 
+  // Copies-per-sticker for the give side, both for the count and the chip badges.
+  const giveQty = new Map(swap.giving.map((id) => [id, giveQtyOf(swap, id)]));
+  const givenCopies = [...given].reduce((n, id) => n + (giveQty.get(id) ?? 1), 0);
+
   const confirm = () => {
-    closeSwap(swap.id, { givenIds: [...given], receivedIds: [...received] });
+    // Carry the per-sticker copy counts so settlement removes every given copy.
+    const settledQty: Record<string, number> = {};
+    for (const id of given) {
+      const q = giveQty.get(id) ?? 1;
+      if (q > 1) settledQty[id] = q;
+    }
+    closeSwap(swap.id, {
+      givenIds: [...given],
+      receivedIds: [...received],
+      giveQty: settledQty,
+    });
     onClose();
   };
 
@@ -38,8 +52,13 @@ export default function SwapClose({ swap, onClose }: Props) {
           duplicates; received stickers will be added to your collection.
         </p>
 
-        <div className="section-title">You gave ({given.size})</div>
-        <StickerChips ids={swap.giving} selected={given} onToggle={(id) => toggle(given, setGiven, id)} />
+        <div className="section-title">You gave ({givenCopies})</div>
+        <StickerChips
+          ids={swap.giving}
+          selected={given}
+          quantities={giveQty}
+          onToggle={(id) => toggle(given, setGiven, id)}
+        />
 
         <div className="section-title">You received ({received.size})</div>
         <StickerChips
