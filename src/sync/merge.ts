@@ -57,20 +57,32 @@ function deepEqual(a: unknown, b: unknown): boolean {
   if (typeof a === 'object') {
     const ao = a as Record<string, unknown>;
     const bo = b as Record<string, unknown>;
-    const ak = Object.keys(ao);
-    const bk = Object.keys(bo);
-    if (ak.length !== bk.length) return false;
-    return ak.every((k) => deepEqual(ao[k], bo[k]));
+    const keys = new Set([...Object.keys(ao), ...Object.keys(bo)]);
+    return [...keys].every((k) => deepEqual(ao[k], bo[k]));
   }
   return false;
 }
 
-/** Deterministic winner of a same-id edit-vs-edit collision: later close/create, then id. */
+/** Canonical JSON with recursively sorted keys, so two devices serialize an
+ *  equal value to an identical string (used only for a deterministic tie-break). */
+function canonicalize(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(canonicalize);
+  if (v && typeof v === 'object') {
+    const o = v as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const k of Object.keys(o).sort()) out[k] = canonicalize(o[k]);
+    return out;
+  }
+  return v;
+}
+
+/** Deterministic winner of a same-id edit-vs-edit collision: later close/create
+ *  time wins; on a tie, a stable content order that is identical on every device. */
 function laterSwap(a: Swap, b: Swap): Swap {
   const at = a.closedAt ?? a.createdAt;
   const bt = b.closedAt ?? b.createdAt;
   if (at !== bt) return at > bt ? a : b;
-  return a.id >= b.id ? a : b;
+  return JSON.stringify(canonicalize(a)) <= JSON.stringify(canonicalize(b)) ? a : b;
 }
 
 /**
@@ -94,7 +106,7 @@ export function mergeSwaps(base: Swap[], local: Swap[], remote: Swap[]): Swap[] 
       if (deepEqual(ls, rs)) out.push(ls);
       else if (bs && deepEqual(ls, bs)) out.push(rs); // only remote edited
       else if (bs && deepEqual(rs, bs)) out.push(ls); // only local edited
-      else out.push(laterSwap(ls, rs)); // both edited (or both new & differ)
+      else out.push(laterSwap(ls, rs)); // both edited (or both new & differ) -- commutative tie-break
     } else if (ls && !rs) {
       if (bs && deepEqual(ls, bs)) continue; // unchanged locally, remote deleted -> drop
       out.push(ls); // new locally, or edited-vs-delete -> keep

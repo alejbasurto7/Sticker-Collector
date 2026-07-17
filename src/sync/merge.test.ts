@@ -109,4 +109,21 @@ describe('mergeSwaps', () => {
     expect(mergeSwaps([base], [localEdit], [remoteEdit])).toEqual([remoteEdit]);
     expect(mergeSwaps([base], [remoteEdit], [localEdit])).toEqual([remoteEdit]);
   });
+
+  it('resolves a true tie (equal createdAt, no closedAt) commutatively', () => {
+    const base = swap('s1', { name: 'base', createdAt: 100 });
+    const localEdit = swap('s1', { name: 'L', createdAt: 100 });
+    const remoteEdit = swap('s1', { name: 'R', createdAt: 100 });
+    const ab = mergeSwaps([base], [localEdit], [remoteEdit]);
+    const ba = mergeSwaps([base], [remoteEdit], [localEdit]);
+    expect(ab).toEqual(ba); // same winner regardless of which side is "local"
+  });
+
+  it('treats an explicit undefined field as an absent key (no phantom conflict drops a real edit)', () => {
+    const base = swap('s1', { name: 'keep' });
+    const rolledBack = swap('s1', { name: 'keep', closedAt: undefined, settledDelta: undefined });
+    const remoteEdit = swap('s1', { name: 'new' });
+    // local is a semantic no-op vs base; remote made a genuine edit -> remote must survive.
+    expect(mergeSwaps([base], [rolledBack], [remoteEdit])).toEqual([remoteEdit]);
+  });
 });
