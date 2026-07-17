@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   pickSyncState, sanitizeRemote, hasCollectionData, type SyncPayload,
   reconstructActive, allAlbums, cloudManagedIds, sliceCloudPayload, sliceAlbumPayload, type SliceState,
+  normalizeRemote, legacyToCollection,
 } from './serialize';
 
 /** A pristine, brand-new install: one default album, nothing owned. */
@@ -182,5 +183,42 @@ describe('sliceCloudPayload / sliceAlbumPayload', () => {
   });
   it('returns null for a missing album', () => {
     expect(sliceAlbumPayload(state(), 'ZZZ', 'collaborative')).toBeNull();
+  });
+});
+
+const snap = (id: string) => ({ id, albumName: id, counts: {}, swaps: [], edition: 'latam' as const, trackCC: true, locked: false, activityDays: [], completedOn: null, unlockedAchievements: {} });
+
+describe('normalizeRemote', () => {
+  it('accepts a valid album payload', () => {
+    const p = { kind: 'album', v: 1, access: 'collaborative', album: snap('A') };
+    expect(normalizeRemote(p)).toEqual(p);
+  });
+  it('rejects an album payload with a bad access value', () => {
+    expect(normalizeRemote({ kind: 'album', v: 1, access: 'nope', album: snap('A') })).toBeNull();
+  });
+  it('rejects an album payload with a non-numeric v', () => {
+    expect(normalizeRemote({ kind: 'album', v: 'x', access: 'read-only', album: snap('A') })).toBeNull();
+  });
+  it('accepts a valid collection payload', () => {
+    const p = { kind: 'collection', v: 1, albums: [snap('A')] };
+    expect(normalizeRemote(p)).toEqual(p);
+  });
+  it('coerces a header-less legacy blob to a collection payload (active reconstructed)', () => {
+    const legacy = {
+      counts: { 'MEX-1': 3 }, swaps: [], edition: 'latam', trackCC: true, albumName: 'Live',
+      locked: false, activityDays: [], completedOn: null, unlockedAchievements: {},
+      activeAlbumId: 'A', albums: [{ ...snap('A'), albumName: 'stale', counts: {} }, snap('B')],
+    };
+    const out = normalizeRemote(legacy)!;
+    expect(out.kind).toBe('collection');
+    const a = (out as any).albums.find((x: any) => x.id === 'A');
+    expect(a.albumName).toBe('Live');          // reconstructed from top-level, not 'stale'
+    expect(a.counts).toEqual({ 'MEX-1': 3 });
+    expect((out as any).albums.map((x: any) => x.id).sort()).toEqual(['A', 'B']);
+  });
+  it('rejects junk', () => {
+    expect(normalizeRemote(null)).toBeNull();
+    expect(normalizeRemote('nope')).toBeNull();
+    expect(normalizeRemote({})).toBeNull();
   });
 });

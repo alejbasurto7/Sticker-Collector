@@ -2,7 +2,7 @@ import type { Counts, Edition, Swap } from '../types';
 // Type-only imports (erased at build) — keeps this module free of the store's
 // runtime (localStorage/zustand), so it's importable in a plain Node test env.
 import type { AlbumSnapshot, Theme } from '../store/collectionStore';
-import { PAYLOAD_V, type AlbumPayload, type CollectionPayload } from './payload';
+import { PAYLOAD_V, type AlbumPayload, type CollectionPayload, type ChannelPayload, isAlbumPayload, isCollectionPayload } from './payload';
 
 /**
  * The exact slice of collection state that travels between devices. This is the
@@ -122,4 +122,26 @@ export function sanitizeRemote(data: unknown): SyncPayload | null {
   if (typeof data.activeAlbumId !== 'string') return null;
   if (!Array.isArray(data.swaps)) return null;
   return data as unknown as SyncPayload;
+}
+
+/** Coerce a header-less legacy whole-collection blob into a CollectionPayload. */
+export function legacyToCollection(data: unknown): CollectionPayload | null {
+  if (!isObject(data) || !Array.isArray(data.albums) || typeof data.activeAlbumId !== 'string') return null;
+  if (!isObject(data.counts)) return null;
+  const s = data as unknown as SliceState;
+  return { kind: 'collection', v: PAYLOAD_V, albums: allAlbums(s) };
+}
+
+/** Validate/normalise a pulled row's `data` into a ChannelPayload, or null. */
+export function normalizeRemote(data: unknown): ChannelPayload | null {
+  if (isAlbumPayload(data)) {
+    if (typeof data.v !== 'number') return null;
+    if (data.access !== 'collaborative' && data.access !== 'read-only') return null;
+    return data;
+  }
+  if (isCollectionPayload(data)) {
+    if (typeof (data as CollectionPayload).v !== 'number') return null;
+    return data;
+  }
+  return legacyToCollection(data); // header-less legacy row (or null)
 }
