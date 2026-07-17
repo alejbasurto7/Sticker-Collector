@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Counts, Edition, Swap } from '../types';
 import type { SyncPayload } from '../sync/serialize';
+import type { CollectionPayload } from '../sync/payload';
 import { album, applyEdition, DEFAULT_EDITION, DEFAULT_TRACK_CC } from '../data/sampleAlbum';
 import { computeReservations, settleSwapCounts, reverseSettlement } from '../utils/swap';
 
@@ -122,6 +123,12 @@ interface CollectionState {
   // Cross-device sync: replace the whole collection with a snapshot pulled from
   // the cloud, reconciling exactly like a fresh page load (see onRehydrateStorage).
   applyRemoteState: (payload: SyncPayload) => void;
+
+  // Per-album sync: apply a merged collection (cloud albums replaced, non-cloud preserved).
+  applyMergedCollection: (payload: CollectionPayload, nonCloudIds: Set<string>) => void;
+
+  // Per-album sync: apply a merged album snapshot (adopted or replaced).
+  applyMergedAlbum: (albumId: string, snapshot: AlbumSnapshot) => void;
 }
 
 const clampCount = (n: number) => (n < 0 ? 0 : n);
@@ -511,6 +518,36 @@ export const useCollection = create<CollectionState>()(
             );
           }
           return next;
+        }),
+
+      applyMergedCollection: (payload, nonCloudIds) =>
+        set((s) => {
+          const kept = s.albums.filter((a) => nonCloudIds.has(a.id)); // shared/private stay
+          const albums = [...kept, ...payload.albums];
+          const activeInCloud = payload.albums.find((a) => a.id === s.activeAlbumId);
+          if (activeInCloud) {
+            applyEdition(activeInCloud.edition, activeInCloud.trackCC);
+            return { albums, ...loadSnapshot(activeInCloud) };
+          }
+          if (!albums.some((a) => a.id === s.activeAlbumId)) {
+            const fallback = albums[0];
+            if (!fallback) return { albums };
+            applyEdition(fallback.edition, fallback.trackCC);
+            return { albums, activeAlbumId: fallback.id, ...loadSnapshot(fallback) };
+          }
+          return { albums }; // active is a shared/private album — leave top-level alone
+        }),
+
+      applyMergedAlbum: (albumId, snapshot) =>
+        set((s) => {
+          const albums = s.albums.some((a) => a.id === albumId)
+            ? s.albums.map((a) => (a.id === albumId ? snapshot : a))
+            : [...s.albums, snapshot];
+          if (s.activeAlbumId === albumId) {
+            applyEdition(snapshot.edition, snapshot.trackCC);
+            return { albums, ...loadSnapshot(snapshot) };
+          }
+          return { albums };
         }),
     }),
     {
