@@ -3,6 +3,7 @@ import { useCollection } from '../store/collectionStore';
 import { parseExport } from '../utils/import';
 import { buildListFromIds } from '../utils/listExport';
 import { computeCandidates, computeReservations } from '../utils/swap';
+import { tapVerb } from '../utils/device';
 import type { Swap } from '../types';
 import StickerChips from './StickerChips';
 
@@ -185,7 +186,7 @@ export default function NewSwapDialog({ onClose, initialText, editSwap }: Props)
               <p className="reserved-note">
                 ⚠️ {candidates.giveReserved.size} spare
                 {candidates.giveReserved.size > 1 ? 's are' : ' is'} already promised in
-                another open swap. Tap to include and double-book anyway.
+                another open swap. {tapVerb()} to include and double-book anyway.
               </p>
             )}
 
@@ -202,7 +203,7 @@ export default function NewSwapDialog({ onClose, initialText, editSwap }: Props)
               <p className="reserved-note">
                 ⚠️ {candidates.getReserved.size} sticker
                 {candidates.getReserved.size > 1 ? 's are' : ' is'} already coming from
-                another open swap. Tap to include if you want a backup.
+                another open swap. {tapVerb()} to include if you want a backup.
               </p>
             )}
 

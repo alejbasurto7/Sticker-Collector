@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Swap } from '../types';
 import { useCollection } from '../store/collectionStore';
 import { computeConflicts, giveQtyOf } from '../utils/swap';
+import { isDesktop } from '../utils/device';
 import { buildSwapExport } from '../utils/listExport';
 import { copyToClipboard } from '../utils/share';
 import StickerChips from './StickerChips';
@@ -152,7 +153,9 @@ export default function SwapDetail({ swap, onClose }: Props) {
         </div>
         <p className="modal-sub">
           {isOpen
-            ? 'Tap a sticker to unselect it. Tap again to add it back.'
+            ? isDesktop()
+              ? 'Click a sticker to unselect it. Click again to add it back.'
+              : 'Tap a sticker to unselect it. Tap again to add it back.'
             : 'This swap is concluded. Counts were updated when it closed.'}
         </p>
 

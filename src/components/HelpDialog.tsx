@@ -1,19 +1,7 @@
+import { isDesktop } from '../utils/device';
+
 interface Props {
   onClose: () => void;
-}
-
-/**
- * True on the desktop build (mouse-primary): a fine pointer that can hover.
- * Touch devices — the installed PWA on a phone or tablet — report a coarse
- * pointer and no hover, so they fall through to the tap / long-press wording.
- * The gestures themselves live in StickerCell, which already handles both
- * mouse and touch at runtime; this only picks the instructions to show.
- */
-function isDesktop() {
-  return (
-    typeof window !== 'undefined' &&
-    window.matchMedia?.('(hover: hover) and (pointer: fine)').matches === true
-  );
 }
 
 /**
