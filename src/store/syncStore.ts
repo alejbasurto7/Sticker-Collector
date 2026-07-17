@@ -1,72 +1,100 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { ChannelPayload, CollectionPayload } from '../sync/payload';
+import { PAYLOAD_V } from '../sync/payload';
 
-/** Live sync connection state, surfaced in the Sync settings section. */
 export type SyncStatus = 'unlinked' | 'syncing' | 'synced' | 'offline' | 'error';
 
-interface SyncState {
-  /** The raw sync code — kept ONLY on this device, never synced into the blob. */
-  code: string | null;
-  /** SHA-256 of the code; what the server row is keyed on. */
-  codeHash: string | null;
-  /** Random per-device id, so the engine can ignore its own echoed writes. */
-  writerId: string | null;
-  linkedAt: number | null;
-  /** Last server row version this device has applied/written (optimistic concurrency). */
-  lastVersion: number;
-  lastSyncedAt: number | null;
-  status: SyncStatus;
-
-  setLink: (p: { code: string; codeHash: string; writerId: string }) => void;
-  clearLink: () => void;
-  setStatus: (status: SyncStatus) => void;
-  markSynced: (version: number) => void;
+export interface LinkMeta {
+  code: string; codeHash: string; writerId: string;
+  lastVersion: number; lastSyncedAt: number | null; status: SyncStatus;
+}
+export interface AlbumLink extends LinkMeta {
+  albumId: string; role: 'owner' | 'joiner'; access: 'collaborative' | 'read-only';
 }
 
-/**
- * Sync metadata lives in its OWN persisted store (separate localStorage key)
- * so the link/identity is never part of the collection blob that gets synced —
- * otherwise the code would travel to every paired device inside the document.
- */
-export const useSyncMeta = create<SyncState>()(
+export interface SyncMetaState {
+  collection: LinkMeta | null;
+  albumLinks: Record<string, AlbumLink>;
+  privateAlbumIds: string[];
+  localAlbumNames: Record<string, string>;
+  bases: Record<string, ChannelPayload>;
+
+  setCollectionLink: (p: { code: string; codeHash: string; writerId: string }) => void;
+  clearCollectionLink: () => void;
+  upsertAlbumLink: (link: AlbumLink) => void;
+  removeAlbumLink: (albumId: string) => void;
+  setPrivate: (albumId: string, isPrivate: boolean) => void;
+  setLocalAlbumName: (albumId: string, name: string | null) => void;
+  tombstoneAlbum: (albumId: string) => void;
+  setBase: (key: string, payload: ChannelPayload) => void;
+  setChannelStatus: (key: string, status: SyncStatus) => void;
+  markChannelSynced: (key: string, version: number) => void;
+}
+
+const freshLink = (p: { code: string; codeHash: string; writerId: string }): LinkMeta => ({
+  ...p, lastVersion: 0, lastSyncedAt: null, status: 'syncing',
+});
+
+/** Apply a per-channel patch to whichever slot (collection or an album link) `key` names. */
+function patchChannel(s: SyncMetaState, key: string, patch: Partial<LinkMeta>): Partial<SyncMetaState> {
+  if (key === 'collection') return s.collection ? { collection: { ...s.collection, ...patch } } : {};
+  const link = s.albumLinks[key];
+  return link ? { albumLinks: { ...s.albumLinks, [key]: { ...link, ...patch } } } : {};
+}
+
+/** Exported for unit testing; also used as the persist `migrate`. */
+export function migrateSyncMeta(persisted: any, version: number): Partial<SyncMetaState> {
+  const base: Partial<SyncMetaState> = { albumLinks: {}, privateAlbumIds: [], localAlbumNames: {}, bases: {} };
+  if (version >= 2) return { ...base, ...persisted };
+  const collection = persisted && persisted.codeHash
+    ? { code: persisted.code, codeHash: persisted.codeHash, writerId: persisted.writerId ?? '',
+        lastVersion: persisted.lastVersion ?? 0, lastSyncedAt: persisted.lastSyncedAt ?? null, status: 'unlinked' as SyncStatus }
+    : null;
+  return { ...base, collection };
+}
+
+export const useSyncMeta = create<SyncMetaState>()(
   persist(
     (set) => ({
-      code: null,
-      codeHash: null,
-      writerId: null,
-      linkedAt: null,
-      lastVersion: 0,
-      lastSyncedAt: null,
-      status: 'unlinked',
+      collection: null, albumLinks: {}, privateAlbumIds: [], localAlbumNames: {}, bases: {},
 
-      setLink: ({ code, codeHash, writerId }) =>
-        set({ code, codeHash, writerId, linkedAt: Date.now(), lastVersion: 0, lastSyncedAt: null, status: 'syncing' }),
-
-      clearLink: () =>
-        set({
-          code: null,
-          codeHash: null,
-          writerId: null,
-          linkedAt: null,
-          lastVersion: 0,
-          lastSyncedAt: null,
-          status: 'unlinked',
-        }),
-
-      setStatus: (status) => set({ status }),
-
-      markSynced: (version) => set({ lastVersion: version, lastSyncedAt: Date.now(), status: 'synced' }),
+      setCollectionLink: (p) => set({ collection: freshLink(p) }),
+      clearCollectionLink: () => set({ collection: null }),
+      upsertAlbumLink: (link) => set((s) => ({ albumLinks: { ...s.albumLinks, [link.albumId]: link } })),
+      removeAlbumLink: (albumId) => set((s) => {
+        const albumLinks = { ...s.albumLinks }; delete albumLinks[albumId];
+        const bases = { ...s.bases }; delete bases[albumId];
+        return { albumLinks, bases };
+      }),
+      setPrivate: (albumId, isPrivate) => set((s) => ({
+        privateAlbumIds: isPrivate
+          ? (s.privateAlbumIds.includes(albumId) ? s.privateAlbumIds : [...s.privateAlbumIds, albumId])
+          : s.privateAlbumIds.filter((id) => id !== albumId),
+      })),
+      setLocalAlbumName: (albumId, name) => set((s) => {
+        const localAlbumNames = { ...s.localAlbumNames };
+        if (name && name.trim()) localAlbumNames[albumId] = name.trim(); else delete localAlbumNames[albumId];
+        return { localAlbumNames };
+      }),
+      tombstoneAlbum: (albumId) => set((s) => {
+        const cur = (s.bases.collection as CollectionPayload | undefined) ?? { kind: 'collection', v: PAYLOAD_V, albums: [] };
+        const set2 = new Set([...(cur.deletedAlbumIds ?? []), albumId]);
+        return { bases: { ...s.bases, collection: { ...cur, deletedAlbumIds: [...set2].sort() } } };
+      }),
+      setBase: (key, payload) => set((s) => ({ bases: { ...s.bases, [key]: payload } })),
+      setChannelStatus: (key, status) => set((s) => patchChannel(s, key, { status })),
+      markChannelSynced: (key, version) => set((s) => patchChannel(s, key, { lastVersion: version, lastSyncedAt: Date.now(), status: 'synced' })),
     }),
     {
       name: 'figuritas-sync-v1',
-      // `status` is transient runtime state — don't persist a stale "syncing".
-      partialize: (s) => ({
-        code: s.code,
-        codeHash: s.codeHash,
-        writerId: s.writerId,
-        linkedAt: s.linkedAt,
-        lastVersion: s.lastVersion,
-        lastSyncedAt: s.lastSyncedAt,
+      version: 2,
+      migrate: migrateSyncMeta,
+      // Persist everything except transient statuses (recomputed at runtime).
+      partialize: (s): Partial<SyncMetaState> => ({
+        collection: s.collection ? { ...s.collection, status: 'unlinked' as SyncStatus } : null,
+        albumLinks: Object.fromEntries(Object.entries(s.albumLinks).map(([k, v]) => [k, { ...v, status: 'unlinked' as SyncStatus }])),
+        privateAlbumIds: s.privateAlbumIds, localAlbumNames: s.localAlbumNames, bases: s.bases,
       }),
     },
   ),
