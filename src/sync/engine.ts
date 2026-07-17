@@ -285,9 +285,16 @@ async function doPushChannel(key: string, attempt = 0): Promise<void> {
       return;
     }
     const row = firstRow(pullData);
-    const isOwnEcho = row?.writer_id === channel.writerId;
-    const remote = row && !isOwnEcho ? normalizeRemote(row.data) : null;
-    const merged = isOwnEcho || !remote ? local : mergeFor(channel, baseFor(channel), local, remote);
+    // Always compute remote and route through mergeFor when a row exists — including our own
+    // last-written row ("own echo", the common single-active-device case). Merging local against
+    // its own last-written value is an idempotent no-op for everything EXCEPT tombstones, which
+    // mergeCollection reconstructs from `base` (sliceCloudPayload/local never carries
+    // deletedAlbumIds). A shortcut that special-cased own-echo to `merged = local` would silently
+    // drop deletedAlbumIds from both the pushed row and the recorded base, resurrecting tombstoned
+    // albums from another device later. We still never re-apply our own echoed write into the
+    // store below when merged === local, so this only changes the merge/tombstone computation.
+    const remote = row ? normalizeRemote(row.data) : null;
+    const merged = remote ? mergeFor(channel, baseFor(channel), local, remote) : local;
 
     const { data: pushData, error: pushError } = await supabase.rpc('sync_push', {
       p_code_hash: channel.codeHash,

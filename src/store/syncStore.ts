@@ -59,8 +59,22 @@ export const useSyncMeta = create<SyncMetaState>()(
     (set) => ({
       collection: null, albumLinks: {}, privateAlbumIds: [], localAlbumNames: {}, bases: {},
 
-      setCollectionLink: (p) => set({ collection: freshLink(p) }),
-      clearCollectionLink: () => set({ collection: null }),
+      // `bases.collection` is keyed by the fixed string 'collection', not by codeHash, so it
+      // must be reset on every (re)link: a freshly-established link starts with no ancestor
+      // (the engine's baseFor('collection') then falls back to its empty-collection default),
+      // and an unlinked device must not let a stale base from a previous code be reused as the
+      // merge ancestor for a differently-coded link later (mergeCounts/scalar3 would misclassify
+      // real local edits as "unchanged since base" and silently discard them).
+      setCollectionLink: (p) => set((s) => {
+        const bases = { ...s.bases };
+        delete bases.collection;
+        return { collection: freshLink(p), bases };
+      }),
+      clearCollectionLink: () => set((s) => {
+        const bases = { ...s.bases };
+        delete bases.collection;
+        return { collection: null, bases };
+      }),
       upsertAlbumLink: (link) => set((s) => ({ albumLinks: { ...s.albumLinks, [link.albumId]: link } })),
       removeAlbumLink: (albumId) => set((s) => {
         const albumLinks = { ...s.albumLinks }; delete albumLinks[albumId];

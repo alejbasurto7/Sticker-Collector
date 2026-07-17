@@ -213,4 +213,62 @@ describe('mergeFor', () => {
     // 'theirs' isn't in managedIds (not present locally at all) -> preserved untouched from remote.
     expect(merged.albums.find((a) => a.id === 'theirs')).toEqual(snap('theirs'));
   });
+
+  // Bug 1 regression: routing an "own echo" push through mergeFor (instead of a `merged = local`
+  // shortcut) must reconstruct a tombstone that only `base` carries. `local` (sliceCloudPayload)
+  // and `remote` (the server's echoed row) never carry deletedAlbumIds themselves -- only
+  // mergeCollection unions and re-attaches them, from whichever of base/local/remote has them.
+  it('the collection channel reconstructs a base-only tombstone even when local/remote lack it', () => {
+    useCollection.setState(
+      {
+        counts: {},
+        swaps: [],
+        edition: 'latam',
+        trackCC: true,
+        albumName: 'mine',
+        locked: false,
+        activityDays: [],
+        completedOn: null,
+        unlockedAchievements: {},
+        importSeq: 0,
+        theme: 'dark',
+        activeAlbumId: 'mine',
+        albums: [snap('mine')],
+      } as any,
+      false,
+    );
+    useSyncMeta.setState(
+      { collection: null, albumLinks: {}, privateAlbumIds: [], localAlbumNames: {}, bases: {} },
+      false,
+    );
+
+    const channel: Channel = {
+      key: 'collection',
+      kind: 'collection',
+      codeHash: 'h',
+      writerId: 'w',
+      lastVersion: 0,
+      writable: true,
+    };
+    // Only `base` (the previously recorded ancestor, e.g. via tombstoneAlbum) carries the
+    // tombstone -- local (a fresh sliceCloudPayload) and remote (our own echoed write) don't.
+    const base: CollectionPayload = {
+      kind: 'collection',
+      v: PAYLOAD_V,
+      albums: [snap('mine', { counts: { A: 1 } })],
+      deletedAlbumIds: ['X'],
+    };
+    const local: CollectionPayload = {
+      kind: 'collection',
+      v: PAYLOAD_V,
+      albums: [snap('mine', { counts: { A: 1 } })],
+    };
+    const remote: CollectionPayload = {
+      kind: 'collection',
+      v: PAYLOAD_V,
+      albums: [snap('mine', { counts: { A: 1 } })],
+    };
+    const merged = mergeFor(channel, base, local, remote) as CollectionPayload;
+    expect(merged.deletedAlbumIds).toContain('X');
+  });
 });

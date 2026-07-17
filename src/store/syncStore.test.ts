@@ -31,6 +31,25 @@ describe('syncMeta v2 actions', () => {
     expect(useSyncMeta.getState().collection!.lastVersion).toBe(7);
     expect(useSyncMeta.getState().collection!.status).toBe('synced');
   });
+
+  // Bug 2 regression: bases.collection is keyed by the fixed string 'collection' (not by
+  // codeHash), so a stale base from a previous link must never survive an unlink or a fresh
+  // link — otherwise it gets reused as the 3-way-merge ancestor for a differently-coded
+  // collection and mergeCounts/scalar3 misclassify real local edits as "unchanged since base",
+  // silently discarding them.
+  it('clearCollectionLink drops a pre-seeded bases.collection', () => {
+    useSyncMeta.setState((s) => ({ bases: { ...s.bases, collection: { kind: 'collection', v: 1, albums: [] } } }));
+    expect(useSyncMeta.getState().bases.collection).toBeDefined();
+    useSyncMeta.getState().clearCollectionLink();
+    expect(useSyncMeta.getState().bases.collection).toBeUndefined();
+  });
+
+  it('setCollectionLink drops a pre-seeded bases.collection from a previous code', () => {
+    useSyncMeta.setState((s) => ({ bases: { ...s.bases, collection: { kind: 'collection', v: 1, albums: [] } } }));
+    expect(useSyncMeta.getState().bases.collection).toBeDefined();
+    useSyncMeta.getState().setCollectionLink({ code: 'NEW', codeHash: 'NEWHASH', writerId: 'W2' });
+    expect(useSyncMeta.getState().bases.collection).toBeUndefined();
+  });
 });
 
 describe('v1 -> v2 migration', () => {
