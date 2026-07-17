@@ -196,7 +196,7 @@ export function mergeCollection(
   return {
     kind: 'collection',
     v: PAYLOAD_V,
-    albums: [...out.values()],
+    albums: [...out.values()].sort((x, y) => (x.id < y.id ? -1 : x.id > y.id ? 1 : 0)),
     ...(tomb.size ? { deletedAlbumIds: [...tomb].sort() } : {}),
   };
 }

@@ -201,11 +201,13 @@ describe('mergeCollection', () => {
   });
 
   it('preserves a remote album this device does not manage (carve-out safety)', () => {
+    const others = album({ id: 'others', counts: { Z: 1 } });
     const base = coll([]);
     const local = coll([album({ id: 'mine' })]);
-    const remote = coll([album({ id: 'mine' }), album({ id: 'others' })]);
+    const remote = coll([album({ id: 'mine' }), others]);
     const m = mergeCollection(base, local, remote, new Set(['mine']));
     expect(m.albums.map((a) => a.id).sort()).toEqual(['mine', 'others']);
+    expect(m.albums.find((a) => a.id === 'others')).toEqual(others); // preserved untouched
   });
 
   it('does NOT delete a managed album merely absent from remote', () => {
