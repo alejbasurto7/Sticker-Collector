@@ -5,6 +5,11 @@ import type {
   PointerEvent as ReactPointerEvent,
 } from 'react';
 import type { Sticker } from '../types';
+import {
+  armGhostClickGuard,
+  consumeGhostClick,
+  disarmGhostClickGuard,
+} from '../utils/ghostClickGuard';
 
 interface Props {
   sticker: Sticker;
@@ -37,9 +42,6 @@ export default function StickerCell({
   onRemove,
 }: Props) {
   const timer = useRef<number | null>(null);
-  // Set when a long-press fires so the click the browser still synthesizes on
-  // release doesn't also add a sticker.
-  const suppressClick = useRef(false);
   // The pointer type that began the current interaction. Lets onContextMenu
   // tell a desktop right-click (decrement) apart from the native contextmenu a
   // touch long-press also raises (already handled by the timer below).
@@ -59,10 +61,10 @@ export default function StickerCell({
   // the matching pointerup never landed and the tap was silently dropped).
   const onClick = () => {
     if (locked) return;
-    if (suppressClick.current) {
-      suppressClick.current = false;
-      return;
-    }
+    // Swallow the click iOS synthesizes after a long-press. The guard is shared
+    // across cells because that click can land on a neighbour that shifted under
+    // the finger once the pressed cell dropped out of a filtered view.
+    if (consumeGhostClick()) return;
     onAdd();
   };
 
@@ -72,11 +74,13 @@ export default function StickerCell({
     // Desktop decrements with a right-click (see onContextMenu); only touch and
     // pen use the press-and-hold gesture, so don't arm the timer for a mouse.
     if (e.pointerType === 'mouse') return;
-    suppressClick.current = false;
+    // A fresh press: clear any suppression a previous long-press armed but whose
+    // ghost click never arrived, so it can't swallow this gesture's tap.
+    disarmGhostClickGuard();
     clear();
     timer.current = window.setTimeout(() => {
       timer.current = null;
-      suppressClick.current = true;
+      armGhostClickGuard();
       onRemove();
     }, LONG_PRESS_MS);
   };
