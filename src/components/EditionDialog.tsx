@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useCollection } from '../store/collectionStore';
+import { useSyncMeta } from '../store/syncStore';
+import { resolveAlbumName } from '../sync/albumMode';
 import { CC_EMOJI, EDITION_INFO } from '../data/sampleAlbum';
 import { ALBUM_TYPE } from '../config';
 import { VERSION_LABEL } from '../version';
@@ -30,6 +32,7 @@ export default function EditionDialog({ onClose }: Props) {
   const switchAlbum = useCollection((s) => s.switchAlbum);
   const deleteAlbum = useCollection((s) => s.deleteAlbum);
   const counts = useCollection((s) => s.counts);
+  const localAlbumNames = useSyncMeta((s) => s.localAlbumNames);
 
   const [draft, setDraft] = useState(albumName);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -93,7 +96,7 @@ export default function EditionDialog({ onClose }: Props) {
               >
                 {albums.map((a) => (
                   <option key={a.id} value={a.id}>
-                    {a.albumName}
+                    {resolveAlbumName(a.id, a.albumName, localAlbumNames)}
                   </option>
                 ))}
               </select>
@@ -250,7 +253,9 @@ export default function EditionDialog({ onClose }: Props) {
                 marginBottom: '0.5rem',
               }}
             >
-              <div style={{ fontWeight: 700, fontSize: '1rem' }}>{albumName}</div>
+              <div style={{ fontWeight: 700, fontSize: '1rem' }}>
+                {resolveAlbumName(activeAlbumId, albumName, localAlbumNames)}
+              </div>
               <div style={{ color: 'var(--text-dim)', fontSize: '0.85rem' }}>{ALBUM_TYPE}</div>
             </div>
             <div className="btn-row">

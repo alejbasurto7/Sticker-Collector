@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ALBUM_TYPE } from './config';
 import { useCollection } from './store/collectionStore';
 import { useSyncBoot } from './sync/useSync';
+import { useResolvedAlbumName } from './sync/useAlbumMode';
 import { computeStats, displayPct } from './utils/stats';
 import TabBar, { type Tab } from './components/TabBar';
 import ProgressBar from './components/ProgressBar';
@@ -26,6 +27,7 @@ export default function App() {
   const trackCC = useCollection((s) => s.trackCC);
   const albumName = useCollection((s) => s.albumName);
   const activeAlbumId = useCollection((s) => s.activeAlbumId);
+  const displayName = useResolvedAlbumName(activeAlbumId, albumName);
   const theme = useCollection((s) => s.theme);
   const locked = useCollection((s) => s.locked);
   const toggleLocked = useCollection((s) => s.toggleLocked);
@@ -60,7 +62,7 @@ export default function App() {
     <div className="app">
       <header className="app-header">
         <div className="header-top">
-          <h1>{albumName}</h1>
+          <h1>{displayName}</h1>
           <div className="header-actions">
             <button
               className={`icon-btn lock-toggle${locked ? ' locked' : ''}`}
