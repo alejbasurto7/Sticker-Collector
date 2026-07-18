@@ -547,18 +547,30 @@ function applyPulledRow(channel: Channel, row: Row | null): void {
     useSyncMeta.getState().setChannelStatus(channel.key, 'synced');
     return;
   }
-  // Owner revoked: a joiner seeing `sharingEndedAt` adopts the final copy, is notified, and
-  // converts the album to a private Local fork (the live link ends here).
+  // Owner-side changes a joiner must react to on pull: a stopped share (`sharingEndedAt`) ends the
+  // link and converts the album to a private Local fork; a flipped access level is adopted into the
+  // local link so read-only gating reflects the owner's choice (the payload carries it — Task 2's
+  // owner-side `setShareAccess` pushes it — but nothing consumed it until here).
   if (channel.kind === 'album' && channel.role === 'joiner') {
     const data = normalizeRemote(row.data);
-    if (data && data.kind === 'album' && typeof data.sharingEndedAt === 'number') {
-      handleRevoked(channel, data);
-      return;
+    if (data && data.kind === 'album') {
+      if (typeof data.sharingEndedAt === 'number') {
+        handleRevoked(channel, data);
+        return;
+      }
+      if (data.access !== channel.access) {
+        const link = useSyncMeta.getState().albumLinks[channel.albumId];
+        if (link) useSyncMeta.getState().upsertAlbumLink({ ...link, access: data.access });
+        channel.access = data.access;        // keep THIS pull's gating consistent with the new level
+        channel.writable = isWritable(channel);
+      }
     }
   }
   // ...existing body unchanged (the `row.writer_id !== channel.writerId && ...` block, etc.)...
 }
 ```
+
+Note: inside the `channel.kind === 'album'` narrow, `channel` is an `AlbumChannel` whose `access`/`writable` are mutable fields, so reassigning them for the remainder of this pull is legal and keeps the read-only/writable decision below consistent with the freshly-adopted level. `isWritable` is already defined in this file.
 
 Add the `handleRevoked` helper just above `applyPulledRow`:
 
