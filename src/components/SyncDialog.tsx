@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import QRCode from 'qrcode';
-import { createLink, peekRemote, linkWithRemote, linkWithLocal, type PeekOk } from '../sync/engine';
+import { createLink, peekRemote, linkWithRemote, linkWithLocal, joinAlbumCode, type PeekOk, type AlbumPeekOk } from '../sync/engine';
 import { formatSyncCode } from '../lib/syncCode';
 import { copyToClipboard } from '../utils/share';
 import QrScanner from './QrScanner';
@@ -9,7 +9,7 @@ interface Props {
   onClose: () => void;
 }
 
-type Mode = 'choose' | 'create' | 'enter' | 'direction';
+type Mode = 'choose' | 'create' | 'enter' | 'direction' | 'joinAlbum';
 
 const QR_PREFIX = 'sticker-sync:';
 
@@ -23,6 +23,8 @@ export default function SyncDialog({ onClose }: Props) {
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
   const [peek, setPeek] = useState<PeekOk | null>(null);
+  const [albumPeek, setAlbumPeek] = useState<AlbumPeekOk | null>(null);
+  const [joinAlias, setJoinAlias] = useState('');
 
   async function handleCreate() {
     setBusy(true);
@@ -54,12 +56,13 @@ export default function SyncDialog({ onClose }: Props) {
       );
       return;
     }
-    if (res.kind !== 'collection') {
-      // Shared-album codes aren't joinable from this dialog yet — that UI lands separately.
+    if (res.kind === 'album') {
+      setAlbumPeek(res);
       setBusy(false);
-      setError('No collection found for that code. Double-check it, or create the code on your other device first.');
+      setMode('joinAlbum');
       return;
     }
+    // kind === 'collection' (today's Cloud-join flow, unchanged):
     // Safe path: this device is empty, so pulling the shared collection loses nothing.
     if (!res.localHasData) {
       linkWithRemote(res);
@@ -71,6 +74,15 @@ export default function SyncDialog({ onClose }: Props) {
     setPeek(res);
     setBusy(false);
     setMode('direction');
+  }
+
+  function confirmJoinAlbum() {
+    if (!albumPeek) return;
+    setBusy(true);
+    void joinAlbumCode(albumPeek, { displayName: joinAlias.trim() || undefined }).finally(() => {
+      setBusy(false);
+      onClose();
+    });
   }
 
   function keepLocal() {
@@ -154,8 +166,8 @@ export default function SyncDialog({ onClose }: Props) {
           <>
             <h2>Enter sync code</h2>
             <p className="modal-sub">
-              Type the code shown on your other device. If this device already has stickers,
-              you’ll choose which collection to keep before anything changes.
+              Type a code from another device. A Cloud code links your own devices; a shared-album
+              code adds that one album to your collection.
             </p>
             <input
               type="text"
@@ -221,6 +233,36 @@ export default function SyncDialog({ onClose }: Props) {
             <div className="btn-row">
               <button className="btn full" disabled={busy} onClick={() => { setPeek(null); setMode('enter'); }}>
                 Cancel
+              </button>
+            </div>
+          </>
+        )}
+
+        {mode === 'joinAlbum' && albumPeek && (
+          <>
+            <h2>Join shared album</h2>
+            <p className="modal-sub">
+              This code shares a single album ({albumPeek.access === 'read-only' ? 'read-only' : 'collaborative'}).
+              It’ll be added to your collection{albumPeek.access === 'read-only' ? ' to view' : ' to edit together'}.
+            </p>
+            <div className="settings-field">
+              <label htmlFor="join-alias" className="settings-field-label">Name on this device (optional)</label>
+              <input
+                id="join-alias"
+                type="text"
+                className="settings-input"
+                placeholder="(optional)"
+                value={joinAlias}
+                onChange={(e) => setJoinAlias(e.target.value)}
+              />
+            </div>
+            {error && <p className="sync-error">{error}</p>}
+            <div className="btn-row">
+              <button className="btn full" disabled={busy} onClick={() => { setAlbumPeek(null); setMode('enter'); }}>
+                Back
+              </button>
+              <button className="btn primary full" disabled={busy} onClick={confirmJoinAlbum}>
+                {busy ? 'Joining…' : 'Join album'}
               </button>
             </div>
           </>

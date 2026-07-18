@@ -56,8 +56,9 @@ export default function SyncSection() {
       {!linked ? (
         <>
           <p className="modal-sub" style={{ margin: '0 0 12px' }}>
-            Share this collection across your phone and computer. Automatic, offline-first, no
-            account needed.
+            Cloud sync keeps <strong>your own devices</strong> in step — phone and computer share
+            one collection. Automatic, offline-first, no account. (To share a single album with
+            someone else, use <strong>Sharing</strong> in the Album section above.)
           </p>
           <button type="button" className="btn full" onClick={() => setDialogOpen(true)}>
             🔗 Set up sync
