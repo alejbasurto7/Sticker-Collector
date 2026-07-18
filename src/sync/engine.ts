@@ -13,6 +13,7 @@ import {
 } from './serialize';
 import { mergeAlbum, mergeCollection, deepEqual } from './merge';
 import { PAYLOAD_V, type AlbumPayload, type CollectionPayload, type ChannelPayload } from './payload';
+import { deleteDisposition } from './albumMode';
 
 // --- channel model ------------------------------------------------------------
 
@@ -509,4 +510,67 @@ export function unlink(): void {
   // Album links, if any, are left intact (Stage 3 manages them) — resume the engine in case any
   // remain active. A no-op today (Stage 2 has no album links), harmless once Stage 3 adds them.
   startEngine();
+}
+
+/** Rebuild channels/timers after a link-set change. Idempotent (mirrors unlink()'s pattern). */
+export function restartEngine(): void {
+  stopEngine();
+  startEngine();
+}
+
+/** A locally-unique album id for an adopted/forked album (opaque; ids elsewhere are opaque too). */
+export function newAlbumId(): string {
+  return crypto.randomUUID();
+}
+
+/**
+ * Make THIS device the OWNER of a new shared-album channel for `albumId`. Ensures the album is
+ * not marked Local, creates the owner link, seeds the album row, and (re)starts the engine.
+ * The album is automatically carved out of the Cloud channel because `computeManagedIds`
+ * excludes `albumLinks` keys — no tombstone (other Cloud devices keep their copy: carve-out ≠ delete).
+ */
+export async function createAlbumShare(
+  albumId: string, access: 'collaborative' | 'read-only',
+): Promise<string> {
+  const code = generateSyncCode();
+  const codeHash = await hashSyncCode(code);
+  useSyncMeta.getState().setPrivate(albumId, false);
+  useSyncMeta.getState().upsertAlbumLink({
+    albumId, code, codeHash, writerId: newWriterId(),
+    role: 'owner', access, lastVersion: 0, lastSyncedAt: null, status: 'syncing',
+  });
+  await doPushChannel(albumId); // seed the album row (base version 0 -> insert)
+  restartEngine();
+  return code;
+}
+
+/** Carve an UNLINKED album in/out of the Cloud channel. `local` = private (this device only). */
+export function setAlbumMode(albumId: string, mode: 'cloud' | 'local'): void {
+  useSyncMeta.getState().setPrivate(albumId, mode === 'local');
+  schedulePush('collection'); // reflect the carve-in/out on the Cloud row (no-op if unlinked)
+}
+
+/** Owner flips a share's access level; push so joiners pick up the new level on their next pull. */
+export function setShareAccess(albumId: string, access: 'collaborative' | 'read-only'): void {
+  const link = useSyncMeta.getState().albumLinks[albumId];
+  if (!link || link.role !== 'owner') return;
+  useSyncMeta.getState().upsertAlbumLink({ ...link, access });
+  schedulePush(albumId);
+}
+
+/**
+ * Delete `albumId` locally and propagate the deletion correctly: a shared album unlinks its
+ * channel here (the cloud row and other participants are untouched — no accounts to revoke); a
+ * Cloud album gets an explicit tombstone so every Cloud device removes it (absence alone never
+ * deletes); a Local album is purely local. Any recorded tombstone is flushed on the Cloud push.
+ */
+export async function deleteAlbumEverywhere(albumId: string): Promise<void> {
+  const meta = useSyncMeta.getState();
+  const disposition = deleteDisposition(albumId, meta);
+  if (disposition === 'unlink') meta.removeAlbumLink(albumId);
+  else if (disposition === 'tombstone') meta.tombstoneAlbum(albumId);
+  else meta.setPrivate(albumId, false); // local: just clear the private flag
+  useCollection.getState().deleteAlbum(albumId);
+  restartEngine();
+  schedulePush('collection'); // flush the tombstone (no-op if the Cloud channel isn't linked)
 }
