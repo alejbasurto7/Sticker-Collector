@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Swap } from '../types';
 import { useCollection } from '../store/collectionStore';
-import { useEffectiveReadOnly } from '../sync/useAlbumMode';
+import { useForcedReadOnly } from '../sync/useAlbumMode';
 import { computeConflicts, giveQtyOf } from '../utils/swap';
 import { buildSwapExport } from '../utils/listExport';
 import { copyToClipboard } from '../utils/share';
@@ -24,7 +24,7 @@ export default function SwapDetail({ swap, onClose }: Props) {
   const deleteSwap = useCollection((s) => s.deleteSwap);
   const rollbackSwap = useCollection((s) => s.rollbackSwap);
   const updateSwap = useCollection((s) => s.updateSwap);
-  const readOnly = useEffectiveReadOnly();
+  const readOnly = useForcedReadOnly();
   const [closing, setClosing] = useState(false);
   const [editing, setEditing] = useState(false);
   // Seed from what's already saved so reopening shows prior edits.

@@ -1,7 +1,7 @@
 import { supabase } from '../lib/supabase';
 import { useCollection } from '../store/collectionStore';
 import type { AlbumSnapshot } from '../store/collectionStore';
-import { useSyncMeta, type SyncMetaState } from '../store/syncStore';
+import { useSyncMeta, type SyncMetaState, type AlbumLink } from '../store/syncStore';
 import { generateSyncCode, hashSyncCode, isValidSyncCode, formatSyncCode } from '../lib/syncCode';
 import {
   hasCollectionData,
@@ -216,7 +216,14 @@ function applyMerged(channel: Channel, merged: ChannelPayload): void {
 
 /** Joiner-side handling of an owner's stop-sharing: adopt final copy, notify, convert to Local. */
 function handleRevoked(channel: AlbumChannel, data: AlbumPayload): void {
-  applyMerged(channel, data); // adopt the owner's final snapshot
+  // A collaborative joiner may hold local edits the owner's final snapshot lacks — merge them in so
+  // leaving with a copy keeps THEIR contributions, not just the owner's. A read-only joiner had no
+  // edits (force-locked), so the owner's copy is authoritative (replace == merge there).
+  const local = localSlice(channel);
+  const merged = channel.access === 'read-only' || !local
+    ? data
+    : mergeFor(channel, baseFor(channel), local, data);
+  applyMerged(channel, merged); // adopt the (merged) final snapshot
   const name = resolveAlbumName(
     channel.albumId, data.album.albumName, useSyncMeta.getState().localAlbumNames,
   );
@@ -561,6 +568,11 @@ export async function linkWithLocal(peek: PeekOk): Promise<void> {
  * engine's read-only-joiner path adopts the owner's truth and never pushes).
  */
 export async function joinAlbumCode(peek: AlbumPeekOk, opts?: { displayName?: string }): Promise<void> {
+  const already = Object.values(useSyncMeta.getState().albumLinks).find((l) => l.codeHash === peek.codeHash);
+  if (already) {
+    useCollection.getState().switchAlbum(already.albumId); // same code re-entered -> just show it
+    return;
+  }
   const existingIds = useCollection.getState().albums.map((a) => a.id);
   const localId = pickLocalAlbumId(peek.album.id, existingIds, newAlbumId);
   const album: AlbumSnapshot = { ...peek.album, id: localId };
@@ -597,6 +609,32 @@ export function leaveAlbumShare(albumId: string, keepLocal: boolean): void {
 }
 
 /**
+ * Best-effort: push a FINAL payload marked with `sharingEndedAt` so joiners learn the share ended.
+ * Merges the current remote first (never a raw overwrite), so a collaborative joiner's server-side
+ * edits survive in the final row. Failure is swallowed — revocation is soft/eventual (spec).
+ */
+async function pushSharingEnded(link: AlbumLink): Promise<void> {
+  if (!supabase) return;
+  const local = sliceAlbumPayload(useCollection.getState(), link.albumId, link.access);
+  if (!local) return;
+  try {
+    const { data: pullData } = await supabase.rpc('sync_pull', { p_code_hash: link.codeHash });
+    const row = firstRow(pullData);
+    const remote = row ? normalizeRemote(row.data) : null;
+    const channel = findChannel(link.albumId);
+    const merged = remote && channel ? mergeFor(channel, baseFor(channel), local, remote) : local;
+    await supabase.rpc('sync_push', {
+      p_code_hash: link.codeHash,
+      p_data: { ...(merged as AlbumPayload), sharingEndedAt: Date.now() },
+      p_writer: link.writerId,
+      p_base_version: row?.version ?? link.lastVersion,
+    });
+  } catch {
+    /* best-effort: callers proceed with the local unlink regardless */
+  }
+}
+
+/**
  * An OWNER stops sharing. Best-effort push a final payload carrying `sharingEndedAt` (so a joiner
  * who pulls learns the share ended), then unlink locally and revert the album to Cloud or Local.
  * Delivery is eventual: a joiner who never reopens simply receives no further updates (spec:
@@ -604,23 +642,7 @@ export function leaveAlbumShare(albumId: string, keepLocal: boolean): void {
  */
 export async function stopSharing(albumId: string, revertTo: 'cloud' | 'local'): Promise<void> {
   const link = useSyncMeta.getState().albumLinks[albumId];
-  if (link && supabase) {
-    const slice = sliceAlbumPayload(useCollection.getState(), albumId, link.access);
-    if (slice) {
-      try {
-        const { data: pullData } = await supabase.rpc('sync_pull', { p_code_hash: link.codeHash });
-        const baseVersion = firstRow(pullData)?.version ?? link.lastVersion;
-        await supabase.rpc('sync_push', {
-          p_code_hash: link.codeHash,
-          p_data: { ...slice, sharingEndedAt: Date.now() },
-          p_writer: link.writerId,
-          p_base_version: baseVersion,
-        });
-      } catch {
-        /* best-effort: the local unlink below always proceeds */
-      }
-    }
-  }
+  if (link) await pushSharingEnded(link);
   useSyncMeta.getState().removeAlbumLink(albumId);
   useSyncMeta.getState().setPrivate(albumId, revertTo === 'local');
   restartEngine();
@@ -690,8 +712,13 @@ export function setShareAccess(albumId: string, access: 'collaborative' | 'read-
 export async function deleteAlbumEverywhere(albumId: string): Promise<void> {
   const meta = useSyncMeta.getState();
   const disposition = deleteDisposition(albumId, meta);
-  if (disposition === 'unlink') meta.removeAlbumLink(albumId);
-  else if (disposition === 'tombstone') meta.tombstoneAlbum(albumId);
+  if (disposition === 'unlink') {
+    // Deleting a share you OWN is "stop sharing + delete": notify joiners first (spec). A joiner
+    // deleting simply leaves (they aren't the owner, so no marker).
+    const link = meta.albumLinks[albumId];
+    if (link?.role === 'owner') await pushSharingEnded(link);
+    meta.removeAlbumLink(albumId);
+  } else if (disposition === 'tombstone') meta.tombstoneAlbum(albumId);
   else meta.setPrivate(albumId, false); // local: just clear the private flag
   useCollection.getState().deleteAlbum(albumId);
   restartEngine();

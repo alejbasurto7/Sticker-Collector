@@ -131,7 +131,12 @@ export default function EditionDialog({ onClose }: Props) {
             >
               ➕ New Album
             </button>
-            <button type="button" className="btn full" onClick={() => setImportOpen(true)}>
+            <button
+              type="button"
+              className="btn full"
+              onClick={() => setImportOpen(true)}
+              disabled={forcedReadOnly}
+            >
               ⬇ Import…
             </button>
             <button
@@ -177,6 +182,7 @@ export default function EditionDialog({ onClose }: Props) {
             role="switch"
             aria-checked={trackCC}
             onClick={() => setTrackCC(!trackCC)}
+            disabled={forcedReadOnly}
           >
             <span className="setting-label">
               {CC_EMOJI} {trackCC ? 'Untrack' : 'Track'} Coca-Cola stickers
@@ -206,6 +212,7 @@ export default function EditionDialog({ onClose }: Props) {
                       setEdition(key);
                       onClose();
                     }}
+                    disabled={forcedReadOnly}
                   >
                     <div className="swap-top">
                       <span className="swap-name">{info.label}</span>

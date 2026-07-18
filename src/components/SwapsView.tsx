@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useCollection } from '../store/collectionStore';
-import { useEffectiveReadOnly } from '../sync/useAlbumMode';
+import { useForcedReadOnly } from '../sync/useAlbumMode';
 import { activeReceiving, computeConflicts, totalGiving } from '../utils/swap';
 import type { Swap } from '../types';
 import NewSwapDialog from './NewSwapDialog';
@@ -9,7 +9,7 @@ import SwapDetail from './SwapDetail';
 export default function SwapsView() {
   const swaps = useCollection((s) => s.swaps);
   const counts = useCollection((s) => s.counts);
-  const readOnly = useEffectiveReadOnly();
+  const readOnly = useForcedReadOnly();
   const [creating, setCreating] = useState(false);
   const [openSwap, setOpenSwap] = useState<Swap | null>(null);
 
