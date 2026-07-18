@@ -8,6 +8,8 @@ import { VERSION_LABEL } from '../version';
 import type { Edition } from '../types';
 import { buildListExport } from '../utils/listExport';
 import { copyToClipboard } from '../utils/share';
+import { deleteAlbumEverywhere } from '../sync/engine';
+import AlbumSharing from './AlbumSharing';
 import ImportDialog from './ImportDialog';
 import SyncSection from './SyncSection';
 
@@ -30,7 +32,6 @@ export default function EditionDialog({ onClose }: Props) {
   const activeAlbumId = useCollection((s) => s.activeAlbumId);
   const createAlbum = useCollection((s) => s.createAlbum);
   const switchAlbum = useCollection((s) => s.switchAlbum);
-  const deleteAlbum = useCollection((s) => s.deleteAlbum);
   const counts = useCollection((s) => s.counts);
   const localAlbumNames = useSyncMeta((s) => s.localAlbumNames);
 
@@ -56,8 +57,8 @@ export default function EditionDialog({ onClose }: Props) {
     }
   }
 
-  function handleConfirmDelete() {
-    deleteAlbum(activeAlbumId);
+  async function handleConfirmDelete() {
+    await deleteAlbumEverywhere(activeAlbumId);
     setConfirmingDelete(false);
     onClose();
   }
@@ -139,6 +140,8 @@ export default function EditionDialog({ onClose }: Props) {
               {exported ? '✓ Copied' : '⬆ Export'}
             </button>
           </div>
+
+          <AlbumSharing />
         </section>
 
         {/* ---------- Sync (self-hides when Supabase isn't configured) ---------- */}
