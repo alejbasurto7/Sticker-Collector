@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { useCollection } from '../store/collectionStore';
+import type { AlbumSnapshot } from '../store/collectionStore';
 import { useSyncMeta, type SyncMetaState } from '../store/syncStore';
 import { generateSyncCode, hashSyncCode, isValidSyncCode, formatSyncCode } from '../lib/syncCode';
 import {
@@ -13,7 +14,7 @@ import {
 } from './serialize';
 import { mergeAlbum, mergeCollection, deepEqual } from './merge';
 import { PAYLOAD_V, type AlbumPayload, type CollectionPayload, type ChannelPayload } from './payload';
-import { deleteDisposition } from './albumMode';
+import { deleteDisposition, pickLocalAlbumId } from './albumMode';
 
 // --- channel model ------------------------------------------------------------
 
@@ -431,6 +432,7 @@ function localHasData(): boolean {
 
 export interface PeekOk {
   ok: true;
+  kind: 'collection';
   code: string;
   codeHash: string;
   remoteVersion: number;
@@ -438,13 +440,29 @@ export interface PeekOk {
   /** True when this device already has a collection (a plain overwrite would have lost it). */
   localHasData: boolean;
 }
-export type PeekResult = PeekOk | { ok: false; reason: 'invalid' | 'not-found' | 'network' | 'unconfigured' };
+
+/** A peeked shared-album row (Stage 3 join flow). */
+export interface AlbumPeekOk {
+  ok: true;
+  kind: 'album';
+  code: string;
+  codeHash: string;
+  remoteVersion: number;
+  access: 'collaborative' | 'read-only';
+  album: AlbumSnapshot;
+  sharingEndedAt?: number;
+}
+
+export type PeekResult =
+  | PeekOk
+  | AlbumPeekOk
+  | { ok: false; reason: 'invalid' | 'not-found' | 'network' | 'unconfigured' };
 
 /**
- * Look up a code's cloud collection WITHOUT changing anything locally. Nothing is linked or
- * overwritten here. `remoteData` is the validated/normalized `CollectionPayload` — a row that
- * fails validation, or is actually an album-share row (Stage 3 join flow, not this one), is
- * reported as not-found.
+ * Look up a code's row WITHOUT changing anything locally. Nothing is linked or overwritten here.
+ * A `kind:'collection'` row peeks as a `PeekOk` (`remoteData` is the validated/normalized
+ * `CollectionPayload`); a `kind:'album'` row (a shared-album code, Stage 3 join flow) peeks as an
+ * `AlbumPeekOk`. A row that fails validation is reported as not-found.
  */
 export async function peekRemote(input: string): Promise<PeekResult> {
   if (!supabase) return { ok: false, reason: 'unconfigured' };
@@ -457,14 +475,16 @@ export async function peekRemote(input: string): Promise<PeekResult> {
     const row = firstRow(data);
     if (!row) return { ok: false, reason: 'not-found' };
     const remote = normalizeRemote(row.data);
-    if (!remote || remote.kind !== 'collection') return { ok: false, reason: 'not-found' };
+    if (!remote) return { ok: false, reason: 'not-found' };
+    if (remote.kind === 'album') {
+      return {
+        ok: true, kind: 'album', code, codeHash, remoteVersion: row.version,
+        access: remote.access, album: remote.album, sharingEndedAt: remote.sharingEndedAt,
+      };
+    }
     return {
-      ok: true,
-      code,
-      codeHash,
-      remoteVersion: row.version,
-      remoteData: remote,
-      localHasData: localHasData(),
+      ok: true, kind: 'collection', code, codeHash, remoteVersion: row.version,
+      remoteData: remote, localHasData: localHasData(),
     };
   } catch {
     return { ok: false, reason: 'network' };
@@ -501,6 +521,37 @@ export async function linkWithLocal(peek: PeekOk): Promise<void> {
   useSyncMeta.getState().markChannelSynced('collection', peek.remoteVersion);
   await doPushChannel('collection');
   startEngine();
+}
+
+/**
+ * Join a shared-album code: adopt the owner's album as a NEW local album (joiner role) under a
+ * locally-unique id, seed the merge base, optionally set a local display alias, make it active,
+ * and start syncing. Collaborative joins merge from here on; a read-only join is pull-only (the
+ * engine's read-only-joiner path adopts the owner's truth and never pushes).
+ */
+export async function joinAlbumCode(peek: AlbumPeekOk, opts?: { displayName?: string }): Promise<void> {
+  const existingIds = useCollection.getState().albums.map((a) => a.id);
+  const localId = pickLocalAlbumId(peek.album.id, existingIds, newAlbumId);
+  const album: AlbumSnapshot = { ...peek.album, id: localId };
+
+  // Adopt the owner's copy without echoing it straight back as a local edit.
+  applyingRemote = true;
+  try {
+    useCollection.getState().applyMergedAlbum(localId, album);
+  } finally {
+    applyingRemote = false;
+  }
+
+  useSyncMeta.getState().upsertAlbumLink({
+    albumId: localId, code: peek.code, codeHash: peek.codeHash, writerId: newWriterId(),
+    role: 'joiner', access: peek.access, lastVersion: peek.remoteVersion, lastSyncedAt: null, status: 'syncing',
+  });
+  // Seed the base with the adopted snapshot so subsequent 3-way merges have a common ancestor.
+  useSyncMeta.getState().setBase(localId, { kind: 'album', v: PAYLOAD_V, access: peek.access, album });
+  if (opts?.displayName) useSyncMeta.getState().setLocalAlbumName(localId, opts.displayName);
+
+  useCollection.getState().switchAlbum(localId); // show the joined album
+  restartEngine();
 }
 
 /** Stop syncing the Cloud channel on this device. Local data is untouched. */

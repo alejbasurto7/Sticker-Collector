@@ -54,6 +54,12 @@ export default function SyncDialog({ onClose }: Props) {
       );
       return;
     }
+    if (res.kind !== 'collection') {
+      // Shared-album codes aren't joinable from this dialog yet — that UI lands separately.
+      setBusy(false);
+      setError('No collection found for that code. Double-check it, or create the code on your other device first.');
+      return;
+    }
     // Safe path: this device is empty, so pulling the shared collection loses nothing.
     if (!res.localHasData) {
       linkWithRemote(res);
