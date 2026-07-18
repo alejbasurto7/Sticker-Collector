@@ -141,7 +141,7 @@ export default function EditionDialog({ onClose }: Props) {
             </button>
           </div>
 
-          <AlbumSharing />
+          <AlbumSharing key={activeAlbumId} />
         </section>
 
         {/* ---------- Sync (self-hides when Supabase isn't configured) ---------- */}
