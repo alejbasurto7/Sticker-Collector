@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Swap } from '../types';
 import { useCollection } from '../store/collectionStore';
+import { useEffectiveReadOnly } from '../sync/useAlbumMode';
 import { computeConflicts, giveQtyOf } from '../utils/swap';
 import { buildSwapExport } from '../utils/listExport';
 import { copyToClipboard } from '../utils/share';
@@ -23,6 +24,7 @@ export default function SwapDetail({ swap, onClose }: Props) {
   const deleteSwap = useCollection((s) => s.deleteSwap);
   const rollbackSwap = useCollection((s) => s.rollbackSwap);
   const updateSwap = useCollection((s) => s.updateSwap);
+  const readOnly = useEffectiveReadOnly();
   const [closing, setClosing] = useState(false);
   const [editing, setEditing] = useState(false);
   // Seed from what's already saved so reopening shows prior edits.
@@ -168,7 +170,7 @@ export default function SwapDetail({ swap, onClose }: Props) {
           conflicts={giveConflicts}
           quantities={giveQty}
           onToggle={toggleGiving}
-          readOnly={!isOpen}
+          readOnly={!isOpen || readOnly}
         />
 
         <div className="section-title">You get ({receiving.size})</div>
@@ -177,7 +179,7 @@ export default function SwapDetail({ swap, onClose }: Props) {
           selected={receiving}
           conflicts={recvConflicts}
           onToggle={toggleReceiving}
-          readOnly={!isOpen}
+          readOnly={!isOpen || readOnly}
         />
 
         <button
@@ -188,7 +190,7 @@ export default function SwapDetail({ swap, onClose }: Props) {
           {justCopied ? '✓ Copied to clipboard' : 'Export'}
         </button>
 
-        {isOpen && (
+        {isOpen && !readOnly && (
           <button
             className={`btn full ${justSaved ? 'success' : 'primary'}`}
             style={{ marginTop: 10 }}
@@ -200,15 +202,17 @@ export default function SwapDetail({ swap, onClose }: Props) {
         )}
 
         <div className="btn-row">
-          <button className="btn danger" onClick={remove}>
-            Delete
-          </button>
-          {!isOpen && (
+          {!readOnly && (
+            <button className="btn danger" onClick={remove}>
+              Delete
+            </button>
+          )}
+          {!isOpen && !readOnly && (
             <button className="btn" onClick={rollback}>
               ↩ Rollback
             </button>
           )}
-          {isOpen && (
+          {isOpen && !readOnly && (
             <button className="btn" onClick={() => setEditing(true)}>
               ✎ Edit
             </button>
@@ -216,12 +220,18 @@ export default function SwapDetail({ swap, onClose }: Props) {
           <button className="btn" onClick={onClose}>
             Close
           </button>
-          {isOpen && (
+          {isOpen && !readOnly && (
             <button className="btn primary full" onClick={() => setClosing(true)}>
               🤝 Mark as swapped
             </button>
           )}
         </div>
+
+        {readOnly && (
+          <p className="modal-sub" style={{ margin: '8px 0 0' }}>
+            🔒 Read-only — shared by the code owner. You can view this swap but not change it.
+          </p>
+        )}
 
         {closing && (
           <SwapClose

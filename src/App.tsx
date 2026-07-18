@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ALBUM_TYPE } from './config';
 import { useCollection } from './store/collectionStore';
 import { useSyncBoot } from './sync/useSync';
-import { useResolvedAlbumName } from './sync/useAlbumMode';
+import { useResolvedAlbumName, useForcedReadOnly } from './sync/useAlbumMode';
 import { computeStats, displayPct } from './utils/stats';
 import TabBar, { type Tab } from './components/TabBar';
 import ProgressBar from './components/ProgressBar';
@@ -31,6 +31,7 @@ export default function App() {
   const theme = useCollection((s) => s.theme);
   const locked = useCollection((s) => s.locked);
   const toggleLocked = useCollection((s) => s.toggleLocked);
+  const forcedReadOnly = useForcedReadOnly();
 
   // Boot cross-device sync (no-op unless Supabase is configured and a link exists).
   useSyncBoot();
@@ -65,14 +66,21 @@ export default function App() {
           <h1>{displayName}</h1>
           <div className="header-actions">
             <button
-              className={`icon-btn lock-toggle${locked ? ' locked' : ''}`}
-              onClick={toggleLocked}
+              className={`icon-btn lock-toggle${locked || forcedReadOnly ? ' locked' : ''}`}
+              onClick={forcedReadOnly ? undefined : toggleLocked}
+              disabled={forcedReadOnly}
               role="switch"
-              aria-checked={locked}
-              aria-label={locked ? 'Album locked — tap to unlock and edit' : 'Album unlocked — tap to lock'}
-              title={locked ? 'Locked (read-only)' : 'Unlocked (editable)'}
+              aria-checked={locked || forcedReadOnly}
+              aria-label={
+                forcedReadOnly
+                  ? 'Read-only shared album — editing is disabled'
+                  : locked
+                    ? 'Album locked — tap to unlock and edit'
+                    : 'Album unlocked — tap to lock'
+              }
+              title={forcedReadOnly ? 'Read-only shared album' : locked ? 'Locked (read-only)' : 'Unlocked (editable)'}
             >
-              {locked ? '🔒' : '🔓'}
+              {locked || forcedReadOnly ? '🔒' : '🔓'}
             </button>
             <button className="icon-btn" onClick={() => setShareOpen(true)} aria-label="Share list">
               <svg

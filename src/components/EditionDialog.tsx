@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useCollection } from '../store/collectionStore';
 import { useSyncMeta } from '../store/syncStore';
 import { resolveAlbumName } from '../sync/albumMode';
+import { useForcedReadOnly } from '../sync/useAlbumMode';
 import { CC_EMOJI, EDITION_INFO } from '../data/sampleAlbum';
 import { ALBUM_TYPE } from '../config';
 import { VERSION_LABEL } from '../version';
@@ -34,6 +35,7 @@ export default function EditionDialog({ onClose }: Props) {
   const switchAlbum = useCollection((s) => s.switchAlbum);
   const counts = useCollection((s) => s.counts);
   const localAlbumNames = useSyncMeta((s) => s.localAlbumNames);
+  const forcedReadOnly = useForcedReadOnly();
 
   const [draft, setDraft] = useState(albumName);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -116,6 +118,7 @@ export default function EditionDialog({ onClose }: Props) {
               onChange={(e) => setDraft(e.target.value)}
               onBlur={handleNameBlur}
               onKeyDown={handleNameKeyDown}
+              disabled={forcedReadOnly}
             />
           </div>
 

@@ -6,6 +6,7 @@ import { templateFor } from '../data/layouts';
 import { slotBox, bindTemplate } from '../data/layoutGeometry';
 import type { SectionTemplate, Placement } from '../data/layoutGeometry';
 import { useCollection } from '../store/collectionStore';
+import { useEffectiveReadOnly } from '../sync/useAlbumMode';
 import StickerCell from './StickerCell';
 import type { AlbumFilter } from './FilterBar';
 
@@ -39,7 +40,7 @@ export default function PageSection({ page, filter, open, onToggle }: Props) {
   const counts = useCollection((s) => s.counts);
   const addOne = useCollection((s) => s.addOne);
   const removeOne = useCollection((s) => s.removeOne);
-  const locked = useCollection((s) => s.locked);
+  const locked = useEffectiveReadOnly();
 
   const owned = page.stickerIds.filter((id) => (counts[id] ?? 0) >= 1).length;
   const total = page.stickerIds.length;
