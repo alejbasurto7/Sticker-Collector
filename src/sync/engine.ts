@@ -14,7 +14,7 @@ import {
 } from './serialize';
 import { mergeAlbum, mergeCollection, deepEqual } from './merge';
 import { PAYLOAD_V, type AlbumPayload, type CollectionPayload, type ChannelPayload } from './payload';
-import { deleteDisposition, pickLocalAlbumId } from './albumMode';
+import { deleteDisposition, pickLocalAlbumId, resolveAlbumName } from './albumMode';
 
 // --- channel model ------------------------------------------------------------
 
@@ -214,6 +214,18 @@ function applyMerged(channel: Channel, merged: ChannelPayload): void {
   }
 }
 
+/** Joiner-side handling of an owner's stop-sharing: adopt final copy, notify, convert to Local. */
+function handleRevoked(channel: AlbumChannel, data: AlbumPayload): void {
+  applyMerged(channel, data); // adopt the owner's final snapshot
+  const name = resolveAlbumName(
+    channel.albumId, data.album.albumName, useSyncMeta.getState().localAlbumNames,
+  );
+  useSyncMeta.getState().setRevokedNotice(`The owner stopped sharing “${name}”. It's now saved only on this device.`);
+  useSyncMeta.getState().removeAlbumLink(channel.albumId);
+  useSyncMeta.getState().setPrivate(channel.albumId, true);
+  restartEngine();
+}
+
 /**
  * Apply a pulled server row to this channel when it's genuinely newer AND not our own echoed
  * write. A read-only joiner adopts the owner's row directly (no local merge); every other
@@ -232,6 +244,25 @@ function applyPulledRow(channel: Channel, row: Row | null): void {
   if (!row) {
     useSyncMeta.getState().setChannelStatus(channel.key, 'synced');
     return;
+  }
+  // Owner-side changes a joiner must react to on pull: a stopped share (`sharingEndedAt`) ends the
+  // link and converts the album to a private Local fork; a flipped access level is adopted into the
+  // local link so read-only gating reflects the owner's choice (the payload carries it — Task 2's
+  // owner-side `setShareAccess` pushes it — but nothing consumed it until here).
+  if (channel.kind === 'album' && channel.role === 'joiner') {
+    const data = normalizeRemote(row.data);
+    if (data && data.kind === 'album') {
+      if (typeof data.sharingEndedAt === 'number') {
+        handleRevoked(channel, data);
+        return;
+      }
+      if (data.access !== channel.access) {
+        const link = useSyncMeta.getState().albumLinks[channel.albumId];
+        if (link) useSyncMeta.getState().upsertAlbumLink({ ...link, access: data.access });
+        channel.access = data.access;        // keep THIS pull's gating consistent with the new level
+        channel.writable = isWritable(channel);
+      }
+    }
   }
   if (row.writer_id !== channel.writerId && row.version > channel.lastVersion) {
     const remote = normalizeRemote(row.data);
@@ -551,6 +582,47 @@ export async function joinAlbumCode(peek: AlbumPeekOk, opts?: { displayName?: st
   if (opts?.displayName) useSyncMeta.getState().setLocalAlbumName(localId, opts.displayName);
 
   useCollection.getState().switchAlbum(localId); // show the joined album
+  restartEngine();
+}
+
+/**
+ * A JOINER leaves a shared album. Purely local, always works (no server coordination): drop the
+ * link and either keep a private Local fork of the album (`keepLocal`) or delete it entirely.
+ */
+export function leaveAlbumShare(albumId: string, keepLocal: boolean): void {
+  useSyncMeta.getState().removeAlbumLink(albumId);
+  if (keepLocal) useSyncMeta.getState().setPrivate(albumId, true);
+  else useCollection.getState().deleteAlbum(albumId);
+  restartEngine();
+}
+
+/**
+ * An OWNER stops sharing. Best-effort push a final payload carrying `sharingEndedAt` (so a joiner
+ * who pulls learns the share ended), then unlink locally and revert the album to Cloud or Local.
+ * Delivery is eventual: a joiner who never reopens simply receives no further updates (spec:
+ * "Revocation ... cannot un-download a copy already on the joiner's device").
+ */
+export async function stopSharing(albumId: string, revertTo: 'cloud' | 'local'): Promise<void> {
+  const link = useSyncMeta.getState().albumLinks[albumId];
+  if (link && supabase) {
+    const slice = sliceAlbumPayload(useCollection.getState(), albumId, link.access);
+    if (slice) {
+      try {
+        const { data: pullData } = await supabase.rpc('sync_pull', { p_code_hash: link.codeHash });
+        const baseVersion = firstRow(pullData)?.version ?? link.lastVersion;
+        await supabase.rpc('sync_push', {
+          p_code_hash: link.codeHash,
+          p_data: { ...slice, sharingEndedAt: Date.now() },
+          p_writer: link.writerId,
+          p_base_version: baseVersion,
+        });
+      } catch {
+        /* best-effort: the local unlink below always proceeds */
+      }
+    }
+  }
+  useSyncMeta.getState().removeAlbumLink(albumId);
+  useSyncMeta.getState().setPrivate(albumId, revertTo === 'local');
   restartEngine();
 }
 

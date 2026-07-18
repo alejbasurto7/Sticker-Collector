@@ -19,6 +19,8 @@ export interface SyncMetaState {
   privateAlbumIds: string[];
   localAlbumNames: Record<string, string>;
   bases: Record<string, ChannelPayload>;
+  /** Transient: set when an owner revoked a share we joined; shown once, then cleared. Not persisted. */
+  revokedNotice: string | null;
 
   setCollectionLink: (p: { code: string; codeHash: string; writerId: string }) => void;
   clearCollectionLink: () => void;
@@ -30,6 +32,8 @@ export interface SyncMetaState {
   setBase: (key: string, payload: ChannelPayload) => void;
   setChannelStatus: (key: string, status: SyncStatus) => void;
   markChannelSynced: (key: string, version: number) => void;
+  setRevokedNotice: (msg: string) => void;
+  clearRevokedNotice: () => void;
 }
 
 const freshLink = (p: { code: string; codeHash: string; writerId: string }): LinkMeta => ({
@@ -58,6 +62,7 @@ export const useSyncMeta = create<SyncMetaState>()(
   persist(
     (set) => ({
       collection: null, albumLinks: {}, privateAlbumIds: [], localAlbumNames: {}, bases: {},
+      revokedNotice: null,
 
       // `bases.collection` is keyed by the fixed string 'collection', not by codeHash, so it
       // must be reset on every (re)link: a freshly-established link starts with no ancestor
@@ -99,6 +104,8 @@ export const useSyncMeta = create<SyncMetaState>()(
       setBase: (key, payload) => set((s) => ({ bases: { ...s.bases, [key]: payload } })),
       setChannelStatus: (key, status) => set((s) => patchChannel(s, key, { status })),
       markChannelSynced: (key, version) => set((s) => patchChannel(s, key, { lastVersion: version, lastSyncedAt: Date.now(), status: 'synced' })),
+      setRevokedNotice: (msg) => set({ revokedNotice: msg }),
+      clearRevokedNotice: () => set({ revokedNotice: null }),
     }),
     {
       name: 'figuritas-sync-v1',

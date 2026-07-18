@@ -13,6 +13,7 @@ import HelpDialog from './components/HelpDialog';
 import ShareListDialog from './components/ShareListDialog';
 import AchievementToaster from './components/AchievementToaster';
 import ReloadPrompt from './components/ReloadPrompt';
+import RevocationNotice from './components/RevocationNotice';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('album');
@@ -126,6 +127,7 @@ export default function App() {
       {editionOpen && <EditionDialog onClose={() => setEditionOpen(false)} />}
       {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} />}
 
+      <RevocationNotice />
       <AchievementToaster />
       <ReloadPrompt />
     </div>
