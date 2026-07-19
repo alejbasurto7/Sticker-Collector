@@ -1,5 +1,5 @@
-import { album } from '../data/sampleAlbum';
-import type { Counts } from '../types';
+import { album, buildAlbumFor } from '../data/sampleAlbum';
+import type { Album, Counts, Edition } from '../types';
 
 export interface PageProgress {
   pageId: string;
@@ -104,19 +104,33 @@ export function countOf(counts: Counts, id: string): number {
 }
 
 export function computeStats(counts: Counts, history?: CollectionHistory): Stats {
-  const total = album.stickers.length;
+  return statsForAlbum(album, counts, history);
+}
+
+/** Stats for a specific album layout — pure, no dependence on the live singleton. */
+export function computeStatsFor(
+  counts: Counts,
+  edition: Edition,
+  trackCC: boolean,
+  history?: CollectionHistory,
+): Stats {
+  return statsForAlbum(buildAlbumFor(edition, trackCC), counts, history);
+}
+
+function statsForAlbum(a: Album, counts: Counts, history?: CollectionHistory): Stats {
+  const total = a.stickers.length;
   let ownedUnique = 0;
   let dupesTotal = 0;
   let totalCollected = 0;
 
-  for (const s of album.stickers) {
+  for (const s of a.stickers) {
     const c = counts[s.id] ?? 0;
     if (c >= 1) ownedUnique++;
     if (c > 1) dupesTotal += c - 1;
     totalCollected += c;
   }
 
-  const pages: PageProgress[] = album.pages.map((p) => {
+  const pages: PageProgress[] = a.pages.map((p) => {
     const owned = p.stickerIds.reduce((acc, id) => acc + ((counts[id] ?? 0) >= 1 ? 1 : 0), 0);
     const totalP = p.stickerIds.length;
     return {
@@ -132,7 +146,7 @@ export function computeStats(counts: Counts, history?: CollectionHistory): Stats
   });
 
   // Progress grouped by sticker type (Holograms / Regular / Team).
-  const pageTypeById = Object.fromEntries(album.pages.map((p) => [p.id, p.type]));
+  const pageTypeById = Object.fromEntries(a.pages.map((p) => [p.id, p.type]));
   const typeOrder: { type: StickerType; label: string; emoji: string }[] = [
     { type: 'hologram', label: 'Holograms', emoji: '✨' },
     { type: 'regular', label: 'Regular', emoji: '🟦' },
@@ -143,7 +157,7 @@ export function computeStats(counts: Counts, history?: CollectionHistory): Stats
     regular: { owned: 0, total: 0 },
     team: { owned: 0, total: 0 },
   };
-  for (const s of album.stickers) {
+  for (const s of a.stickers) {
     const t = stickerType(s, pageTypeById[s.pageId] ?? '');
     typeAcc[t].total++;
     if ((counts[s.id] ?? 0) >= 1) typeAcc[t].owned++;
@@ -155,10 +169,10 @@ export function computeStats(counts: Counts, history?: CollectionHistory): Stats
 
   // Most duplicated sticker.
   let mostDuplicated: Stats['mostDuplicated'] = null;
-  for (const s of album.stickers) {
+  for (const s of a.stickers) {
     const extra = (counts[s.id] ?? 0) - 1;
     if (extra > 0 && (!mostDuplicated || extra > mostDuplicated.extra)) {
-      const page = album.pages.find((p) => p.id === s.pageId)!;
+      const page = a.pages.find((p) => p.id === s.pageId)!;
       mostDuplicated = { id: s.id, number: s.number, code: page.code, emoji: page.emoji, extra };
     }
   }
