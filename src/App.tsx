@@ -17,6 +17,7 @@ import ReloadPrompt from './components/ReloadPrompt';
 import RevocationNotice from './components/RevocationNotice';
 import AlbumSwitcher from './components/AlbumSwitcher';
 import LibrarySheet from './components/LibrarySheet';
+import AlbumDetailView from './components/AlbumDetailView';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('album');
@@ -24,6 +25,7 @@ export default function App() {
   const [shareOpen, setShareOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
   const counts = useCollection((s) => s.counts);
   const swaps = useCollection((s) => s.swaps);
   const edition = useCollection((s) => s.edition);
@@ -145,7 +147,7 @@ export default function App() {
           onManageAlbum={(id) => {
             switchAlbum(id);
             setLibraryOpen(false);
-            setEditionOpen(true);
+            setDetailOpen(true);
           }}
           onOpenSettings={() => {
             setLibraryOpen(false);
@@ -153,6 +155,8 @@ export default function App() {
           }}
         />
       )}
+
+      {detailOpen && <AlbumDetailView onClose={() => setDetailOpen(false)} />}
 
       <RevocationNotice />
       <AchievementToaster />
