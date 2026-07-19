@@ -42,9 +42,18 @@ function indexPages(a: Album): Record<string, Page> {
  * Existing count data is unaffected.
  */
 export function applyEdition(edition: Edition, trackCC: boolean): void {
-  album = buildAlbumFromType(activeType, { variant: edition, enabledOptional: enabledOptional(trackCC) });
+  album = buildAlbumFor(edition, trackCC);
   stickerById = indexStickers(album);
   pageById = indexPages(album);
+}
+
+/** Build an album layout for an arbitrary edition + CC tracking, without mutating
+ *  the live `album` singleton. Used by per-album stats for parked albums. */
+export function buildAlbumFor(edition: Edition, trackCC: boolean): Album {
+  return buildAlbumFromType(activeType, {
+    variant: edition,
+    enabledOptional: enabledOptional(trackCC),
+  });
 }
 
 /** Order/accent/punctuation-insensitive key for a country name ("Congo DR" ↔ "DR Congo"). */

@@ -2,32 +2,36 @@ import { useEffect, useMemo, useState } from 'react';
 import { ALBUM_TYPE } from './config';
 import { useCollection } from './store/collectionStore';
 import { useSyncBoot } from './sync/useSync';
-import { useResolvedAlbumName, useForcedReadOnly } from './sync/useAlbumMode';
+import { useForcedReadOnly } from './sync/useAlbumMode';
 import { computeStats, displayPct } from './utils/stats';
 import TabBar, { type Tab } from './components/TabBar';
 import ProgressBar from './components/ProgressBar';
 import AlbumView from './components/AlbumView';
 import SwapsView from './components/SwapsView';
 import StatsView from './components/StatsView';
-import EditionDialog from './components/EditionDialog';
+import SettingsDialog from './components/SettingsDialog';
 import HelpDialog from './components/HelpDialog';
 import ShareListDialog from './components/ShareListDialog';
 import AchievementToaster from './components/AchievementToaster';
 import ReloadPrompt from './components/ReloadPrompt';
 import RevocationNotice from './components/RevocationNotice';
+import AlbumSwitcher from './components/AlbumSwitcher';
+import LibrarySheet from './components/LibrarySheet';
+import AlbumDetailView from './components/AlbumDetailView';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('album');
-  const [editionOpen, setEditionOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
   const counts = useCollection((s) => s.counts);
   const swaps = useCollection((s) => s.swaps);
   const edition = useCollection((s) => s.edition);
   const trackCC = useCollection((s) => s.trackCC);
-  const albumName = useCollection((s) => s.albumName);
   const activeAlbumId = useCollection((s) => s.activeAlbumId);
-  const displayName = useResolvedAlbumName(activeAlbumId, albumName);
+  const switchAlbum = useCollection((s) => s.switchAlbum);
   const theme = useCollection((s) => s.theme);
   const locked = useCollection((s) => s.locked);
   const toggleLocked = useCollection((s) => s.toggleLocked);
@@ -63,7 +67,7 @@ export default function App() {
     <div className="app">
       <header className="app-header">
         <div className="header-top">
-          <h1>{displayName}</h1>
+          <AlbumSwitcher onOpen={() => setLibraryOpen(true)} />
           <div className="header-actions">
             <button
               className={`icon-btn lock-toggle${locked || forcedReadOnly ? ' locked' : ''}`}
@@ -99,9 +103,6 @@ export default function App() {
                 <line x1="12" y1="2" x2="12" y2="15" />
               </svg>
             </button>
-            <button className="icon-btn" onClick={() => setEditionOpen(true)} aria-label="Settings">
-              ⚙️
-            </button>
             <button
               className="icon-btn help-btn"
               onClick={() => setHelpOpen(true)}
@@ -134,8 +135,25 @@ export default function App() {
       <TabBar active={tab} onChange={setTab} openSwaps={openSwaps} />
 
       {shareOpen && <ShareListDialog onClose={() => setShareOpen(false)} />}
-      {editionOpen && <EditionDialog onClose={() => setEditionOpen(false)} />}
+      {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
       {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} />}
+
+      {libraryOpen && (
+        <LibrarySheet
+          onClose={() => setLibraryOpen(false)}
+          onManageAlbum={(id) => {
+            switchAlbum(id);
+            setLibraryOpen(false);
+            setDetailOpen(true);
+          }}
+          onOpenSettings={() => {
+            setLibraryOpen(false);
+            setSettingsOpen(true);
+          }}
+        />
+      )}
+
+      {detailOpen && <AlbumDetailView onClose={() => setDetailOpen(false)} />}
 
       <RevocationNotice />
       <AchievementToaster />

@@ -5,14 +5,12 @@ import { resolveAlbumName } from '../sync/albumMode';
 import { useForcedReadOnly } from '../sync/useAlbumMode';
 import { album, CC_EMOJI, EDITION_INFO } from '../data/sampleAlbum';
 import { ALBUM_TYPE } from '../config';
-import { VERSION_LABEL } from '../version';
 import type { Edition } from '../types';
 import { buildListExport } from '../utils/listExport';
 import { copyToClipboard } from '../utils/share';
 import { deleteAlbumEverywhere } from '../sync/engine';
 import AlbumSharing from './AlbumSharing';
 import ImportDialog from './ImportDialog';
-import SyncSection from './SyncSection';
 import { pagesSupportPages } from '../data/layouts';
 
 interface Props {
@@ -21,39 +19,29 @@ interface Props {
 
 const ORDER: Edition[] = ['latam', 'na'];
 
-export default function EditionDialog({ onClose }: Props) {
+/** Per-album settings hub. App switches to this album before opening, so every
+ *  control edits the mirrored active-album state — never a parked snapshot. */
+export default function AlbumDetailView({ onClose }: Props) {
   const edition = useCollection((s) => s.edition);
   const setEdition = useCollection((s) => s.setEdition);
   const trackCC = useCollection((s) => s.trackCC);
   const setTrackCC = useCollection((s) => s.setTrackCC);
-  const theme = useCollection((s) => s.theme);
-  const setTheme = useCollection((s) => s.setTheme);
   const albumLayout = useCollection((s) => s.albumLayout);
   const setAlbumLayout = useCollection((s) => s.setAlbumLayout);
   const albumName = useCollection((s) => s.albumName);
   const setAlbumName = useCollection((s) => s.setAlbumName);
-  const albums = useCollection((s) => s.albums);
   const activeAlbumId = useCollection((s) => s.activeAlbumId);
-  const createAlbum = useCollection((s) => s.createAlbum);
-  const switchAlbum = useCollection((s) => s.switchAlbum);
   const counts = useCollection((s) => s.counts);
   const localAlbumNames = useSyncMeta((s) => s.localAlbumNames);
   const forcedReadOnly = useForcedReadOnly();
-  // The whole-collection Cloud section only manages an existing Cloud link; until one is set up,
-  // Cloud setup lives on the per-album Sharing → Cloud button (which opens the sync dialog).
-  const hasCloudLink = useSyncMeta((s) => s.collection !== null);
 
   const [draft, setDraft] = useState(albumName);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [exported, setExported] = useState(false);
 
-  // Pages layout only differs from Compact when some page has a matching template.
-  // Recompute when the edition / CC tracking changes the album's sticker counts.
   const supportsPages = useMemo(() => pagesSupportPages(album.pages), [edition, trackCC]);
 
-  // The album name changes out from under us when the user creates or switches
-  // albums, so keep the editable draft mirrored to the active album's name.
   useEffect(() => {
     setDraft(albumName);
   }, [albumName]);
@@ -61,27 +49,20 @@ export default function EditionDialog({ onClose }: Props) {
   function handleNameBlur() {
     setAlbumName(draft);
   }
-
   function handleNameKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter') {
       setAlbumName(draft);
       e.currentTarget.blur();
     }
   }
-
   async function handleConfirmDelete() {
     await deleteAlbumEverywhere(activeAlbumId);
     setConfirmingDelete(false);
     onClose();
   }
-
-  // Copy the whole collection to the clipboard in the exact "Figuritas App - List"
-  // format the Import dialog consumes, so it can be transferred to another app or
-  // kept as a backup. Both sections + swap quantities make the export lossless.
   async function handleExport() {
     const text = buildListExport(counts, albumName, 'both', true);
-    const ok = await copyToClipboard(text);
-    if (ok) {
+    if (await copyToClipboard(text)) {
       setExported(true);
       window.setTimeout(() => setExported(false), 1800);
     }
@@ -90,36 +71,13 @@ export default function EditionDialog({ onClose }: Props) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h2>Settings</h2>
+        <h2>{resolveAlbumName(activeAlbumId, albumName, localAlbumNames)}</h2>
+        <p className="modal-sub">{ALBUM_TYPE}</p>
 
-        {/* ---------- Album ---------- */}
+        {/* ---------- Name / transfer / sharing ---------- */}
         <section className="settings-section">
-          <h3 className="settings-heading">Album</h3>
-
-          {albums.length > 1 && (
-            <div className="settings-field">
-              <label htmlFor="album-selector" className="settings-field-label">
-                Current album
-              </label>
-              <select
-                id="album-selector"
-                className="settings-select"
-                value={activeAlbumId}
-                onChange={(e) => switchAlbum(e.target.value)}
-              >
-                {albums.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {resolveAlbumName(a.id, a.albumName, localAlbumNames)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
           <div className="settings-field">
-            <label htmlFor="album-name-input" className="settings-field-label">
-              Album name
-            </label>
+            <label htmlFor="album-name-input" className="settings-field-label">Album name</label>
             <input
               id="album-name-input"
               type="text"
@@ -131,93 +89,24 @@ export default function EditionDialog({ onClose }: Props) {
               disabled={forcedReadOnly}
             />
           </div>
-
           <div className="settings-actions">
-            <button
-              type="button"
-              className="btn full"
-              style={{ gridColumn: '1 / -1' }}
-              onClick={() => createAlbum()}
-            >
-              ➕ New Album
-            </button>
-            <button
-              type="button"
-              className="btn full"
-              onClick={() => setImportOpen(true)}
-              disabled={forcedReadOnly}
-            >
+            <button type="button" className="btn full" onClick={() => setImportOpen(true)} disabled={forcedReadOnly}>
               ⬇ Import…
             </button>
-            <button
-              type="button"
-              className="btn full"
-              onClick={handleExport}
-              aria-live="polite"
-            >
+            <button type="button" className="btn full" onClick={handleExport} aria-live="polite">
               {exported ? '✓ Copied' : '⬆ Export'}
             </button>
           </div>
-
           <AlbumSharing key={activeAlbumId} />
         </section>
 
-        {/* ---------- Sync — manage an existing whole-collection Cloud link (create/join happens on
-             the per-album Sharing → Cloud button). Self-hides when Supabase isn't configured. ---------- */}
-        {hasCloudLink && <SyncSection />}
-
-        {/* ---------- Appearance ---------- */}
+        {/* ---------- Layout ---------- */}
         <section className="settings-section">
-          <h3 className="settings-heading">Appearance</h3>
+          <h3 className="settings-heading">Layout</h3>
           <div className="settings-card">
-            {/* Theme */}
             <div className="setting-row">
-              <span className="setting-row-ico" aria-hidden="true">
-                {theme === 'light' ? '☀️' : '🌙'}
-              </span>
               <span className="setting-row-text">
-                <span className="setting-row-title" id="theme-label">
-                  Theme
-                </span>
-              </span>
-              <span className="mini-seg" role="group" aria-labelledby="theme-label">
-                {(['light', 'dark'] as const).map((opt) => (
-                  <button
-                    key={opt}
-                    type="button"
-                    className={theme === opt ? 'on' : ''}
-                    aria-pressed={theme === opt}
-                    onClick={() => setTheme(opt)}
-                  >
-                    {opt === 'light' ? 'Light' : 'Dark'}
-                  </button>
-                ))}
-              </span>
-            </div>
-
-            {/* Layout of the All-filter view */}
-            <div className="setting-row">
-              <span className="setting-row-ico" aria-hidden="true">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <rect x="3" y="3" width="7" height="7" rx="1" />
-                  <rect x="14" y="3" width="7" height="7" rx="1" />
-                  <rect x="3" y="14" width="7" height="7" rx="1" />
-                  <rect x="14" y="14" width="7" height="7" rx="1" />
-                </svg>
-              </span>
-              <span className="setting-row-text">
-                <span className="setting-row-title" id="layout-label">
-                  Layout
-                </span>
+                <span className="setting-row-title" id="layout-label">Layout</span>
                 <span className="setting-row-sub">
                   {supportsPages ? 'The All view' : "Pages view isn't available for this album."}
                 </span>
@@ -275,10 +164,7 @@ export default function EditionDialog({ onClose }: Props) {
                     key={key}
                     className="swap-card edition-card"
                     style={{ borderColor: selected ? 'var(--green)' : undefined }}
-                    onClick={() => {
-                      setEdition(key);
-                      onClose();
-                    }}
+                    onClick={() => setEdition(key)}
                     disabled={forcedReadOnly}
                   >
                     <div className="swap-top">
@@ -299,22 +185,14 @@ export default function EditionDialog({ onClose }: Props) {
         {/* ---------- Danger zone ---------- */}
         <section className="settings-section">
           <h3 className="settings-heading danger-heading">Danger zone</h3>
-          <button
-            type="button"
-            className="btn danger full"
-            onClick={() => setConfirmingDelete(true)}
-          >
+          <button type="button" className="btn danger full" onClick={() => setConfirmingDelete(true)}>
             🗑️ Delete album
           </button>
         </section>
 
         <div className="btn-row">
-          <button className="btn full" onClick={onClose}>
-            Close
-          </button>
+          <button className="btn full" onClick={onClose}>Close</button>
         </div>
-
-        <p className="settings-version">{VERSION_LABEL}</p>
       </div>
 
       {confirmingDelete && (
@@ -322,8 +200,8 @@ export default function EditionDialog({ onClose }: Props) {
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h2>Delete album?</h2>
             <p className="modal-sub">
-              This will permanently delete the album below, along with its stickers and
-              swaps. This action cannot be undone.
+              This will permanently delete the album below, along with its stickers and swaps. This action
+              cannot be undone.
             </p>
             <div
               style={{
@@ -339,12 +217,8 @@ export default function EditionDialog({ onClose }: Props) {
               <div style={{ color: 'var(--text-dim)', fontSize: '0.85rem' }}>{ALBUM_TYPE}</div>
             </div>
             <div className="btn-row">
-              <button className="btn full" onClick={() => setConfirmingDelete(false)}>
-                Cancel
-              </button>
-              <button className="btn danger full" onClick={handleConfirmDelete}>
-                Delete
-              </button>
+              <button className="btn full" onClick={() => setConfirmingDelete(false)}>Cancel</button>
+              <button className="btn danger full" onClick={handleConfirmDelete}>Delete</button>
             </div>
           </div>
         </div>
