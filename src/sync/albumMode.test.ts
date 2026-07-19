@@ -9,18 +9,23 @@ const link = (over: Partial<AlbumLink> = {}): AlbumLink => ({
   lastVersion: 0, lastSyncedAt: null, status: 'synced', ...over,
 });
 
+const cloudLink = { code: 'C', codeHash: 'H', writerId: 'W', lastVersion: 0, lastSyncedAt: null, status: 'synced' as const };
+
 describe('albumMode', () => {
-  it('is shared when a link exists', () => {
-    expect(albumMode('A', { albumLinks: { A: link() }, privateAlbumIds: [] })).toBe('shared');
+  it('is shared when a link exists (regardless of the Cloud link)', () => {
+    expect(albumMode('A', { albumLinks: { A: link() }, privateAlbumIds: [], collection: null })).toBe('shared');
   });
-  it('is local when private', () => {
-    expect(albumMode('A', { albumLinks: {}, privateAlbumIds: ['A'] })).toBe('local');
+  it('is local when explicitly private', () => {
+    expect(albumMode('A', { albumLinks: {}, privateAlbumIds: ['A'], collection: cloudLink })).toBe('local');
   });
-  it('is cloud otherwise', () => {
-    expect(albumMode('A', { albumLinks: {}, privateAlbumIds: [] })).toBe('cloud');
+  it('defaults to local until a Cloud code is set up', () => {
+    expect(albumMode('A', { albumLinks: {}, privateAlbumIds: [], collection: null })).toBe('local');
+  });
+  it('defaults to cloud once a Cloud link exists', () => {
+    expect(albumMode('A', { albumLinks: {}, privateAlbumIds: [], collection: cloudLink })).toBe('cloud');
   });
   it('a link wins over a private flag (shared beats local)', () => {
-    expect(albumMode('A', { albumLinks: { A: link() }, privateAlbumIds: ['A'] })).toBe('shared');
+    expect(albumMode('A', { albumLinks: { A: link() }, privateAlbumIds: ['A'], collection: cloudLink })).toBe('shared');
   });
 });
 

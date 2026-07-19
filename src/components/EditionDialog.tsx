@@ -36,6 +36,9 @@ export default function EditionDialog({ onClose }: Props) {
   const counts = useCollection((s) => s.counts);
   const localAlbumNames = useSyncMeta((s) => s.localAlbumNames);
   const forcedReadOnly = useForcedReadOnly();
+  // The whole-collection Cloud section only manages an existing Cloud link; until one is set up,
+  // Cloud setup lives on the per-album Sharing → Cloud button (which opens the sync dialog).
+  const hasCloudLink = useSyncMeta((s) => s.collection !== null);
 
   const [draft, setDraft] = useState(albumName);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -152,8 +155,9 @@ export default function EditionDialog({ onClose }: Props) {
           <AlbumSharing key={activeAlbumId} />
         </section>
 
-        {/* ---------- Sync (self-hides when Supabase isn't configured) ---------- */}
-        <SyncSection />
+        {/* ---------- Sync — manage an existing whole-collection Cloud link (create/join happens on
+             the per-album Sharing → Cloud button). Self-hides when Supabase isn't configured. ---------- */}
+        {hasCloudLink && <SyncSection />}
 
         {/* ---------- Appearance ---------- */}
         <section className="settings-section">

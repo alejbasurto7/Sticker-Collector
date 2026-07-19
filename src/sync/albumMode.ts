@@ -5,12 +5,19 @@ import type { AlbumLink, SyncMetaState } from '../store/syncStore';
 export type AlbumMode = 'local' | 'cloud' | 'shared';
 
 type MetaSlice = Pick<SyncMetaState, 'albumLinks' | 'privateAlbumIds'>;
+/** `albumMode` also needs the Cloud link to decide the default (Local until Cloud is set up). */
+type ModeSlice = MetaSlice & Pick<SyncMetaState, 'collection'>;
 
-/** An album is Shared iff linked, Local iff private, else Cloud. A link wins over a private flag. */
-export function albumMode(albumId: string, meta: MetaSlice): AlbumMode {
+/**
+ * An album is Shared iff linked, Local iff explicitly private. Otherwise the default is
+ * context-dependent: **Local** until a Cloud code is set up (nothing syncs it yet — showing "Cloud"
+ * there would be misleading), then **Cloud** once a Cloud link exists (untouched albums sync as the
+ * whole-collection Cloud channel). A link wins over a private flag.
+ */
+export function albumMode(albumId: string, meta: ModeSlice): AlbumMode {
   if (meta.albumLinks[albumId]) return 'shared';
   if (meta.privateAlbumIds.includes(albumId)) return 'local';
-  return 'cloud';
+  return meta.collection ? 'cloud' : 'local';
 }
 
 /** True only for a read-only JOINER link — the one channel whose edits the UI must force-lock. */

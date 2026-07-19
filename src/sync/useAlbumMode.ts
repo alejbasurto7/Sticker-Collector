@@ -6,7 +6,8 @@ import { albumMode, effectiveReadOnly, forcedReadOnly, resolveAlbumName, type Al
 export function useAlbumMode(albumId: string): AlbumMode {
   const albumLinks = useSyncMeta((s) => s.albumLinks);
   const privateAlbumIds = useSyncMeta((s) => s.privateAlbumIds);
-  return albumMode(albumId, { albumLinks, privateAlbumIds });
+  const collection = useSyncMeta((s) => s.collection);
+  return albumMode(albumId, { albumLinks, privateAlbumIds, collection });
 }
 
 /** True when the ACTIVE album is a read-only share we joined (edits must be force-locked). */
