@@ -36,6 +36,19 @@ describe('applyMergedCollection', () => {
     expect(st.albumName).toBe('B2');
     expect(st.counts).toEqual({ 'ARG-1': 3 });
   });
+  it('never adopts a shared/private album that lingers in the cloud payload (keeps live top-level)', () => {
+    // Regression: an album shared AFTER it was already in the Cloud row lingers there (carve-out ≠
+    // deletion), so mergeCollection re-surfaces a STALE copy in the payload. If applyMergedCollection
+    // adopts it for the active album, loadSnapshot overwrites live top-level and a just-created swap
+    // vanishes. The album's own channel is authoritative — the Cloud copy must be ignored.
+    const liveSwap = { id: 'sw1', name: 'x', createdAt: 1, status: 'open' as const, theirNeeds: [], theirSwaps: [], giving: [], receiving: [] };
+    useCollection.setState({ swaps: [liveSwap], albums: [snap('A', { swaps: [liveSwap] })] } as any, false);
+    const stalePayload = { kind: 'collection' as const, v: 1, albums: [snap('A', { swaps: [] })] }; // stale 'A' (no swap)
+    useCollection.getState().applyMergedCollection(stalePayload, new Set(['A'])); // 'A' is non-cloud (shared)
+    const st = useCollection.getState();
+    expect(st.swaps.map((sw) => sw.id)).toEqual(['sw1']); // live swap survives — top-level untouched
+    expect(st.albums.filter((a) => a.id === 'A')).toHaveLength(1); // no duplicate 'A' from the payload
+  });
   it('does not crash when the merged album set is empty (keeps active id unchanged)', () => {
     const before = useCollection.getState().activeAlbumId;
     useCollection.getState().applyMergedCollection({ kind: 'collection', v: 1, albums: [] }, new Set());

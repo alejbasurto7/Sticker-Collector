@@ -496,9 +496,14 @@ export const useCollection = create<CollectionState>()(
 
       applyMergedCollection: (payload, nonCloudIds) =>
         set((s) => {
-          const kept = s.albums.filter((a) => nonCloudIds.has(a.id)); // shared/private stay
-          const albums = [...kept, ...payload.albums];
-          const activeInCloud = payload.albums.find((a) => a.id === s.activeAlbumId);
+          const kept = s.albums.filter((a) => nonCloudIds.has(a.id)); // shared/private keep their LIVE local copy
+          // A shared/private album can linger in the Cloud row (carve-out ≠ deletion, so mergeCollection
+          // preserves it there). Its authoritative copy is its OWN channel — the Cloud payload's copy is
+          // stale — so never adopt a nonCloud album from the payload here (that clobbered live edits,
+          // e.g. a just-created swap on the active shared album).
+          const cloudAlbums = payload.albums.filter((a) => !nonCloudIds.has(a.id));
+          const albums = [...kept, ...cloudAlbums];
+          const activeInCloud = cloudAlbums.find((a) => a.id === s.activeAlbumId);
           if (activeInCloud) {
             applyEdition(activeInCloud.edition, activeInCloud.trackCC);
             return { albums, ...loadSnapshot(activeInCloud) };
