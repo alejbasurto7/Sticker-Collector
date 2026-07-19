@@ -9,7 +9,7 @@ import ProgressBar from './components/ProgressBar';
 import AlbumView from './components/AlbumView';
 import SwapsView from './components/SwapsView';
 import StatsView from './components/StatsView';
-import EditionDialog from './components/EditionDialog';
+import SettingsDialog from './components/SettingsDialog';
 import HelpDialog from './components/HelpDialog';
 import ShareListDialog from './components/ShareListDialog';
 import AchievementToaster from './components/AchievementToaster';
@@ -21,7 +21,7 @@ import AlbumDetailView from './components/AlbumDetailView';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('album');
-  const [editionOpen, setEditionOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
@@ -103,9 +103,6 @@ export default function App() {
                 <line x1="12" y1="2" x2="12" y2="15" />
               </svg>
             </button>
-            <button className="icon-btn" onClick={() => setEditionOpen(true)} aria-label="Settings">
-              ⚙️
-            </button>
             <button
               className="icon-btn help-btn"
               onClick={() => setHelpOpen(true)}
@@ -138,7 +135,7 @@ export default function App() {
       <TabBar active={tab} onChange={setTab} openSwaps={openSwaps} />
 
       {shareOpen && <ShareListDialog onClose={() => setShareOpen(false)} />}
-      {editionOpen && <EditionDialog onClose={() => setEditionOpen(false)} />}
+      {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
       {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} />}
 
       {libraryOpen && (
@@ -151,7 +148,7 @@ export default function App() {
           }}
           onOpenSettings={() => {
             setLibraryOpen(false);
-            setEditionOpen(true);
+            setSettingsOpen(true);
           }}
         />
       )}
