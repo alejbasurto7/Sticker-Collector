@@ -1,7 +1,7 @@
 import type { Counts, Edition, Swap } from '../types';
 // Type-only imports (erased at build) — keeps this module free of the store's
 // runtime (localStorage/zustand), so it's importable in a plain Node test env.
-import type { AlbumSnapshot, Theme } from '../store/collectionStore';
+import type { AlbumSnapshot, Theme, AlbumLayout } from '../store/collectionStore';
 import { PAYLOAD_V, type AlbumPayload, type CollectionPayload, type ChannelPayload, isAlbumPayload, isCollectionPayload } from './payload';
 
 /**
@@ -23,6 +23,7 @@ export interface SyncPayload {
   unlockedAchievements: Record<string, number>;
   importSeq: number;
   theme: Theme;
+  albumLayout: AlbumLayout;
   albums: AlbumSnapshot[];
   activeAlbumId: string;
 }
@@ -31,7 +32,7 @@ export interface SyncPayload {
 export interface SliceState {
   counts: Counts; swaps: Swap[]; edition: Edition; trackCC: boolean; albumName: string;
   locked: boolean; firstStickerAt?: number; activityDays: string[]; completedOn: string | null;
-  unlockedAchievements: Record<string, number>;
+  unlockedAchievements: Record<string, number>; albumLayout: AlbumLayout;
   albums: AlbumSnapshot[]; activeAlbumId: string;
 }
 
@@ -41,6 +42,7 @@ export function reconstructActive(s: SliceState): AlbumSnapshot {
     id: s.activeAlbumId, albumName: s.albumName, counts: s.counts, swaps: s.swaps,
     edition: s.edition, trackCC: s.trackCC, locked: s.locked, firstStickerAt: s.firstStickerAt,
     activityDays: s.activityDays, completedOn: s.completedOn, unlockedAchievements: s.unlockedAchievements,
+    albumLayout: s.albumLayout,
   };
 }
 

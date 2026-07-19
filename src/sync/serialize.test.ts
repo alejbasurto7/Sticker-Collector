@@ -65,7 +65,7 @@ function state(): SliceState {
   return {
     counts: { 'MEX-1': 2 }, swaps: [], edition: 'latam' as const, trackCC: true,
     albumName: 'Active', locked: false, firstStickerAt: 10, activityDays: ['2026-07-01'],
-    completedOn: null, unlockedAchievements: {},
+    completedOn: null, unlockedAchievements: {}, albumLayout: 'pages' as const,
     activeAlbumId: 'A',
     albums: [
       { id: 'A', albumName: 'stale-A', counts: {}, swaps: [], edition: 'latam' as const, trackCC: true, locked: false, activityDays: [], completedOn: null, unlockedAchievements: {} },
@@ -80,6 +80,7 @@ describe('reconstructActive / allAlbums', () => {
     expect(a.id).toBe('A');
     expect(a.albumName).toBe('Active');       // top-level, not 'stale-A'
     expect(a.counts).toEqual({ 'MEX-1': 2 });
+    expect(a.albumLayout).toBe('pages');      // per-album layout is carried into the synced slice
   });
   it('allAlbums refreshes the active entry and keeps the rest', () => {
     const all = allAlbums(state());

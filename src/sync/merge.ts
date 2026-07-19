@@ -149,6 +149,8 @@ export function mergeAlbum(
     edition: scalar3(base?.edition, local.edition, remote.edition),
     trackCC: scalar3(base?.trackCC, local.trackCC, remote.trackCC),
     locked: scalar3(base?.locked, local.locked, remote.locked),
+    // Per-album layout (Compact/Pages) is a synced scalar; default missing (legacy) sides to compact.
+    albumLayout: scalar3(base?.albumLayout, local.albumLayout ?? 'compact', remote.albumLayout ?? 'compact'),
     firstStickerAt: firstDefs.length ? Math.min(...firstDefs) : undefined,
     activityDays: [...new Set([...local.activityDays, ...remote.activityDays])].sort(),
     completedOn: completedDefs.length ? completedDefs.sort()[0] : null,

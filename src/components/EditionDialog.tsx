@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useCollection } from '../store/collectionStore';
 import { useSyncMeta } from '../store/syncStore';
 import { resolveAlbumName } from '../sync/albumMode';
 import { useForcedReadOnly } from '../sync/useAlbumMode';
-import { CC_EMOJI, EDITION_INFO } from '../data/sampleAlbum';
+import { album, CC_EMOJI, EDITION_INFO } from '../data/sampleAlbum';
 import { ALBUM_TYPE } from '../config';
 import { VERSION_LABEL } from '../version';
 import type { Edition } from '../types';
@@ -13,6 +13,7 @@ import { deleteAlbumEverywhere } from '../sync/engine';
 import AlbumSharing from './AlbumSharing';
 import ImportDialog from './ImportDialog';
 import SyncSection from './SyncSection';
+import { pagesSupportPages } from '../data/layouts';
 
 interface Props {
   onClose: () => void;
@@ -26,7 +27,9 @@ export default function EditionDialog({ onClose }: Props) {
   const trackCC = useCollection((s) => s.trackCC);
   const setTrackCC = useCollection((s) => s.setTrackCC);
   const theme = useCollection((s) => s.theme);
-  const toggleTheme = useCollection((s) => s.toggleTheme);
+  const setTheme = useCollection((s) => s.setTheme);
+  const albumLayout = useCollection((s) => s.albumLayout);
+  const setAlbumLayout = useCollection((s) => s.setAlbumLayout);
   const albumName = useCollection((s) => s.albumName);
   const setAlbumName = useCollection((s) => s.setAlbumName);
   const albums = useCollection((s) => s.albums);
@@ -44,6 +47,10 @@ export default function EditionDialog({ onClose }: Props) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [exported, setExported] = useState(false);
+
+  // Pages layout only differs from Compact when some page has a matching template.
+  // Recompute when the edition / CC tracking changes the album's sticker counts.
+  const supportsPages = useMemo(() => pagesSupportPages(album.pages), [edition, trackCC]);
 
   // The album name changes out from under us when the user creates or switches
   // albums, so keep the editable draft mirrored to the active album's name.
@@ -162,19 +169,75 @@ export default function EditionDialog({ onClose }: Props) {
         {/* ---------- Appearance ---------- */}
         <section className="settings-section">
           <h3 className="settings-heading">Appearance</h3>
-          <button
-            type="button"
-            className="setting-toggle"
-            role="switch"
-            aria-checked={theme === 'light'}
-            aria-label="Toggle light mode"
-            onClick={toggleTheme}
-          >
-            <span className="setting-label">{theme === 'light' ? '☀️ Light mode' : '🌙 Dark mode'}</span>
-            <span className={`switch theme-switch${theme === 'light' ? ' on' : ''}`} aria-hidden="true">
-              <span className="knob">{theme === 'light' ? '☀️' : '🌙'}</span>
-            </span>
-          </button>
+          <div className="settings-card">
+            {/* Theme */}
+            <div className="setting-row">
+              <span className="setting-row-ico" aria-hidden="true">
+                {theme === 'light' ? '☀️' : '🌙'}
+              </span>
+              <span className="setting-row-text">
+                <span className="setting-row-title" id="theme-label">
+                  Theme
+                </span>
+              </span>
+              <span className="mini-seg" role="group" aria-labelledby="theme-label">
+                {(['light', 'dark'] as const).map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    className={theme === opt ? 'on' : ''}
+                    aria-pressed={theme === opt}
+                    onClick={() => setTheme(opt)}
+                  >
+                    {opt === 'light' ? 'Light' : 'Dark'}
+                  </button>
+                ))}
+              </span>
+            </div>
+
+            {/* Layout of the All-filter view */}
+            <div className="setting-row">
+              <span className="setting-row-ico" aria-hidden="true">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect x="3" y="3" width="7" height="7" rx="1" />
+                  <rect x="14" y="3" width="7" height="7" rx="1" />
+                  <rect x="3" y="14" width="7" height="7" rx="1" />
+                  <rect x="14" y="14" width="7" height="7" rx="1" />
+                </svg>
+              </span>
+              <span className="setting-row-text">
+                <span className="setting-row-title" id="layout-label">
+                  Layout
+                </span>
+                <span className="setting-row-sub">
+                  {supportsPages ? 'The All view' : "Pages view isn't available for this album."}
+                </span>
+              </span>
+              <span className="mini-seg" role="group" aria-labelledby="layout-label">
+                {(['compact', 'pages'] as const).map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    className={albumLayout === opt ? 'on' : ''}
+                    aria-pressed={albumLayout === opt}
+                    disabled={!supportsPages}
+                    onClick={() => setAlbumLayout(opt)}
+                  >
+                    {opt === 'compact' ? 'Compact' : 'Pages'}
+                  </button>
+                ))}
+              </span>
+            </div>
+          </div>
         </section>
 
         {/* ---------- Coca-Cola tracking ---------- */}

@@ -106,3 +106,8 @@ export function templateFor(page: Page): SectionTemplate | undefined {
   if (!t) return undefined;
   return realSlotCount(t) === page.stickerIds.length ? t : undefined;
 }
+
+/** True when at least one of these pages maps to a matching printed-album template. */
+export function pagesSupportPages(pages: Page[]): boolean {
+  return pages.some((p) => templateFor(p) != null);
+}

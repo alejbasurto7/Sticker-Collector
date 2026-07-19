@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import type { SectionTemplate } from '../../data/layoutGeometry';
+import { tapVerb } from '../../utils/device';
 import type { SelectedSlot } from './TemplateCanvas';
 
 interface SlotInspectorProps {
@@ -132,7 +133,7 @@ export default function SlotInspector({
         </>
       ) : (
         <p style={{ margin: '12px 0 4px', opacity: 0.55, fontSize: 12 }}>
-          Tap a slot to edit it.
+          {tapVerb()} a slot to edit it.
         </p>
       )}
     </div>

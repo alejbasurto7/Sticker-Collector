@@ -3,11 +3,13 @@ import type { Swap } from '../types';
 import { useCollection } from '../store/collectionStore';
 import { useForcedReadOnly } from '../sync/useAlbumMode';
 import { computeConflicts, giveQtyOf } from '../utils/swap';
+import { isDesktop } from '../utils/device';
 import { buildSwapExport } from '../utils/listExport';
 import { copyToClipboard } from '../utils/share';
 import StickerChips from './StickerChips';
 import SwapClose from './SwapClose';
 import NewSwapDialog from './NewSwapDialog';
+import EditSwapDetails from './EditSwapDetails';
 
 /** Same membership, order-independent — used to tell saved state from edited state. */
 const sameMembers = (set: Set<string>, arr: string[]) =>
@@ -27,6 +29,7 @@ export default function SwapDetail({ swap, onClose }: Props) {
   const readOnly = useForcedReadOnly();
   const [closing, setClosing] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [editingDetails, setEditingDetails] = useState(false);
   // Seed from what's already saved so reopening shows prior edits.
   const [deselectedGiving, setDeselectedGiving] = useState(() => new Set(swap.deselectedGiving ?? []));
   const [deselectedReceiving, setDeselectedReceiving] = useState(() => new Set(swap.deselectedReceiving ?? []));
@@ -152,7 +155,9 @@ export default function SwapDetail({ swap, onClose }: Props) {
         </div>
         <p className="modal-sub">
           {isOpen
-            ? 'Tap a sticker to unselect it. Tap again to add it back.'
+            ? isDesktop()
+              ? 'Click a sticker to unselect it. Click again to add it back.'
+              : 'Tap a sticker to unselect it. Tap again to add it back.'
             : 'This swap is concluded. Counts were updated when it closed.'}
         </p>
 
@@ -161,6 +166,13 @@ export default function SwapDetail({ swap, onClose }: Props) {
             ⚠️ {conflictCount} sticker{conflictCount > 1 ? 's' : ''} here{' '}
             {conflictCount > 1 ? 'are' : 'is'} also promised in another open swap.
           </div>
+        )}
+
+        {swap.notes && (
+          <>
+            <div className="section-title">Notes</div>
+            <p className="swap-notes">{swap.notes}</p>
+          </>
         )}
 
         <div className="section-title">You give ({giveCopies})</div>
@@ -212,6 +224,11 @@ export default function SwapDetail({ swap, onClose }: Props) {
               ↩ Rollback
             </button>
           )}
+          {!isOpen && !readOnly && (
+            <button className="btn" onClick={() => setEditingDetails(true)}>
+              ✎ Edit details
+            </button>
+          )}
           {isOpen && !readOnly && (
             <button className="btn" onClick={() => setEditing(true)}>
               ✎ Edit
@@ -244,6 +261,10 @@ export default function SwapDetail({ swap, onClose }: Props) {
         )}
 
         {editing && <NewSwapDialog editSwap={swap} onClose={() => setEditing(false)} />}
+
+        {editingDetails && (
+          <EditSwapDetails swap={swap} onClose={() => setEditingDetails(false)} />
+        )}
       </div>
     </div>
   );

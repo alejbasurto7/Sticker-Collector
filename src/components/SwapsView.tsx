@@ -3,6 +3,7 @@ import { useCollection } from '../store/collectionStore';
 import { useForcedReadOnly } from '../sync/useAlbumMode';
 import { activeReceiving, computeConflicts, totalGiving } from '../utils/swap';
 import type { Swap } from '../types';
+import { tapVerb } from '../utils/device';
 import NewSwapDialog from './NewSwapDialog';
 import SwapDetail from './SwapDetail';
 
@@ -47,7 +48,7 @@ export default function SwapsView() {
         <div className="empty-state">
           <div className="big-emoji">🔄</div>
           <p>
-            No swaps yet. Tap <b>New swap</b>, paste another collector's list, and the app
+            No swaps yet. {tapVerb()} <b>New swap</b>, paste another collector's list, and the app
             finds which stickers you can trade.
           </p>
         </div>

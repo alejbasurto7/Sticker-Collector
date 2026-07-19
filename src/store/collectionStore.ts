@@ -7,6 +7,7 @@ import { computeReservations, settleSwapCounts, reverseSettlement } from '../uti
 
 type ImportMode = 'replace' | 'merge';
 export type Theme = 'dark' | 'light';
+export type AlbumLayout = 'compact' | 'pages';
 
 /** Default name given to a freshly created album (deduplicated when it collides). */
 const NEW_ALBUM_NAME = 'New Album';
@@ -27,6 +28,8 @@ export interface AlbumSnapshot {
   trackCC: boolean;
   /** When true the album is read-only: tapping sticker cells does nothing. */
   locked: boolean;
+  /** Album-tab layout for the All filter. Optional so legacy snapshots default to compact. */
+  albumLayout?: AlbumLayout;
   firstStickerAt?: number;
   activityDays: string[];
   completedOn: string | null;
@@ -41,6 +44,8 @@ interface CollectionState {
   albumName: string;
   /** When true the active album is locked (read-only): sticker cells ignore taps. */
   locked: boolean;
+  /** Album-tab layout for the All filter on the active album ('compact' | 'pages'). */
+  albumLayout: AlbumLayout;
   /** Timestamp of the very first sticker added (for speed-run style achievements). */
   firstStickerAt?: number;
   /** Local YYYY-MM-DD days on which the collection grew (streak + days collecting). */
@@ -71,6 +76,8 @@ interface CollectionState {
   setAlbumName: (name: string) => void;
   /** Flip the active album between locked (read-only) and unlocked (editable). */
   toggleLocked: () => void;
+  /** Set the active album's All-filter layout, mirroring into its parked snapshot. */
+  setAlbumLayout: (layout: AlbumLayout) => void;
 
   // Album management
   createAlbum: () => void;
@@ -87,6 +94,7 @@ interface CollectionState {
   // Swap actions
   createSwap: (input: {
     name: string;
+    notes?: string;
     theirNeeds: string[];
     theirSwaps: string[];
     giving: string[];
@@ -100,6 +108,7 @@ interface CollectionState {
       giving?: string[];
       receiving?: string[];
       name?: string;
+      notes?: string;
       theirNeeds?: string[];
       theirSwaps?: string[];
       theirNeedsQty?: Record<string, number>;
@@ -142,6 +151,7 @@ function snapshotActive(s: CollectionState): AlbumSnapshot {
     edition: s.edition,
     trackCC: s.trackCC,
     locked: s.locked,
+    albumLayout: s.albumLayout,
     firstStickerAt: s.firstStickerAt,
     activityDays: s.activityDays,
     completedOn: s.completedOn,
@@ -157,6 +167,7 @@ function loadSnapshot(a: AlbumSnapshot) {
     edition: a.edition,
     trackCC: a.trackCC,
     locked: a.locked ?? false,
+    albumLayout: a.albumLayout ?? 'compact',
     albumName: a.albumName,
     firstStickerAt: a.firstStickerAt,
     activityDays: a.activityDays,
@@ -219,6 +230,7 @@ export const useCollection = create<CollectionState>()(
       trackCC: DEFAULT_TRACK_CC,
       albumName: DEFAULT_ALBUM_NAME,
       locked: false,
+      albumLayout: 'compact',
       activityDays: [],
       completedOn: null,
       unlockedAchievements: {},
@@ -234,6 +246,7 @@ export const useCollection = create<CollectionState>()(
           edition: DEFAULT_EDITION,
           trackCC: DEFAULT_TRACK_CC,
           locked: false,
+          albumLayout: 'compact',
           activityDays: [],
           completedOn: null,
           unlockedAchievements: {},
@@ -252,6 +265,7 @@ export const useCollection = create<CollectionState>()(
             edition: DEFAULT_EDITION,
             trackCC: DEFAULT_TRACK_CC,
             locked: false,
+            albumLayout: 'compact',
             firstStickerAt: undefined,
             activityDays: [],
             completedOn: null,
@@ -290,6 +304,7 @@ export const useCollection = create<CollectionState>()(
               edition: DEFAULT_EDITION,
               trackCC: DEFAULT_TRACK_CC,
               locked: false,
+              albumLayout: 'compact',
               firstStickerAt: undefined,
               activityDays: [],
               completedOn: null,
@@ -344,6 +359,15 @@ export const useCollection = create<CollectionState>()(
           return { locked, albums };
         }),
 
+      setAlbumLayout: (layout) =>
+        set((s) => {
+          // Mirror into the parked snapshot so the choice survives album switches.
+          const albums = s.albums.map((a) =>
+            a.id === s.activeAlbumId ? { ...a, albumLayout: layout } : a,
+          );
+          return { albumLayout: layout, albums };
+        }),
+
       addOne: (id) =>
         set((s) => {
           const counts = { ...s.counts, [id]: clampCount((s.counts[id] ?? 0) + 1) };
@@ -389,6 +413,7 @@ export const useCollection = create<CollectionState>()(
         const swap: Swap = {
           id,
           name: input.name.trim() || 'Untitled swap',
+          notes: input.notes?.trim() || undefined,
           createdAt: Date.now(),
           status: 'open',
           theirNeeds: input.theirNeeds,
@@ -411,6 +436,7 @@ export const useCollection = create<CollectionState>()(
                   ...(patch.giving ? { giving: patch.giving } : {}),
                   ...(patch.receiving ? { receiving: patch.receiving } : {}),
                   ...(patch.name !== undefined ? { name: patch.name } : {}),
+                  ...(patch.notes !== undefined ? { notes: patch.notes.trim() || undefined } : {}),
                   ...(patch.theirNeeds ? { theirNeeds: patch.theirNeeds } : {}),
                   ...(patch.theirSwaps ? { theirSwaps: patch.theirSwaps } : {}),
                   ...(patch.theirNeedsQty ? { theirNeedsQty: patch.theirNeedsQty } : {}),

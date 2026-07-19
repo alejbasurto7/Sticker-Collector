@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { album } from '../data/sampleAlbum';
 import { useCollection } from '../store/collectionStore';
+import { isDesktop } from '../utils/device';
 import FilterBar, { type AlbumFilter } from './FilterBar';
 import PageSection from './PageSection';
 
@@ -103,7 +104,11 @@ export default function AlbumView() {
       </div>
 
       <div className="album-toolbar">
-        <p className="empty-note">Tap a sticker to add it · long-press to remove.</p>
+        <p className="empty-note">
+          {isDesktop()
+            ? 'Click a sticker to add it · right-click to remove.'
+            : 'Tap a sticker to add it · long-press to remove.'}
+        </p>
         <button
           className="expand-toggle"
           onClick={toggleAll}
