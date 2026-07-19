@@ -109,12 +109,6 @@ button {
   border-bottom: 1px solid var(--border);
 }
 
-.app-header h1 {
-  margin: 0;
-  font-size: 19px;
-  font-weight: 800;
-  letter-spacing: 0.2px;
-}
 .header-top {
   display: flex;
   align-items: center;
@@ -1203,7 +1197,7 @@ button {
   font-size: 13px;
 }
 /* Appearance: grouped-list card — each setting is a labelled row with its
-   control on the right, so the section reads as one unit (see EditionDialog). */
+   control on the right, so the section reads as one unit. */
 .settings-card {
   background: var(--bg);
   border: 1px solid var(--border);
@@ -1590,10 +1584,14 @@ textarea.notes-input {
 }
 
 /* Colourful host-nation header keeps light text over its dark/blue top band. */
-:root[data-theme='light'] .app-header h1 {
+:root[data-theme='light'] .app-header .subtitle {
+  color: rgba(255, 255, 255, 0.9);
+}
+:root[data-theme='light'] .album-switcher-name {
   color: #ffffff;
 }
-:root[data-theme='light'] .app-header .subtitle {
+:root[data-theme='light'] .album-switcher-count,
+:root[data-theme='light'] .album-switcher-caret {
   color: rgba(255, 255, 255, 0.9);
 }
 
