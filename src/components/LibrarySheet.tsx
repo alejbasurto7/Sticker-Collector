@@ -71,8 +71,9 @@ export default function LibrarySheet({ onClose, onManageAlbum, onOpenCloudSync }
     if (!dragId || !listRef.current) return;
     const cards = Array.from(listRef.current.querySelectorAll<HTMLElement>('.album-card'));
     const y = e.clientY;
-    // Target slot = first card whose vertical midpoint is below the pointer.
-    let target = cards.length - 1;
+    // Insert-before slot = first card whose vertical midpoint is below the pointer;
+    // cards.length means "below every card" → append at the end.
+    let target = cards.length;
     for (let i = 0; i < cards.length; i++) {
       const r = cards[i].getBoundingClientRect();
       if (y < r.top + r.height / 2) { target = i; break; }
@@ -80,10 +81,15 @@ export default function LibrarySheet({ onClose, onManageAlbum, onOpenCloudSync }
     setLiveIds((prev) => {
       if (!prev) return prev;
       const from = prev.indexOf(dragId);
-      if (from === -1 || from === target) return prev;
+      if (from === -1) return prev;
+      // `target` indexes the list WITH the dragged card still in it. Removing that
+      // card shifts every later slot down one, so when inserting past the original
+      // position the index drops by one.
+      const insertAt = target > from ? target - 1 : target;
+      if (insertAt === from) return prev;
       const next = [...prev];
       next.splice(from, 1);
-      next.splice(target, 0, dragId);
+      next.splice(insertAt, 0, dragId);
       return next;
     });
   }
