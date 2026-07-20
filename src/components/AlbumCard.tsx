@@ -1,14 +1,9 @@
 import { useMemo } from 'react';
 import type { AlbumSnapshot } from '../store/collectionStore';
 import { useAlbumMode, useResolvedAlbumName } from '../sync/useAlbumMode';
+import { MODE_BADGE } from '../sync/albumMode';
 import { computeStatsFor, displayPct } from '../utils/stats';
 import { monogram, coverTint } from '../utils/albumCover';
-
-const MODE_BADGE = {
-  local: { icon: '📱', label: 'Local' },
-  cloud: { icon: '☁️', label: 'Cloud' },
-  shared: { icon: '👥', label: 'Shared' },
-} as const;
 
 interface Props {
   album: AlbumSnapshot;

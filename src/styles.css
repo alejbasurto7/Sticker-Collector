@@ -1594,7 +1594,8 @@ textarea.notes-input {
 :root[data-theme='light'] .album-switcher-caret {
   color: rgba(255, 255, 255, 0.9);
 }
-:root[data-theme='light'] .album-switcher-count {
+:root[data-theme='light'] .album-switcher-count,
+:root[data-theme='light'] .album-switcher-mode {
   color: #ffffff;
   background: rgba(255, 255, 255, 0.28);
 }
@@ -1813,6 +1814,20 @@ textarea.notes-input {
   background: rgba(255, 255, 255, 0.14);
   border-radius: 999px;
   padding: 1px 6px;
+}
+/* Local/Cloud/Shared status pill, sits after the count on the name line. */
+.album-switcher-mode {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  padding: 1px 7px;
+  white-space: nowrap;
 }
 /* Album type moved into the switcher (was a separate header subtitle). */
 .album-switcher-type {
