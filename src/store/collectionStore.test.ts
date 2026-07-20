@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useCollection } from './collectionStore';
+import { useCollection, orderAlbums } from './collectionStore';
 
 const snap = (id: string, over = {}) => ({ id, albumName: id, counts: {}, swaps: [], edition: 'latam' as const, trackCC: true, locked: false, activityDays: [], completedOn: null, unlockedAchievements: {}, ...over });
 
@@ -141,5 +141,47 @@ describe('per-album layout', () => {
     useCollection.setState((s) => ({ albums: [...s.albums, legacy] }));
     useCollection.getState().switchAlbum('legacy');
     expect(useCollection.getState().albumLayout).toBe('compact');
+  });
+});
+
+describe('orderAlbums (pure)', () => {
+  const A = snap('A');
+  const B = snap('B');
+  const C = snap('C');
+
+  it('returns albums unchanged when order is undefined', () => {
+    expect(orderAlbums([A, B, C], undefined).map((a) => a.id)).toEqual(['A', 'B', 'C']);
+  });
+  it('returns albums unchanged when order is empty', () => {
+    expect(orderAlbums([A, B, C], []).map((a) => a.id)).toEqual(['A', 'B', 'C']);
+  });
+  it('applies a full manual order', () => {
+    expect(orderAlbums([A, B, C], ['C', 'A', 'B']).map((a) => a.id)).toEqual(['C', 'A', 'B']);
+  });
+  it('lists ordered ids first, then unlisted albums in natural order', () => {
+    expect(orderAlbums([A, B, C], ['C']).map((a) => a.id)).toEqual(['C', 'A', 'B']);
+  });
+  it('ignores ids in the order that no longer exist', () => {
+    expect(orderAlbums([A, B], ['Z', 'B', 'A']).map((a) => a.id)).toEqual(['B', 'A']);
+  });
+});
+
+describe('reorderAlbums', () => {
+  it('records the manual order in albumOrder', () => {
+    useCollection.getState().reorderAlbums(['S', 'A']);
+    expect(useCollection.getState().albumOrder).toEqual(['S', 'A']);
+  });
+  it('keeps the manual order across a sync merge that re-sorts albums by id', () => {
+    useCollection.getState().reorderAlbums(['S', 'A']);
+    // A cloud merge rebuilds `albums` id-sorted; albumOrder must be untouched.
+    const payload = {
+      kind: 'collection' as const,
+      v: 1,
+      albums: [snap('A'), snap('S', { albumName: 'Shared' })],
+    };
+    useCollection.getState().applyMergedCollection(payload, new Set());
+    const st = useCollection.getState();
+    expect(st.albumOrder).toEqual(['S', 'A']); // preserved through sync
+    expect(orderAlbums(st.albums, st.albumOrder).map((a) => a.id)).toEqual(['S', 'A']);
   });
 });

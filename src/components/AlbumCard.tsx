@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import type { PointerEventHandler, KeyboardEventHandler } from 'react';
 import type { AlbumSnapshot } from '../store/collectionStore';
 import { useAlbumMode, useResolvedAlbumName } from '../sync/useAlbumMode';
 import { MODE_BADGE } from '../sync/albumMode';
@@ -8,11 +9,30 @@ import { monogram, coverTint } from '../utils/albumCover';
 interface Props {
   album: AlbumSnapshot;
   isActive: boolean;
+  /** Show the drag grip? False when there is only one album (nothing to sort). */
+  sortable: boolean;
+  /** True while this card is the one being dragged (adds a lift style). */
+  isDragging: boolean;
   onOpen: () => void;   // switch to this album + close the sheet
   onManage: () => void; // switch + open this album's detail
+  onGripPointerDown: PointerEventHandler<HTMLButtonElement>;
+  onGripPointerMove: PointerEventHandler<HTMLButtonElement>;
+  onGripPointerUp: PointerEventHandler<HTMLButtonElement>;
+  onGripKeyDown: KeyboardEventHandler<HTMLButtonElement>;
 }
 
-export default function AlbumCard({ album, isActive, onOpen, onManage }: Props) {
+export default function AlbumCard({
+  album,
+  isActive,
+  sortable,
+  isDragging,
+  onOpen,
+  onManage,
+  onGripPointerDown,
+  onGripPointerMove,
+  onGripPointerUp,
+  onGripKeyDown,
+}: Props) {
   const name = useResolvedAlbumName(album.id, album.albumName);
   const mode = useAlbumMode(album.id);
   const stats = useMemo(
@@ -23,7 +43,21 @@ export default function AlbumCard({ album, isActive, onOpen, onManage }: Props) 
   const pct = displayPct(stats.completionPct);
 
   return (
-    <div className={`album-card${isActive ? ' active' : ''}`}>
+    <div className={`album-card${isActive ? ' active' : ''}${isDragging ? ' dragging' : ''}`}>
+      {sortable && (
+        <button
+          type="button"
+          className="album-card-grip"
+          aria-label={`Reorder ${name}. Use arrow up and down to move.`}
+          onPointerDown={onGripPointerDown}
+          onPointerMove={onGripPointerMove}
+          onPointerUp={onGripPointerUp}
+          onPointerCancel={onGripPointerUp}
+          onKeyDown={onGripKeyDown}
+        >
+          ⠿
+        </button>
+      )}
       <button type="button" className="album-card-main" onClick={onOpen}>
         <span className={`album-cover tint-${coverTint(album.id)}`} aria-hidden="true">
           {monogram(name)}

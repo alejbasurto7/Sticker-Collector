@@ -1,4 +1,5 @@
-import { useCollection } from '../store/collectionStore';
+import { useMemo } from 'react';
+import { useCollection, orderAlbums } from '../store/collectionStore';
 import { useAlbumMode, useResolvedAlbumName } from '../sync/useAlbumMode';
 import { MODE_BADGE } from '../sync/albumMode';
 import { monogram, coverTint } from '../utils/albumCover';
@@ -14,12 +15,15 @@ export default function AlbumSwitcher({ onOpen }: Props) {
   const activeAlbumId = useCollection((s) => s.activeAlbumId);
   const albumName = useCollection((s) => s.albumName);
   const albums = useCollection((s) => s.albums);
+  const albumOrder = useCollection((s) => s.albumOrder);
   const name = useResolvedAlbumName(activeAlbumId, albumName);
   const mode = useAlbumMode(activeAlbumId);
   const badge = MODE_BADGE[mode];
 
-  const total = albums.length;
-  const index = albums.findIndex((a) => a.id === activeAlbumId);
+  // The x/n position follows the user's manual arrangement (local albumOrder).
+  const ordered = useMemo(() => orderAlbums(albums, albumOrder), [albums, albumOrder]);
+  const total = ordered.length;
+  const index = ordered.findIndex((a) => a.id === activeAlbumId);
   const multi = total > 1;
 
   return (

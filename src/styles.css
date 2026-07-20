@@ -1960,6 +1960,31 @@ textarea.notes-input {
   background: var(--bg-elev);
   color: var(--text);
 }
+.album-card-grip {
+  flex: none;
+  padding: 0 12px;
+  border: none;
+  border-right: 1px solid var(--border);
+  background: none;
+  color: var(--text-dim);
+  font-size: 15px;
+  cursor: grab;
+  /* Prevent touch-drag from scrolling the page/modal while reordering. */
+  touch-action: none;
+}
+.album-card-grip:hover {
+  background: var(--bg-elev);
+  color: var(--text);
+}
+.album-card-grip:active {
+  cursor: grabbing;
+}
+.album-card.dragging {
+  position: relative;
+  z-index: 1;
+  border-color: var(--green);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
 
 /* ---------- Mode pill colour-coding (Cloud → blue, Shared → green, Local → neutral) ----------
    Layered on top of any pill base via the shared `.mode-pill` marker; text stays on a
