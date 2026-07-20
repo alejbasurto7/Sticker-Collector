@@ -8,10 +8,10 @@ import {
   createAlbumShare, setAlbumMode, setShareAccess, stopSharing, leaveAlbumShare,
 } from '../sync/engine';
 import { copyToClipboard } from '../utils/share';
+import { QR_PREFIX } from '../lib/syncCode';
 import SyncDialog from './SyncDialog';
 
 type Access = 'collaborative' | 'read-only';
-const QR_PREFIX = 'sticker-sync:';
 
 const STATUS_LABEL: Record<SyncStatus, string> = {
   unlinked: 'Not linked', syncing: 'Syncing…', synced: 'Synced', offline: 'Offline', error: 'Sync error',

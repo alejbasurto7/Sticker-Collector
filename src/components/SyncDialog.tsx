@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import QRCode from 'qrcode';
 import { createLink, peekRemote, linkWithRemote, linkWithLocal, joinAlbumCode, type PeekOk, type AlbumPeekOk } from '../sync/engine';
-import { formatSyncCode } from '../lib/syncCode';
+import { formatSyncCode, QR_PREFIX } from '../lib/syncCode';
 import { copyToClipboard } from '../utils/share';
 import QrScanner from './QrScanner';
 import { DEFAULT_JOIN_NAME } from '../sync/joinAlbum';
@@ -11,8 +11,6 @@ interface Props {
 }
 
 type Mode = 'choose' | 'create' | 'enter' | 'direction' | 'joinAlbum';
-
-const QR_PREFIX = 'sticker-sync:';
 
 export default function SyncDialog({ onClose }: Props) {
   const [mode, setMode] = useState<Mode>('choose');

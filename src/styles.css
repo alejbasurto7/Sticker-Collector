@@ -1705,6 +1705,18 @@ textarea.notes-input {
   background: #fff;
   padding: 8px;
 }
+.sync-qr-block {
+  text-align: center;
+  margin-top: 12px;
+}
+.sync-qr-block .sync-qr {
+  margin-bottom: 8px;
+}
+.sync-qr-caption {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin: 0 0 10px;
+}
 .qr-scan-wrap {
   margin: 10px 0;
 }

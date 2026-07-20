@@ -9,6 +9,15 @@
 const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 const CODE_LEN = 12;
 
+/**
+ * URI-scheme prefix for the QR-code payload that encodes a sync code
+ * (`sticker-sync:<code>`). The in-app scanner strips this prefix before joining.
+ * Note: this happens to match the hash salt in hashSyncCode, but they are
+ * separate concerns — don't couple them. Changing this QR scheme must never
+ * change the server-side code hashes.
+ */
+export const QR_PREFIX = 'sticker-sync:';
+
 /** Generate a fresh, unguessable sync code formatted as XXXX-XXXX-XXXX. */
 export function generateSyncCode(): string {
   const bytes = new Uint8Array(8); // 64 bits of entropy

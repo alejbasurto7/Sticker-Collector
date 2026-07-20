@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import QRCode from 'qrcode';
 import { isSyncConfigured } from '../lib/supabase';
+import { QR_PREFIX } from '../lib/syncCode';
 import { useSyncMeta, type SyncStatus } from '../store/syncStore';
 import { unlink } from '../sync/engine';
-import { copyToClipboard } from '../utils/share';
+import { copyToClipboard, shareImage } from '../utils/share';
+import { APP_NAME } from '../config';
 import SyncDialog from './SyncDialog';
 
 const STATUS_LABEL: Record<SyncStatus, string> = {
@@ -37,6 +40,26 @@ export default function SyncSection() {
   const [revealed, setRevealed] = useState(false);
   const [confirmingUnlink, setConfirmingUnlink] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [qrUrl, setQrUrl] = useState('');
+
+  // Regenerate the QR whenever the code changes; clear it when unlinked.
+  useEffect(() => {
+    if (!code) {
+      setQrUrl('');
+      return;
+    }
+    let cancelled = false;
+    QRCode.toDataURL(`${QR_PREFIX}${code}`, { margin: 1, width: 240 })
+      .then((url) => {
+        if (!cancelled) setQrUrl(url);
+      })
+      .catch(() => {
+        if (!cancelled) setQrUrl('');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [code]);
 
   if (!isSyncConfigured) return null;
 
@@ -47,6 +70,15 @@ export default function SyncSection() {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1800);
     }
+  }
+
+  async function handleShareQr() {
+    if (!qrUrl || !code) return;
+    await shareImage(qrUrl, {
+      fileName: 'sticker-collector-sync.png',
+      title: `${APP_NAME} sync`,
+      text: `Sync code: ${code} — add it in ${APP_NAME} to link a device.`,
+    });
   }
 
   return (
@@ -82,6 +114,15 @@ export default function SyncSection() {
                 {copied ? '✓' : 'Copy'}
               </button>
             </div>
+            {qrUrl && (
+              <div className="sync-qr-block">
+                <img className="sync-qr" src={qrUrl} alt="Sync code QR" />
+                <p className="sync-qr-caption">Scan on another device to link</p>
+                <button type="button" className="btn" onClick={() => void handleShareQr()}>
+                  Share
+                </button>
+              </div>
+            )}
           </div>
 
           {!confirmingUnlink ? (
