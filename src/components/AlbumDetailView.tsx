@@ -3,6 +3,7 @@ import { useCollection } from '../store/collectionStore';
 import { useSyncMeta } from '../store/syncStore';
 import { resolveAlbumName } from '../sync/albumMode';
 import { useForcedReadOnly, useIsJoiner } from '../sync/useAlbumMode';
+import { DEFAULT_JOIN_NAME } from '../sync/joinAlbum';
 import { album, CC_EMOJI, EDITION_INFO } from '../data/sampleAlbum';
 import { ALBUM_TYPE } from '../config';
 import type { Edition } from '../types';
@@ -33,12 +34,17 @@ export default function AlbumDetailView({ onClose }: Props) {
   const activeAlbumId = useCollection((s) => s.activeAlbumId);
   const counts = useCollection((s) => s.counts);
   const localAlbumNames = useSyncMeta((s) => s.localAlbumNames);
+  const setLocalAlbumName = useSyncMeta((s) => s.setLocalAlbumName);
   const forcedReadOnly = useForcedReadOnly();
   // A joined share's edition / Coca-Cola layout is owner-controlled (both collaborative
   // and read-only joiners are blocked from changing it).
   const joinedShare = useIsJoiner();
+  // For a joiner, the "Album name" field edits THIS device's display name (a local alias); the
+  // owner's synced album name is never shown here. Otherwise it edits the album's own synced name.
+  const displayName = resolveAlbumName(activeAlbumId, albumName, localAlbumNames);
+  const nameValue = joinedShare ? displayName : albumName;
 
-  const [draft, setDraft] = useState(albumName);
+  const [draft, setDraft] = useState(nameValue);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [exported, setExported] = useState(false);
@@ -46,15 +52,23 @@ export default function AlbumDetailView({ onClose }: Props) {
   const supportsPages = useMemo(() => pagesSupportPages(album.pages), [edition, trackCC]);
 
   useEffect(() => {
-    setDraft(albumName);
-  }, [albumName]);
+    setDraft(nameValue);
+  }, [nameValue]);
 
+  function commitName() {
+    if (joinedShare) {
+      // Rename only THIS device's copy; never adopt or display the owner's synced name.
+      setLocalAlbumName(activeAlbumId, draft.trim() || DEFAULT_JOIN_NAME);
+    } else {
+      setAlbumName(draft);
+    }
+  }
   function handleNameBlur() {
-    setAlbumName(draft);
+    commitName();
   }
   function handleNameKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter') {
-      setAlbumName(draft);
+      commitName();
       e.currentTarget.blur();
     }
   }
@@ -64,7 +78,7 @@ export default function AlbumDetailView({ onClose }: Props) {
     onClose();
   }
   async function handleExport() {
-    const text = buildListExport(counts, albumName, 'both', true);
+    const text = buildListExport(counts, displayName, 'both', true);
     if (await copyToClipboard(text)) {
       setExported(true);
       window.setTimeout(() => setExported(false), 1800);
@@ -74,7 +88,7 @@ export default function AlbumDetailView({ onClose }: Props) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h2>{resolveAlbumName(activeAlbumId, albumName, localAlbumNames)}</h2>
+        <h2>{displayName}</h2>
         <p className="modal-sub">{ALBUM_TYPE}</p>
 
         {/* ---------- Name / transfer / sharing ---------- */}
@@ -89,8 +103,12 @@ export default function AlbumDetailView({ onClose }: Props) {
               onChange={(e) => setDraft(e.target.value)}
               onBlur={handleNameBlur}
               onKeyDown={handleNameKeyDown}
-              disabled={forcedReadOnly}
             />
+            {joinedShare && (
+              <p className="modal-sub" style={{ margin: '6px 0 0', fontSize: '0.82rem' }}>
+                Shown only on your device.
+              </p>
+            )}
           </div>
           <div className="settings-actions">
             <button type="button" className="btn full" onClick={() => setImportOpen(true)} disabled={forcedReadOnly}>
@@ -217,7 +235,7 @@ export default function AlbumDetailView({ onClose }: Props) {
               }}
             >
               <div style={{ fontWeight: 700, fontSize: '1rem' }}>
-                {resolveAlbumName(activeAlbumId, albumName, localAlbumNames)}
+                {displayName}
               </div>
               <div style={{ color: 'var(--text-dim)', fontSize: '0.85rem' }}>{ALBUM_TYPE}</div>
             </div>

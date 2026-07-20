@@ -20,8 +20,6 @@ const STATUS_LABEL: Record<SyncStatus, string> = {
 export default function AlbumSharing() {
   const activeAlbumId = useCollection((s) => s.activeAlbumId);
   const link = useSyncMeta((s) => s.albumLinks[activeAlbumId]);
-  const localAlbumNames = useSyncMeta((s) => s.localAlbumNames);
-  const setLocalAlbumName = useSyncMeta((s) => s.setLocalAlbumName);
   const hasCloudLink = useSyncMeta((s) => s.collection !== null);
   const mode = useAlbumMode(activeAlbumId);
 
@@ -34,7 +32,6 @@ export default function AlbumSharing() {
   const [confirmingStop, setConfirmingStop] = useState(false);
   const [confirmingLeave, setConfirmingLeave] = useState(false);
   const [syncOpen, setSyncOpen] = useState(false);       // Cloud setup dialog (create/join a Cloud code)
-  const [alias, setAlias] = useState(localAlbumNames[activeAlbumId] ?? '');
 
   if (!isSyncConfigured) return null;
 
@@ -59,11 +56,6 @@ export default function AlbumSharing() {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1600);
     }
-  }
-
-  function commitAlias(next: string) {
-    setAlias(next);
-    setLocalAlbumName(activeAlbumId, next.trim() || null);
   }
 
   return (
@@ -233,22 +225,6 @@ export default function AlbumSharing() {
               </button>
             </>
           )}
-        </div>
-      )}
-
-      {/* Display name on this device (local alias, never synced). Only a joiner renames someone
-          else's shared album locally; an owner just edits the album's own name. */}
-      {mode === 'shared' && !isOwner && (
-        <div className="settings-field" style={{ marginTop: 12 }}>
-          <label htmlFor="album-alias-input" className="settings-field-label">Display name on this device</label>
-          <input
-            id="album-alias-input"
-            type="text"
-            className="settings-input"
-            placeholder="(optional) shown only here"
-            value={alias}
-            onChange={(e) => commitAlias(e.target.value)}
-          />
         </div>
       )}
 
