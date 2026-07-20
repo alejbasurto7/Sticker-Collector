@@ -94,6 +94,14 @@ both, which is intended.
   - Render a Share button next to "Copy code" in the owner manage view, gated on
     `qrUrl`.
 
+### `src/components/JoinAlbumDialog.tsx`
+- Add scan-to-join (decision 7): import `QR_PREFIX` (alongside `formatSyncCode`)
+  and `QrScanner`; add a `scanning` state; add `handleScan` that strips
+  `QR_PREFIX`, sets the code field via `formatSyncCode`, and clears any error.
+- Render a "📷 Scan QR instead" button (⇄ inline `QrScanner` + "Stop camera")
+  inside the "Share code" field, reusing `.qr-scan-wrap` / `.qr-video`. No
+  auto-join; `join()` is unchanged.
+
 ### `src/utils/share.ts`
 - Extract the data-URL → Blob → `File` → Web-Share-or-download tail of
   `shareNodeAsImage` into a reusable helper:
