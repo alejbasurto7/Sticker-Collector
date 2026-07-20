@@ -51,7 +51,7 @@ export default function SettingsView() {
               <span className="setting-row-value">{BUILD_TIME_LABEL}</span>
             </div>
             <div className="setting-row">
-              <span className="setting-row-title">Developer</span>
+              <span className="setting-row-title">Created by</span>
               <span className="setting-row-value">Alex Basurto</span>
             </div>
           </div>
