@@ -84,6 +84,13 @@ interface CollectionState {
   albums: AlbumSnapshot[];
   /** Id of the album whose data is currently mirrored at the top level. */
   activeAlbumId: string;
+  /**
+   * The user's manual album arrangement as an ordered list of album ids. LOCAL-ONLY:
+   * never serialized to the sync payload, so each device keeps its own order and a
+   * Cloud/Shared sync round-trip (which re-sorts `albums` by id) cannot clobber it.
+   * Missing/empty (legacy) means "no manual order" → natural `albums` order.
+   */
+  albumOrder?: string[];
 
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
@@ -101,6 +108,8 @@ interface CollectionState {
   createAlbum: () => void;
   switchAlbum: (id: string) => void;
   deleteAlbum: (id: string) => void;
+  /** Record the user's manual album order (local-only display preference). */
+  reorderAlbums: (orderedIds: string[]) => void;
 
   // Collection actions
   addOne: (id: string) => void;
@@ -192,6 +201,24 @@ function loadSnapshot(a: AlbumSnapshot) {
     completedOn: a.completedOn,
     unlockedAchievements: a.unlockedAchievements,
   };
+}
+
+/**
+ * Apply the local manual order to the album list. Self-healing:
+ *  - albums whose id appears in `order` come first, in `order` sequence;
+ *  - albums not listed (newly created / joined / added by a sync merge) are appended
+ *    in their natural `albums` position;
+ *  - ids in `order` with no matching album are ignored.
+ * Undefined/empty `order` returns the input order unchanged. Pure; never mutates inputs.
+ */
+export function orderAlbums(albums: AlbumSnapshot[], order?: string[]): AlbumSnapshot[] {
+  if (!order || order.length === 0) return albums;
+  const rank = new Map(order.map((id, i) => [id, i] as const));
+  const listed = albums
+    .filter((a) => rank.has(a.id))
+    .sort((x, y) => rank.get(x.id)! - rank.get(y.id)!);
+  const rest = albums.filter((a) => !rank.has(a.id)); // preserves natural order
+  return [...listed, ...rest];
 }
 
 /**
@@ -387,6 +414,8 @@ export const useCollection = create<CollectionState>()(
           );
           return { albumLayout: layout, albums };
         }),
+
+      reorderAlbums: (orderedIds) => set({ albumOrder: orderedIds }),
 
       addOne: (id) =>
         set((s) => {
