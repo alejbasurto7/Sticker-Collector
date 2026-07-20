@@ -51,6 +51,13 @@ both, which is intended.
    encodes this secret, so the text adds no extra exposure. On desktop / browsers
    without file-share support, it falls back to downloading the QR PNG (the code
    text is dropped, but it's still visible on-screen with its own Copy button).
+6. **Same Share button in Shared (album) mode.** The album-sharing owner view
+   (`AlbumSharing.tsx`) already shows a QR, but only right after the share is
+   created — it isn't regenerated when revisiting an existing share. To give it a
+   reliably-present Share button, drive its QR from an effect keyed on the share
+   code (same pattern as `SyncSection`), then add a Share button beside "Copy
+   code". Its share text says "join this shared album" instead of "link a
+   device". Joiners (non-owners) get no QR/Share — they don't hand out a code.
 
 ## Changes
 
@@ -60,10 +67,24 @@ both, which is intended.
   `hashSyncCode`; that salt use is separate and stays inline — do not couple the
   two. Only the QR-payload prefix is being centralized.)
 
-### `src/components/SyncDialog.tsx` and `src/components/AlbumSharing.tsx`
-- Remove the local `const QR_PREFIX = 'sticker-sync:'`.
-- Import `QR_PREFIX` from `../lib/syncCode`.
-- No behavioral change (same string, same call sites).
+### `src/components/SyncDialog.tsx`
+- Remove the local `const QR_PREFIX = 'sticker-sync:'`; import it from
+  `../lib/syncCode`. No behavioral change.
+
+### `src/components/AlbumSharing.tsx`
+- Remove the local `const QR_PREFIX = 'sticker-sync:'`; import it from
+  `../lib/syncCode`.
+- Add the Shared-mode Share button (decision 6):
+  - Imports: add `useEffect`, `shareImage` (from `../utils/share`), `APP_NAME`.
+  - Derive `shareCode = code || (owner ? link.code : '')` and regenerate `qrUrl`
+    from it in a `shareCode`-keyed effect (cancel-guarded, error-soft) —
+    replacing the one-shot `setQrUrl` inside `share()`. This makes the QR persist
+    when revisiting an existing share, not only right after creating one.
+  - `handleShareQr` shares `sticker-collector-album-share.png` + title
+    `<app> shared album` + text
+    `Sync code: <code> — add it in <app> to join this shared album.`
+  - Render a Share button next to "Copy code" in the owner manage view, gated on
+    `qrUrl`.
 
 ### `src/utils/share.ts`
 - Extract the data-URL → Blob → `File` → Web-Share-or-download tail of
@@ -152,7 +173,9 @@ existing `peekRemote`/link flow. No engine or store changes.
   second device reads it and enters the join flow.
 - Share verification: on a mobile/PWA build tapping Share opens the native sheet
   with the QR PNG + code text; on a desktop browser without file-share it
-  downloads `sticker-collector-sync.png`.
+  downloads the PNG. Check both surfaces — Cloud sync (`SyncSection`) and Shared
+  album owner view (`AlbumSharing`) — and confirm the album QR now persists when
+  reopening the dialog for an existing share, not only right after creating it.
 - Regression check: `SyncDialog` create flow and `AlbumSharing` still generate
   their QRs after the `QR_PREFIX` import swap; the stats-card `shareNodeAsImage`
   still shares/downloads after the `shareImage` extraction.
