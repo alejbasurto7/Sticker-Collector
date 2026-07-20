@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { formatSyncCode } from '../lib/syncCode';
+import { formatSyncCode, QR_PREFIX } from '../lib/syncCode';
 import { peekRemote, joinAlbumCode } from '../sync/engine';
 import { joinErrorMessage, DEFAULT_JOIN_NAME } from '../sync/joinAlbum';
+import QrScanner from './QrScanner';
 
 interface Props {
   onClose: () => void;   // cancel — dismiss the dialog, stay in the Library
@@ -18,6 +19,7 @@ export default function JoinAlbumDialog({ onClose, onJoined }: Props) {
   const [name, setName] = useState(DEFAULT_JOIN_NAME);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [scanning, setScanning] = useState(false);
 
   const canJoin = code.trim() !== '' && name.trim() !== '' && !busy;
 
@@ -41,6 +43,15 @@ export default function JoinAlbumDialog({ onClose, onJoined }: Props) {
     }
   }
 
+  // Scanning fills the code field (and stops the camera); the joiner still
+  // reviews the album name and taps "Join album".
+  function handleScan(text: string) {
+    setScanning(false);
+    const raw = text.startsWith(QR_PREFIX) ? text.slice(QR_PREFIX.length) : text;
+    setCode(formatSyncCode(raw));
+    setError('');
+  }
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -61,6 +72,30 @@ export default function JoinAlbumDialog({ onClose, onJoined }: Props) {
             value={code}
             onChange={(e) => setCode(formatSyncCode(e.target.value))}
           />
+          {scanning ? (
+            <div className="qr-scan-wrap">
+              <QrScanner
+                onResult={handleScan}
+                onError={() => {
+                  setScanning(false);
+                  setError('Couldn’t open the camera. Type the code instead.');
+                }}
+              />
+              <button type="button" className="btn full" onClick={() => setScanning(false)}>
+                Stop camera
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="btn full"
+              style={{ marginTop: 8 }}
+              disabled={busy}
+              onClick={() => { setError(''); setScanning(true); }}
+            >
+              📷 Scan QR instead
+            </button>
+          )}
         </div>
 
         <div className="settings-field" style={{ marginTop: 10 }}>

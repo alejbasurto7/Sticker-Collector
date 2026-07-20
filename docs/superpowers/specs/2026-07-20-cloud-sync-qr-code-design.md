@@ -58,6 +58,14 @@ both, which is intended.
    code (same pattern as `SyncSection`), then add a Share button beside "Copy
    code". Its share text says "join this shared album" instead of "link a
    device". Joiners (non-owners) get no QR/Share — they don't hand out a code.
+7. **Scan-to-join in the Join dialog.** `JoinAlbumDialog` (the joiner's "Join a
+   shared album" form) gains a "📷 Scan QR instead" button + inline `QrScanner`,
+   mirroring the scan affordance in `SyncDialog`'s Enter-a-code flow. Unlike that
+   code-only flow (which auto-joins on decode), scanning here only **fills the
+   Share code field and stops the camera** — the joiner still reviews the "Name
+   this album" field and taps "Join album". This preserves the deliberate naming
+   step and reuses the existing `join()` validation (`canJoin`) rather than
+   bypassing it.
 
 ## Changes
 

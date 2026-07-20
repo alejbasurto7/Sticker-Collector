@@ -1001,13 +1001,7 @@ button {
   margin-bottom: 14px;
 }
 
-/* ---------- "How it works?" help icon + sheet ---------- */
-.help-btn {
-  font-size: 20px;
-  font-weight: 800;
-  line-height: 1;
-}
-
+/* ---------- "How it works?" help sheet ---------- */
 .help-modal {
   text-align: center;
 }

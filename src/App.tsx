@@ -9,7 +9,6 @@ import AlbumView from './components/AlbumView';
 import SwapsView from './components/SwapsView';
 import StatsView from './components/StatsView';
 import SettingsDialog from './components/SettingsDialog';
-import HelpDialog from './components/HelpDialog';
 import ShareListDialog from './components/ShareListDialog';
 import AchievementToaster from './components/AchievementToaster';
 import ReloadPrompt from './components/ReloadPrompt';
@@ -25,7 +24,6 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('album');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
-  const [helpOpen, setHelpOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
@@ -36,7 +34,6 @@ export default function App() {
   const activeAlbumId = useCollection((s) => s.activeAlbumId);
   const switchAlbum = useCollection((s) => s.switchAlbum);
   const theme = useCollection((s) => s.theme);
-  const toggleTheme = useCollection((s) => s.toggleTheme);
   const locked = useCollection((s) => s.locked);
   const toggleLocked = useCollection((s) => s.toggleLocked);
   const lastSeenWhatsNewId = useCollection((s) => s.lastSeenWhatsNewId);
@@ -127,22 +124,6 @@ export default function App() {
                 <line x1="12" y1="2" x2="12" y2="15" />
               </svg>
             </button>
-            <button
-              className="icon-btn"
-              onClick={toggleTheme}
-              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-              title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
-            >
-              {theme === 'dark' ? '☀️' : '🌙'}
-            </button>
-            <button
-              className="icon-btn help-btn"
-              onClick={() => setHelpOpen(true)}
-              aria-label="How it works"
-              title="How it works"
-            >
-              ?
-            </button>
           </div>
         </div>
         <div className="header-progress">
@@ -167,7 +148,6 @@ export default function App() {
 
       {shareOpen && <ShareListDialog onClose={() => setShareOpen(false)} />}
       {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
-      {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} />}
 
       {libraryOpen && (
         <LibrarySheet
