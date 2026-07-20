@@ -7,7 +7,8 @@
 
 Add a scannable QR code to the sync-code UI so a second device can link by
 pointing its camera at the first device, instead of typing the 12-character
-sync code by hand.
+sync code by hand. Add a Share button next to it so the QR (plus the code as
+text) can be sent through the native share sheet.
 
 ## Context
 
@@ -42,6 +43,14 @@ both, which is intended.
    copy, extract it once into `src/lib/syncCode.ts` and import it in all three
    generators (the scanner path already lives in `SyncDialog`). Kills drift risk
    on a shared contract.
+5. **Share button — QR image + code text.** A Share button next to the QR opens
+   the native share sheet (Web Share API) with **two** payload parts: the QR PNG
+   as a file, plus a text line carrying the human-readable code
+   (`Sync code: ZVJZ-8RGG-XZY6 — add it in <app> to link a device.`) so a
+   recipient who can't scan can paste it into "Enter a code". The QR already
+   encodes this secret, so the text adds no extra exposure. On desktop / browsers
+   without file-share support, it falls back to downloading the QR PNG (the code
+   text is dropped, but it's still visible on-screen with its own Copy button).
 
 ## Changes
 
@@ -56,9 +65,24 @@ both, which is intended.
 - Import `QR_PREFIX` from `../lib/syncCode`.
 - No behavioral change (same string, same call sites).
 
+### `src/utils/share.ts`
+- Extract the data-URL → Blob → `File` → Web-Share-or-download tail of
+  `shareNodeAsImage` into a reusable helper:
+  ```ts
+  export async function shareImage(
+    dataUrl: string,
+    opts: { fileName: string; title?: string; text?: string },
+  ): Promise<void>
+  ```
+  It tries `navigator.canShare({ files })` → `navigator.share({ files, title, text })`,
+  and on unsupported/cancel falls back to an `<a download>` click on the PNG.
+- Refactor `shareNodeAsImage` to rasterize (unchanged) then delegate to
+  `shareImage` — no behavior change for the existing stats-card share.
+
 ### `src/components/SyncSection.tsx` (the feature)
 - Imports: add `useEffect` (already imports `useState`), `QRCode from 'qrcode'`,
-  and `QR_PREFIX` from `../lib/syncCode`.
+  `QR_PREFIX` from `../lib/syncCode`, `shareImage` from `../utils/share`, and
+  `APP_NAME` from `../config`.
 - State: `const [qrUrl, setQrUrl] = useState('')`.
 - Effect keyed on `code`:
   - If `code` is null → `setQrUrl('')` and return (unlinked / clears stale QR).
@@ -67,22 +91,38 @@ both, which is intended.
   - Guard against stale async results with a `cancelled` flag in the effect
     cleanup; swallow generation errors by clearing `qrUrl` (fail soft — the code
     text + Copy still work).
+- Share handler:
+  ```ts
+  async function handleShareQr() {
+    if (!qrUrl || !code) return;
+    await shareImage(qrUrl, {
+      fileName: 'sticker-collector-sync.png',
+      title: `${APP_NAME} sync`,
+      text: `Sync code: ${code} — add it in ${APP_NAME} to link a device.`,
+    });
+  }
+  ```
 - Render: inside the existing `.settings-field`, immediately after the
   `.sync-code-row`, render when `qrUrl` is set:
   ```tsx
   {qrUrl && (
-    <>
+    <div className="sync-qr-block">
       <img className="sync-qr" src={qrUrl} alt="Sync code QR" />
       <p className="sync-qr-caption">Scan on another device to link</p>
-    </>
+      <button type="button" className="btn" onClick={() => void handleShareQr()}>
+        Share
+      </button>
+    </div>
   )}
   ```
 - Reuse the existing `.sync-qr` class (`styles.css:1698`) — already centered,
   white-padded, responsive. `max-width: 70%` keeps it modest inside the field.
 
 ### `src/styles.css`
-- Add a small `.sync-qr-caption` rule for the helper line (centered, dim,
-  small — mirrors `.sync-time` / `.modal-sub` styling). No changes to `.sync-qr`.
+- Add `.sync-qr-block` (centered column: `text-align: center` so the caption and
+  Share button center under the QR image).
+- Add `.sync-qr-caption` for the helper line (dim, small — mirrors `.sync-time` /
+  `.modal-sub`). No changes to `.sync-qr`.
 
 ## Data flow
 
@@ -94,9 +134,13 @@ existing `peekRemote`/link flow. No engine or store changes.
 ## Error handling
 
 - QR generation is async and can reject; on rejection clear `qrUrl` so the UI
-  degrades to code-text-only (Reveal/Copy unaffected).
+  degrades to code-text-only (Reveal/Copy unaffected). The Share button is only
+  rendered when `qrUrl` is set, so it can't fire without an image.
 - Effect cleanup cancels stale writes when `code` changes rapidly (e.g. link →
   unlink → relink).
+- `shareImage` swallows a user-cancelled/failed `navigator.share` and falls
+  through to the download path; a share of an already-linked device is idempotent
+  and side-effect-free.
 
 ## Testing / verification
 
@@ -106,8 +150,12 @@ existing `peekRemote`/link flow. No engine or store changes.
 - Manual verification: link a device, confirm the QR appears in both the Cloud
   sync dialog and the Library sync panel, and confirm the in-app scanner on a
   second device reads it and enters the join flow.
+- Share verification: on a mobile/PWA build tapping Share opens the native sheet
+  with the QR PNG + code text; on a desktop browser without file-share it
+  downloads `sticker-collector-sync.png`.
 - Regression check: `SyncDialog` create flow and `AlbumSharing` still generate
-  their QRs after the `QR_PREFIX` import swap.
+  their QRs after the `QR_PREFIX` import swap; the stats-card `shareNodeAsImage`
+  still shares/downloads after the `shareImage` extraction.
 
 ## Out of scope (YAGNI)
 
@@ -115,4 +163,7 @@ existing `peekRemote`/link flow. No engine or store changes.
   the app's own custom scheme, read only by the in-app scanner). Revisit only if
   native-camera pairing is requested.
 - No gating the QR behind Reveal (explicitly decided against).
-- No download/save-QR-as-image affordance.
+- No separate "download QR" button — download is only the Share fallback when
+  the Web Share API is unavailable.
+- No copy-to-clipboard of the share text on the desktop fallback (the code is
+  already on-screen with its own Copy button).
