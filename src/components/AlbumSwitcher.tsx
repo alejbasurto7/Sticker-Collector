@@ -41,7 +41,7 @@ export default function AlbumSwitcher({ onOpen }: Props) {
         <span className="album-switcher-line1">
           <span className="album-switcher-name">{name}</span>
           {multi && <span className="album-switcher-count">{index + 1}/{total}</span>}
-          <span className="album-switcher-mode">{badge.icon} {badge.label}</span>
+          <span className={`album-switcher-mode mode-pill mode-${mode}`}>{badge.icon} {badge.label}</span>
         </span>
         <span className="album-switcher-type">{ALBUM_TYPE}</span>
       </span>

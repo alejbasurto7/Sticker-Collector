@@ -14,6 +14,19 @@ const NEW_ALBUM_NAME = 'New Album';
 const DEFAULT_ALBUM_ID = 'usa-mex-can-26';
 const DEFAULT_ALBUM_NAME = 'My Album';
 
+/** localStorage key for the persisted collection (see the persist config below). */
+const PERSIST_KEY = 'figuritas-collection-v1';
+
+/**
+ * Whether a persisted collection already existed at startup — i.e. this is a returning
+ * user (an upgrader), not a brand-new install. Read once at module load, before Zustand
+ * rehydrates; guarded so non-browser (test) environments stay safe. Consumed by the
+ * What's New gate in App.tsx so first-time users never see release notes for features
+ * that are already new to them.
+ */
+export const HAD_PERSISTED_COLLECTION =
+  typeof localStorage !== 'undefined' && localStorage.getItem(PERSIST_KEY) != null;
+
 /**
  * The full collecting state of a single album. The active album's fields are
  * mirrored at the top level of the store (so every view keeps reading them
@@ -64,6 +77,9 @@ interface CollectionState {
   /** UI colour scheme. Global preference, not tied to any album. */
   theme: Theme;
 
+  /** Release id of the last What's New carousel the user has seen (undefined = never). */
+  lastSeenWhatsNewId?: string;
+
   /** Every album the user has, including a (possibly stale) snapshot of the active one. */
   albums: AlbumSnapshot[];
   /** Id of the album whose data is currently mirrored at the top level. */
@@ -71,6 +87,8 @@ interface CollectionState {
 
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
+  /** Record that the user has seen the What's New carousel for release `id`. */
+  setLastSeenWhatsNewId: (id: string) => void;
   setEdition: (edition: Edition) => void;
   setTrackCC: (trackCC: boolean) => void;
   setAlbumName: (name: string) => void;
@@ -327,6 +345,8 @@ export const useCollection = create<CollectionState>()(
 
       toggleTheme: () => set((s) => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
 
+      setLastSeenWhatsNewId: (id) => set({ lastSeenWhatsNewId: id }),
+
       setEdition: (edition) =>
         set((s) => {
           applyEdition(edition, s.trackCC);
@@ -556,7 +576,7 @@ export const useCollection = create<CollectionState>()(
         }),
     }),
     {
-      name: 'figuritas-collection-v1',
+      name: PERSIST_KEY,
       // Rebuild the album to match the persisted edition + CC tracking before first render.
       onRehydrateStorage: () => (state) => {
         if (!state) return;

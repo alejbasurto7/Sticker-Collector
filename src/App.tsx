@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useCollection } from './store/collectionStore';
+import { useCollection, HAD_PERSISTED_COLLECTION } from './store/collectionStore';
 import { useSyncBoot } from './sync/useSync';
 import { useForcedReadOnly } from './sync/useAlbumMode';
 import { computeStats, displayPct } from './utils/stats';
@@ -17,6 +17,9 @@ import RevocationNotice from './components/RevocationNotice';
 import AlbumSwitcher from './components/AlbumSwitcher';
 import LibrarySheet from './components/LibrarySheet';
 import AlbumDetailView from './components/AlbumDetailView';
+import WhatsNewDialog from './components/WhatsNewDialog';
+import { shouldShowWhatsNew } from './whatsNew/gate';
+import { LATEST_WHATS_NEW_ID } from './whatsNew/releases';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('album');
@@ -25,6 +28,7 @@ export default function App() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [whatsNewOpen, setWhatsNewOpen] = useState(false);
   const counts = useCollection((s) => s.counts);
   const swaps = useCollection((s) => s.swaps);
   const edition = useCollection((s) => s.edition);
@@ -35,10 +39,30 @@ export default function App() {
   const toggleTheme = useCollection((s) => s.toggleTheme);
   const locked = useCollection((s) => s.locked);
   const toggleLocked = useCollection((s) => s.toggleLocked);
+  const lastSeenWhatsNewId = useCollection((s) => s.lastSeenWhatsNewId);
+  const setLastSeenWhatsNewId = useCollection((s) => s.setLastSeenWhatsNewId);
   const forcedReadOnly = useForcedReadOnly();
 
   // Boot cross-device sync (no-op unless Supabase is configured and a link exists).
   useSyncBoot();
+
+  // Show the post-upgrade "What's New" carousel once to returning users who haven't
+  // seen this release; silently seed fresh installs so it never fires retroactively.
+  // Runs once on mount — the persisted store is already rehydrated synchronously.
+  useEffect(() => {
+    if (
+      shouldShowWhatsNew({
+        existingUser: HAD_PERSISTED_COLLECTION,
+        lastSeenId: lastSeenWhatsNewId,
+        latestId: LATEST_WHATS_NEW_ID,
+      })
+    ) {
+      setWhatsNewOpen(true);
+    } else if (!HAD_PERSISTED_COLLECTION && lastSeenWhatsNewId !== LATEST_WHATS_NEW_ID) {
+      setLastSeenWhatsNewId(LATEST_WHATS_NEW_ID);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Mirror the chosen colour scheme onto the document root so the light-mode
   // CSS variable overrides (see styles.css) take effect app-wide.
@@ -161,6 +185,15 @@ export default function App() {
       )}
 
       {detailOpen && <AlbumDetailView onClose={() => setDetailOpen(false)} />}
+
+      {whatsNewOpen && (
+        <WhatsNewDialog
+          onClose={() => {
+            setLastSeenWhatsNewId(LATEST_WHATS_NEW_ID);
+            setWhatsNewOpen(false);
+          }}
+        />
+      )}
 
       <RevocationNotice />
       <AchievementToaster />

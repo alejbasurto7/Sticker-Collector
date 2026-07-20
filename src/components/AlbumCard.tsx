@@ -31,7 +31,7 @@ export default function AlbumCard({ album, isActive, onOpen, onManage }: Props) 
         <span className="album-card-body">
           <span className="album-card-top">
             <span className="album-card-name">{name}</span>
-            <span className="album-card-badge">{badge.icon} {badge.label}</span>
+            <span className={`album-card-badge mode-pill mode-${mode}`}>{badge.icon} {badge.label}</span>
           </span>
           <span className="album-card-bar"><span style={{ width: `${pct}%` }} /></span>
           <span className="album-card-meta">
