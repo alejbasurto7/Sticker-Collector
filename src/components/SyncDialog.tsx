@@ -4,6 +4,7 @@ import { createLink, peekRemote, linkWithRemote, linkWithLocal, joinAlbumCode, t
 import { formatSyncCode } from '../lib/syncCode';
 import { copyToClipboard } from '../utils/share';
 import QrScanner from './QrScanner';
+import { DEFAULT_JOIN_NAME } from '../sync/joinAlbum';
 
 interface Props {
   onClose: () => void;
@@ -24,7 +25,7 @@ export default function SyncDialog({ onClose }: Props) {
   const [copied, setCopied] = useState(false);
   const [peek, setPeek] = useState<PeekOk | null>(null);
   const [albumPeek, setAlbumPeek] = useState<AlbumPeekOk | null>(null);
-  const [joinAlias, setJoinAlias] = useState('');
+  const [joinAlias, setJoinAlias] = useState(DEFAULT_JOIN_NAME);
 
   async function handleCreate() {
     setBusy(true);
@@ -79,7 +80,7 @@ export default function SyncDialog({ onClose }: Props) {
   function confirmJoinAlbum() {
     if (!albumPeek) return;
     setBusy(true);
-    void joinAlbumCode(albumPeek, { displayName: joinAlias.trim() || undefined }).finally(() => {
+    void joinAlbumCode(albumPeek, { displayName: joinAlias.trim() || DEFAULT_JOIN_NAME }).finally(() => {
       setBusy(false);
       onClose();
     });

@@ -24,17 +24,20 @@ export default function JoinAlbumDialog({ onClose, onJoined }: Props) {
   async function join() {
     setBusy(true);
     setError('');
-    const peek = await peekRemote(code);
-    const msg = joinErrorMessage(peek);
-    if (msg) {
-      setError(msg);
+    try {
+      const peek = await peekRemote(code);
+      const msg = joinErrorMessage(peek);
+      if (msg) {
+        setError(msg);
+        return;
+      }
+      // msg === null guarantees a joinable album; re-check narrows the type for joinAlbumCode.
+      if (peek.ok && peek.kind === 'album') {
+        await joinAlbumCode(peek, { displayName: name.trim() });
+        onJoined();
+      }
+    } finally {
       setBusy(false);
-      return;
-    }
-    // msg === null guarantees a joinable album; re-check narrows the type for joinAlbumCode.
-    if (peek.ok && peek.kind === 'album') {
-      await joinAlbumCode(peek, { displayName: name.trim() });
-      onJoined();
     }
   }
 
