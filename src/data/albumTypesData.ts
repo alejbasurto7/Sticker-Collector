@@ -9,16 +9,16 @@ export const ALBUM_TYPES: Record<string, AlbumType> = {
     "variants": [
       {
         "id": "na",
-        "label": "🇬🇧 English edition",
+        "label": "🇺🇸 American edition",
         "region": ""
       },
       {
         "id": "latam",
-        "label": "🇪🇸 Spanish edition",
+        "label": "🌐 International edition",
         "region": ""
       }
     ],
-    "defaultVariant": "latam",
+    "defaultVariant": "na",
     "sections": [
       {
         "id": "FWC-trophy",
