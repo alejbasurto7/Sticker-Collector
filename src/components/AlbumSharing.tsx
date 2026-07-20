@@ -6,9 +6,7 @@ import { useSyncMeta, type SyncStatus } from '../store/syncStore';
 import { useAlbumMode } from '../sync/useAlbumMode';
 import {
   createAlbumShare, setAlbumMode, setShareAccess, stopSharing, leaveAlbumShare,
-  peekRemote, joinAlbumCode,
 } from '../sync/engine';
-import { formatSyncCode } from '../lib/syncCode';
 import { copyToClipboard } from '../utils/share';
 import SyncDialog from './SyncDialog';
 
@@ -27,10 +25,8 @@ export default function AlbumSharing() {
   const hasCloudLink = useSyncMeta((s) => s.collection !== null);
   const mode = useAlbumMode(activeAlbumId);
 
-  // Shared sub-panel: choose (share vs join) -> access (owner picks level) | join (paste a code).
-  const [panel, setPanel] = useState<'closed' | 'choose' | 'access' | 'join'>('closed');
-  const [joinCode, setJoinCode] = useState('');
-  const [joinError, setJoinError] = useState('');
+  // Shared sub-panel: access (owner picks the access level, then a code is created).
+  const [panel, setPanel] = useState<'closed' | 'access'>('closed');
   const [code, setCode] = useState('');
   const [qrUrl, setQrUrl] = useState('');
   const [busy, setBusy] = useState(false);
@@ -55,31 +51,6 @@ export default function AlbumSharing() {
     } finally {
       setBusy(false);
     }
-  }
-
-  /** Join an album someone shared with you, from a pasted code. Adds a new album and switches to it. */
-  async function join() {
-    setBusy(true);
-    setJoinError('');
-    const res = await peekRemote(joinCode);
-    if (!res.ok) {
-      setBusy(false);
-      setJoinError(
-        res.reason === 'invalid'
-          ? 'That code doesn’t look right — it should be 12 letters/numbers.'
-          : res.reason === 'not-found'
-            ? 'No shared album found for that code. Double-check it with the person who shared it.'
-            : 'Couldn’t reach sync. Check your connection and try again.',
-      );
-      return;
-    }
-    if (res.kind !== 'album') {
-      setBusy(false);
-      setJoinError('That’s a Cloud code (for syncing your own devices), not a shared-album code. Use the Cloud option for that.');
-      return;
-    }
-    // Adds the album and switches to it -> this component remounts on the new active id, resetting state.
-    await joinAlbumCode(res);
   }
 
   async function copy() {
@@ -138,7 +109,7 @@ export default function AlbumSharing() {
           type="button"
           className={`btn full${mode === 'shared' || sharePanelOpen ? ' primary' : ''}`}
           disabled={busy}
-          onClick={() => { if (mode !== 'shared') setPanel('choose'); }}
+          onClick={() => { if (mode !== 'shared') setPanel('access'); }}
           aria-pressed={mode === 'shared' || sharePanelOpen}
         >
           👥 Shared
@@ -157,24 +128,6 @@ export default function AlbumSharing() {
         </p>
       )}
 
-      {/* Shared -> choose: share this album, or join one shared with you */}
-      {panel === 'choose' && (
-        <div className="settings-field" style={{ marginTop: 10 }}>
-          <p className="modal-sub" style={{ margin: '0 0 8px' }}>Share this album, or join one shared with you?</p>
-          <div className="btn-row" style={{ flexDirection: 'column' }}>
-            <button type="button" className="btn full" disabled={busy} onClick={() => setPanel('access')}>
-              📤 Create a code to share this album
-            </button>
-            <button type="button" className="btn full" disabled={busy} onClick={() => { setPanel('join'); setJoinError(''); }}>
-              📥 Enter a code to join a shared album
-            </button>
-            <button type="button" className="btn full" disabled={busy} onClick={() => setPanel('closed')}>
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Shared -> access: owner picks who can edit, then a code is created */}
       {panel === 'access' && (
         <div className="settings-field" style={{ marginTop: 10 }}>
@@ -186,34 +139,8 @@ export default function AlbumSharing() {
             <button type="button" className="btn full" disabled={busy} onClick={() => share('read-only')}>
               👁️ Read-only — they can only view
             </button>
-            <button type="button" className="btn full" disabled={busy} onClick={() => setPanel('choose')}>
+            <button type="button" className="btn full" disabled={busy} onClick={() => setPanel('closed')}>
               Back
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Shared -> join: paste a code someone shared with you */}
-      {panel === 'join' && (
-        <div className="settings-field" style={{ marginTop: 10 }}>
-          <p className="modal-sub" style={{ margin: '0 0 8px' }}>Enter the code someone shared with you.</p>
-          <input
-            type="text"
-            className="settings-input"
-            placeholder="XXXX-XXXX-XXXX"
-            autoCapitalize="characters"
-            autoCorrect="off"
-            spellCheck={false}
-            value={joinCode}
-            onChange={(e) => setJoinCode(formatSyncCode(e.target.value))}
-          />
-          {joinError && <p className="sync-error">{joinError}</p>}
-          <div className="btn-row" style={{ marginTop: 8 }}>
-            <button type="button" className="btn full" disabled={busy} onClick={() => { setPanel('choose'); setJoinError(''); }}>
-              Back
-            </button>
-            <button type="button" className="btn primary full" disabled={busy || !joinCode} onClick={join}>
-              {busy ? 'Joining…' : 'Join album'}
             </button>
           </div>
         </div>
