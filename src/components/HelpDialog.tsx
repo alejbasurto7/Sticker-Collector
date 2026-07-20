@@ -1,4 +1,5 @@
 import { isDesktop } from '../utils/device';
+import { VERSION_LABEL } from '../version';
 
 interface Props {
   onClose: () => void;
@@ -86,6 +87,7 @@ export default function HelpDialog({ onClose }: Props) {
             Got it
           </button>
         </div>
+        <p className="settings-version">{VERSION_LABEL}</p>
       </div>
     </div>
   );

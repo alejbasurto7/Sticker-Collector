@@ -115,7 +115,7 @@ export default function AlbumSharing() {
             setAlbumMode(activeAlbumId, 'local'); // durable Local (stays on-device even after Cloud is set up)
           }}
         >
-          Local
+          📱 Local
         </button>
         <button
           type="button"
@@ -132,7 +132,7 @@ export default function AlbumSharing() {
             if (!hasCloudLink) setSyncOpen(true); // no Cloud code yet -> open setup (create/join)
           }}
         >
-          Cloud
+          ☁️ Cloud
         </button>
         <button
           type="button"
@@ -141,7 +141,7 @@ export default function AlbumSharing() {
           onClick={() => { if (mode !== 'shared') setPanel('choose'); }}
           aria-pressed={mode === 'shared' || sharePanelOpen}
         >
-          Shared
+          👥 Shared
         </button>
       </div>
 

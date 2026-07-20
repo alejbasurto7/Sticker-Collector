@@ -1590,9 +1590,13 @@ textarea.notes-input {
 :root[data-theme='light'] .album-switcher-name {
   color: #ffffff;
 }
-:root[data-theme='light'] .album-switcher-count,
+:root[data-theme='light'] .album-switcher-type,
 :root[data-theme='light'] .album-switcher-caret {
   color: rgba(255, 255, 255, 0.9);
+}
+:root[data-theme='light'] .album-switcher-count {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.28);
 }
 
 /* Frosted tab bar inverts to a light translucent surface. */
@@ -1737,22 +1741,30 @@ textarea.notes-input {
 }
 
 /* ---------- Album switcher (header) ---------- */
+/* Framed, obviously-tappable control (glassy chip that reads on the colourful
+   header band in both themes). The frame + circular chevron are what signal
+   "this is a selector / the place to manage & add albums". */
 .album-switcher {
   display: flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
-  margin: -4px;
-  padding: 4px 6px 4px 4px;
-  border: none;
-  border-radius: 12px;
-  background: none;
+  max-width: 100%;
+  padding: 6px 10px 6px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.1);
   color: var(--text);
   text-align: left;
   cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 .album-switcher:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.17);
+  border-color: rgba(255, 255, 255, 0.32);
+}
+.album-switcher:active {
+  transform: scale(0.985);
 }
 .album-cover {
   flex: none;
@@ -1775,28 +1787,67 @@ textarea.notes-input {
 .album-switcher-text {
   display: flex;
   flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.album-switcher-line1 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   min-width: 0;
 }
 .album-switcher-name {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 800;
   letter-spacing: 0.2px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Compact "which one of how many" chip on the name line. */
 .album-switcher-count {
+  flex: none;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  padding: 1px 6px;
+}
+/* Album type moved into the switcher (was a separate header subtitle). */
+.album-switcher-type {
   font-size: 11px;
-  font-weight: 600;
-  color: var(--green-bright);
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .album-switcher-caret {
   flex: none;
-  font-size: 12px;
-  color: var(--green-bright);
+  width: 22px;
+  height: 22px;
+  margin-left: 2px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.16);
+  color: var(--text);
+  font-size: 11px;
+  line-height: 1;
 }
 
 /* ---------- Library sheet album cards ---------- */
+/* Confirmation shown in the sheet right after a new album is created. */
+.library-created {
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--green-bright);
+  background: rgba(24, 181, 99, 0.15);
+  border: 1px solid rgba(24, 181, 99, 0.38);
+}
 .album-list {
   display: flex;
   flex-direction: column;

@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ALBUM_TYPE } from './config';
 import { useCollection } from './store/collectionStore';
 import { useSyncBoot } from './sync/useSync';
 import { useForcedReadOnly } from './sync/useAlbumMode';
@@ -33,6 +32,7 @@ export default function App() {
   const activeAlbumId = useCollection((s) => s.activeAlbumId);
   const switchAlbum = useCollection((s) => s.switchAlbum);
   const theme = useCollection((s) => s.theme);
+  const toggleTheme = useCollection((s) => s.toggleTheme);
   const locked = useCollection((s) => s.locked);
   const toggleLocked = useCollection((s) => s.toggleLocked);
   const forcedReadOnly = useForcedReadOnly();
@@ -104,6 +104,14 @@ export default function App() {
               </svg>
             </button>
             <button
+              className="icon-btn"
+              onClick={toggleTheme}
+              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+            >
+              {theme === 'dark' ? '☀️' : '🌙'}
+            </button>
+            <button
               className="icon-btn help-btn"
               onClick={() => setHelpOpen(true)}
               aria-label="How it works"
@@ -113,7 +121,6 @@ export default function App() {
             </button>
           </div>
         </div>
-        <div className="subtitle">{ALBUM_TYPE}</div>
         <div className="header-progress">
           <ProgressBar
             label="Album progress"
@@ -146,7 +153,7 @@ export default function App() {
             setLibraryOpen(false);
             setDetailOpen(true);
           }}
-          onOpenSettings={() => {
+          onOpenCloudSync={() => {
             setLibraryOpen(false);
             setSettingsOpen(true);
           }}
