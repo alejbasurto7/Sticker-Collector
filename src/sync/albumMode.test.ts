@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  albumMode, forcedReadOnly, effectiveReadOnly, resolveAlbumName, deleteDisposition, pickLocalAlbumId,
+  albumMode, forcedReadOnly, isJoiner, effectiveReadOnly, resolveAlbumName, deleteDisposition, pickLocalAlbumId,
 } from './albumMode';
 import type { AlbumLink } from '../store/syncStore';
 
@@ -40,6 +40,15 @@ describe('forcedReadOnly / effectiveReadOnly', () => {
     expect(effectiveReadOnly(true, undefined)).toBe(true);
     expect(effectiveReadOnly(false, link({ role: 'joiner', access: 'read-only' }))).toBe(true);
     expect(effectiveReadOnly(false, undefined)).toBe(false);
+  });
+});
+
+describe('isJoiner', () => {
+  it('true for any joiner (collaborative or read-only), false for owner / no link', () => {
+    expect(isJoiner(link({ role: 'joiner', access: 'collaborative' }))).toBe(true);
+    expect(isJoiner(link({ role: 'joiner', access: 'read-only' }))).toBe(true);
+    expect(isJoiner(link({ role: 'owner' }))).toBe(false);
+    expect(isJoiner(undefined)).toBe(false);
   });
 });
 

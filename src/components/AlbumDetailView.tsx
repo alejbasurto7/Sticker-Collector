@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useCollection } from '../store/collectionStore';
 import { useSyncMeta } from '../store/syncStore';
 import { resolveAlbumName } from '../sync/albumMode';
-import { useForcedReadOnly } from '../sync/useAlbumMode';
+import { useForcedReadOnly, useIsJoiner } from '../sync/useAlbumMode';
 import { album, CC_EMOJI, EDITION_INFO } from '../data/sampleAlbum';
 import { ALBUM_TYPE } from '../config';
 import type { Edition } from '../types';
@@ -34,6 +34,9 @@ export default function AlbumDetailView({ onClose }: Props) {
   const counts = useCollection((s) => s.counts);
   const localAlbumNames = useSyncMeta((s) => s.localAlbumNames);
   const forcedReadOnly = useForcedReadOnly();
+  // A joined share's edition / Coca-Cola layout is owner-controlled (both collaborative
+  // and read-only joiners are blocked from changing it).
+  const joinedShare = useIsJoiner();
 
   const [draft, setDraft] = useState(albumName);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -138,7 +141,7 @@ export default function AlbumDetailView({ onClose }: Props) {
             role="switch"
             aria-checked={trackCC}
             onClick={() => setTrackCC(!trackCC)}
-            disabled={forcedReadOnly}
+            disabled={joinedShare}
           >
             <span className="setting-label">
               {CC_EMOJI} {trackCC ? 'Untrack' : 'Track'} Coca-Cola stickers
@@ -149,9 +152,11 @@ export default function AlbumDetailView({ onClose }: Props) {
           </button>
 
           <p className="modal-sub" style={{ margin: '12px 0 0' }}>
-            {trackCC
-              ? 'The editions differ only in the Coca-Cola page size. Switching keeps all your existing stickers — it just shows or hides the extra slots.'
-              : 'Turn on Coca-Cola tracking above to choose between the NORAM and LATAM editions.'}
+            {joinedShare
+              ? 'Only the album’s owner can change Coca-Cola tracking.'
+              : trackCC
+                ? 'The editions differ only in the Coca-Cola page size. Switching keeps all your existing stickers — it just shows or hides the extra slots.'
+                : 'Turn on Coca-Cola tracking above to choose between the NORAM and LATAM editions.'}
           </p>
 
           {trackCC && (
@@ -165,7 +170,7 @@ export default function AlbumDetailView({ onClose }: Props) {
                     className="swap-card edition-card"
                     style={{ borderColor: selected ? 'var(--green)' : undefined }}
                     onClick={() => setEdition(key)}
-                    disabled={forcedReadOnly}
+                    disabled={joinedShare}
                   >
                     <div className="swap-top">
                       <span className="swap-name">{info.label}</span>

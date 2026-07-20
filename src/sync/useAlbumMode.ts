@@ -1,6 +1,6 @@
 import { useCollection } from '../store/collectionStore';
 import { useSyncMeta } from '../store/syncStore';
-import { albumMode, effectiveReadOnly, forcedReadOnly, resolveAlbumName, type AlbumMode } from './albumMode';
+import { albumMode, effectiveReadOnly, forcedReadOnly, isJoiner, resolveAlbumName, type AlbumMode } from './albumMode';
 
 /** The derived Local/Cloud/Shared mode of one album, reactive to the sync-meta store. */
 export function useAlbumMode(albumId: string): AlbumMode {
@@ -15,6 +15,13 @@ export function useForcedReadOnly(): boolean {
   const activeAlbumId = useCollection((s) => s.activeAlbumId);
   const link = useSyncMeta((s) => s.albumLinks[activeAlbumId]);
   return forcedReadOnly(link);
+}
+
+/** True when the ACTIVE album is one we joined from a share (owner-only structural edits). */
+export function useIsJoiner(): boolean {
+  const activeAlbumId = useCollection((s) => s.activeAlbumId);
+  const link = useSyncMeta((s) => s.albumLinks[activeAlbumId]);
+  return isJoiner(link);
 }
 
 /** True when the ACTIVE album is effectively read-only: user-locked OR a forced read-only share. */

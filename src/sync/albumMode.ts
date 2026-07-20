@@ -25,6 +25,13 @@ export function forcedReadOnly(link: AlbumLink | undefined): boolean {
   return !!link && link.role === 'joiner' && link.access === 'read-only';
 }
 
+/** True when this album was joined from someone else's share (any access level). The album's
+ *  edition / Coca-Cola layout is the owner's to define, so the UI locks those structural
+ *  controls for a joiner even in a collaborative share (where counts stay editable). */
+export function isJoiner(link: AlbumLink | undefined): boolean {
+  return link?.role === 'joiner';
+}
+
 /** Effective read-only for an album: the user's own lock, or a forced read-only share. */
 export function effectiveReadOnly(locked: boolean, link: AlbumLink | undefined): boolean {
   return locked || forcedReadOnly(link);
