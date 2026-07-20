@@ -14,14 +14,14 @@ export const DEFAULT_JOIN_NAME = 'Shared album';
 export function joinErrorMessage(peek: PeekResult): string | null {
   if (peek.ok) {
     if (peek.kind === 'album') return null;
-    return "That's a Cloud code (for syncing your own devices), not a shared-album code. Use the Cloud option for that.";
+    return "That’s a Cloud code (for syncing your own devices), not a shared-album code. Use the Cloud option for that.";
   }
   switch (peek.reason) {
     case 'invalid':
-      return "That code doesn't look right — it should be 12 letters/numbers.";
+      return "That code doesn’t look right — it should be 12 letters/numbers.";
     case 'not-found':
       return "No shared album found for that code. Double-check it with the person who shared it.";
     default: // 'network' | 'unconfigured'
-      return "Couldn't reach sync. Check your connection and try again.";
+      return "Couldn’t reach sync. Check your connection and try again.";
   }
 }

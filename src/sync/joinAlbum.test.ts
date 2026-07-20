@@ -21,12 +21,12 @@ describe('joinErrorMessage', () => {
   });
   it('rejects a Cloud (collection) code with the Cloud-code message', () => {
     expect(joinErrorMessage(collection)).toBe(
-      "That's a Cloud code (for syncing your own devices), not a shared-album code. Use the Cloud option for that.",
+      "That’s a Cloud code (for syncing your own devices), not a shared-album code. Use the Cloud option for that.",
     );
   });
   it('maps invalid to the format hint', () => {
     expect(joinErrorMessage(fail('invalid'))).toBe(
-      "That code doesn't look right — it should be 12 letters/numbers.",
+      "That code doesn’t look right — it should be 12 letters/numbers.",
     );
   });
   it('maps not-found to the double-check message', () => {
@@ -35,7 +35,7 @@ describe('joinErrorMessage', () => {
     );
   });
   it('maps network and unconfigured to the connectivity message', () => {
-    const connectivity = "Couldn't reach sync. Check your connection and try again.";
+    const connectivity = "Couldn’t reach sync. Check your connection and try again.";
     expect(joinErrorMessage(fail('network'))).toBe(connectivity);
     expect(joinErrorMessage(fail('unconfigured'))).toBe(connectivity);
   });
