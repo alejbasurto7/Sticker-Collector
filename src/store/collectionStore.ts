@@ -80,6 +80,9 @@ interface CollectionState {
   /** Release id of the last What's New carousel the user has seen (undefined = never). */
   lastSeenWhatsNewId?: string;
 
+  /** Whether the first-album onboarding carousel has been shown and dismissed. */
+  hasSeenAlbumOnboarding: boolean;
+
   /** Every album the user has, including a (possibly stale) snapshot of the active one. */
   albums: AlbumSnapshot[];
   /** Id of the album whose data is currently mirrored at the top level. */
@@ -89,6 +92,8 @@ interface CollectionState {
   toggleTheme: () => void;
   /** Record that the user has seen the What's New carousel for release `id`. */
   setLastSeenWhatsNewId: (id: string) => void;
+  /** Record that the first-album onboarding carousel has been shown and dismissed. */
+  setAlbumOnboardingSeen: () => void;
   setEdition: (edition: Edition) => void;
   setTrackCC: (trackCC: boolean) => void;
   setAlbumName: (name: string) => void;
@@ -254,6 +259,7 @@ export const useCollection = create<CollectionState>()(
       unlockedAchievements: {},
       importSeq: 0,
       theme: 'dark',
+      hasSeenAlbumOnboarding: false,
       activeAlbumId: DEFAULT_ALBUM_ID,
       albums: [
         {
@@ -346,6 +352,8 @@ export const useCollection = create<CollectionState>()(
       toggleTheme: () => set((s) => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
 
       setLastSeenWhatsNewId: (id) => set({ lastSeenWhatsNewId: id }),
+
+      setAlbumOnboardingSeen: () => set({ hasSeenAlbumOnboarding: true }),
 
       setEdition: (edition) =>
         set((s) => {

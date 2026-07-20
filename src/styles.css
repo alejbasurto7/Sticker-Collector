@@ -2107,6 +2107,123 @@ textarea.notes-input {
   .carousel-dot { transition: none; }
 }
 
+/* ---------- First-album onboarding carousel ----------
+   Reuses the What's New modal + shared Carousel; swaps in the album gradient as its
+   signature accent (top ribbon, active dot, primary button) and shows the gesture
+   demos larger than the Settings help screen. */
+.album-onboarding-modal .onboarding-ribbon {
+  height: 4px;
+  margin: -18px -16px 16px;
+  background: var(--album-gradient);
+  border-radius: 18px 18px 0 0;
+}
+.album-onboarding-modal .carousel-dot[aria-current="true"] {
+  background: var(--album-gradient);
+}
+.album-onboarding-modal .btn.primary {
+  /* The album identity without the gradient's near-white tail, which otherwise reads
+     as an odd bright band at the button's right edge behind the white label. */
+  background: linear-gradient(105deg, #1d4ed8 0%, #c0392b 45%, #0b8a4b 100%);
+  box-shadow: 0 6px 18px -6px rgba(29, 78, 216, 0.55);
+}
+
+.ob-slide {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  padding: 6px 4px 2px;
+}
+.ob-demo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  min-height: 104px;
+  margin-bottom: 8px;
+}
+/* Bigger, non-interactive cells so the gesture reads clearly (vs. 64px in Settings). */
+.ob-demo .cell {
+  width: 72px;
+  height: 72px;
+  aspect-ratio: auto;
+  font-size: 22px;
+  border-radius: 12px;
+  cursor: default;
+}
+.ob-demo .cell:active {
+  transform: none;
+}
+/* Pop the "after" cell as each slide becomes active — the result of the gesture. */
+.album-onboarding-modal .carousel-slide[aria-hidden="false"] .ob-demo .cell:last-child {
+  animation: ob-pop 0.5s 0.1s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+@keyframes ob-pop {
+  0% { transform: scale(0.7); opacity: 0.2; }
+  60% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+.ob-slide-title {
+  margin: 4px 0 0;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.ob-slide-text {
+  margin: 0;
+  max-width: 30ch;
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+/* Closing slide: a static mock of the Settings › How to modify my album row. */
+.ob-settings-card {
+  width: 100%;
+  max-width: 300px;
+  margin: 0 auto 10px;
+  text-align: left;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.ob-settings-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 13px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.ob-settings-row + .ob-settings-row {
+  border-top: 1px solid var(--border);
+}
+.ob-settings-ico {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  background: var(--bg-elev-2);
+  font-size: 14px;
+}
+.ob-settings-row.nav .ob-chev {
+  margin-left: auto;
+  color: var(--text-dim);
+  font-size: 18px;
+}
+/* Highlight the row the copy points at. */
+.ob-settings-row.nav.hi {
+  box-shadow: inset 3px 0 0 var(--green-bright);
+}
+@media (prefers-reduced-motion: reduce) {
+  .album-onboarding-modal .carousel-slide[aria-hidden="false"] .ob-demo .cell:last-child {
+    animation: none;
+  }
+}
+
 /* ---------- What's New slide heroes (static illustrations) ---------- */
 .wn-slide-body {
   display: flex;

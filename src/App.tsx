@@ -20,6 +20,8 @@ import AlbumDetailView from './components/AlbumDetailView';
 import WhatsNewDialog from './components/WhatsNewDialog';
 import { shouldShowWhatsNew } from './whatsNew/gate';
 import { LATEST_WHATS_NEW_ID } from './whatsNew/releases';
+import AlbumOnboardingDialog from './components/AlbumOnboardingDialog';
+import { shouldShowAlbumOnboarding } from './onboarding/gate';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('album');
@@ -28,6 +30,7 @@ export default function App() {
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
   const counts = useCollection((s) => s.counts);
   const swaps = useCollection((s) => s.swaps);
   const edition = useCollection((s) => s.edition);
@@ -39,6 +42,8 @@ export default function App() {
   const toggleLocked = useCollection((s) => s.toggleLocked);
   const lastSeenWhatsNewId = useCollection((s) => s.lastSeenWhatsNewId);
   const setLastSeenWhatsNewId = useCollection((s) => s.setLastSeenWhatsNewId);
+  const hasSeenAlbumOnboarding = useCollection((s) => s.hasSeenAlbumOnboarding);
+  const setAlbumOnboardingSeen = useCollection((s) => s.setAlbumOnboardingSeen);
   const forcedReadOnly = useForcedReadOnly();
 
   // Boot cross-device sync (no-op unless Supabase is configured and a link exists).
@@ -58,6 +63,19 @@ export default function App() {
       setWhatsNewOpen(true);
     } else if (!HAD_PERSISTED_COLLECTION && lastSeenWhatsNewId !== LATEST_WHATS_NEW_ID) {
       setLastSeenWhatsNewId(LATEST_WHATS_NEW_ID);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Show the first-album onboarding carousel once to brand-new users, so they learn
+  // the tap / long-press gestures right away. Returning users are seeded as seen so it
+  // never fires retroactively (the inverse of the What's New gate above). Runs once on
+  // mount — the persisted store is already rehydrated synchronously.
+  useEffect(() => {
+    if (shouldShowAlbumOnboarding({ existingUser: HAD_PERSISTED_COLLECTION, hasSeen: hasSeenAlbumOnboarding })) {
+      setOnboardingOpen(true);
+    } else if (HAD_PERSISTED_COLLECTION && !hasSeenAlbumOnboarding) {
+      setAlbumOnboardingSeen();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -173,6 +191,15 @@ export default function App() {
           onClose={() => {
             setLastSeenWhatsNewId(LATEST_WHATS_NEW_ID);
             setWhatsNewOpen(false);
+          }}
+        />
+      )}
+
+      {onboardingOpen && (
+        <AlbumOnboardingDialog
+          onClose={() => {
+            setAlbumOnboardingSeen();
+            setOnboardingOpen(false);
           }}
         />
       )}

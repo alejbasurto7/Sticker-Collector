@@ -2,9 +2,10 @@ import { isDesktop } from '../utils/device';
 
 /**
  * A demo sticker cell mirroring the real album cell states, used purely to
- * illustrate the tap / long-press gestures — it is not interactive.
+ * illustrate the tap / long-press gestures — it is not interactive. Exported so
+ * the first-album onboarding carousel reuses the exact same cell visuals.
  */
-function DemoCell({ owned, swap }: { owned?: boolean; swap?: boolean }) {
+export function DemoCell({ owned, swap }: { owned?: boolean; swap?: boolean }) {
   return (
     <div className={`cell${owned ? ' owned' : ''}`} aria-hidden="true">
       1
@@ -13,7 +14,7 @@ function DemoCell({ owned, swap }: { owned?: boolean; swap?: boolean }) {
   );
 }
 
-function Arrow() {
+export function Arrow() {
   return (
     <svg
       className="help-arrow"
