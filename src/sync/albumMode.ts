@@ -4,6 +4,13 @@ import type { AlbumLink, SyncMetaState } from '../store/syncStore';
 
 export type AlbumMode = 'local' | 'cloud' | 'shared';
 
+/** The pill shown for each mode (icon + label). Single source of truth for the badge across the UI. */
+export const MODE_BADGE: Record<AlbumMode, { icon: string; label: string }> = {
+  local: { icon: '📱', label: 'Local' },
+  cloud: { icon: '☁️', label: 'Cloud' },
+  shared: { icon: '👥', label: 'Shared' },
+};
+
 type MetaSlice = Pick<SyncMetaState, 'albumLinks' | 'privateAlbumIds'>;
 /** `albumMode` also needs the Cloud link to decide the default (Local until Cloud is set up). */
 type ModeSlice = MetaSlice & Pick<SyncMetaState, 'collection'>;
