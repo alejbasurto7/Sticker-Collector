@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useCollection } from '../store/collectionStore';
 import { useSyncMeta } from '../store/syncStore';
 import AlbumCard from './AlbumCard';
+import { isSyncConfigured } from '../lib/supabase';
+import JoinAlbumDialog from './JoinAlbumDialog';
 
 interface Props {
   onClose: () => void;
@@ -23,6 +25,7 @@ export default function LibrarySheet({ onClose, onManageAlbum, onOpenCloudSync }
   const [naming, setNaming] = useState(false);
   const [draft, setDraft] = useState('');
   const [justCreated, setJustCreated] = useState<string | null>(null);
+  const [joining, setJoining] = useState(false);
 
   function open(id: string) {
     switchAlbum(id);
@@ -69,7 +72,15 @@ export default function LibrarySheet({ onClose, onManageAlbum, onOpenCloudSync }
           >
             ➕ New album
           </button>
-          <button type="button" className="btn full" disabled title="Coming soon">👥 Groups</button>
+          {isSyncConfigured && (
+            <button
+              type="button"
+              className="btn full"
+              onClick={() => { setJustCreated(null); setJoining(true); }}
+            >
+              📥 Join a shared album
+            </button>
+          )}
         </div>
         {hasCloudLink && (
           <button type="button" className="btn full" style={{ marginTop: 8 }} onClick={onOpenCloudSync}>
@@ -105,6 +116,13 @@ export default function LibrarySheet({ onClose, onManageAlbum, onOpenCloudSync }
             </div>
           </div>
         </div>
+      )}
+
+      {joining && (
+        <JoinAlbumDialog
+          onClose={() => setJoining(false)}
+          onJoined={() => { setJoining(false); onClose(); }}
+        />
       )}
     </div>
   );
