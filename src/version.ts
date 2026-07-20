@@ -17,3 +17,6 @@ function formatBuildTime(iso: string): string {
 
 // e.g. "v1.0.0 · a1b3c9d · 2026-06-18 14:32 UTC"
 export const VERSION_LABEL = `v${APP_VERSION} · ${APP_COMMIT} · ${formatBuildTime(APP_BUILD_TIME)}`;
+
+// Formatted build timestamp on its own, for the About screen's "Built" row.
+export const BUILD_TIME_LABEL = formatBuildTime(APP_BUILD_TIME);

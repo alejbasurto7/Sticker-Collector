@@ -2335,3 +2335,58 @@ textarea.notes-input {
   font-weight: 800;
   white-space: nowrap;
 }
+
+/* ---------- Settings tab (full-screen view) ---------- */
+.settings-title {
+  margin: 4px 0 16px;
+  font-size: 20px;
+  font-weight: 800;
+}
+.settings-back {
+  margin: 0 0 4px -4px;
+  padding: 4px;
+  border: none;
+  background: none;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.settings-back:hover {
+  color: var(--text);
+}
+/* Tappable drill-down rows inside a .settings-card (How to modify / About) */
+.setting-nav-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.setting-nav-row + .setting-nav-row {
+  border-top: 1px solid var(--border);
+}
+.setting-nav-row:hover {
+  background: var(--bg-elev);
+}
+.setting-nav-chevron {
+  margin-left: auto;
+  flex: none;
+  color: var(--text-dim);
+  font-size: 20px;
+  line-height: 1;
+}
+/* Right-aligned value column for the About rows */
+.setting-row-value {
+  margin-left: auto;
+  color: var(--text-dim);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
