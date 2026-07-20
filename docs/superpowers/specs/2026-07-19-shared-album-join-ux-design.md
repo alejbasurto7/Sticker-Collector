@@ -65,8 +65,11 @@ no benefit at this size. A dedicated dialog is the cleanest isolation and is ind
 
 ### 1. Entry point — `LibrarySheet`
 
-- Add a **📥 Join a shared album** button directly beneath **➕ New album**.
-- Render it only when `isSyncConfigured` is true (joining is impossible otherwise).
+- **Replace** the disabled **👥 Groups (Coming soon)** button with a **📥 Join a shared album**
+  button, in the same button row as **➕ New album**. Groups returns to this spot when that feature is
+  built.
+- Render it only when `isSyncConfigured` is true (joining is impossible otherwise). When sync is not
+  configured, the slot is simply omitted and **➕ New album** sits alone on the row.
 - It opens `JoinAlbumDialog` as a sub-modal, mirroring how **➕ New album** opens its naming
   sub-modal.
 - On a successful join, `joinAlbumCode` has already switched the active album, so the dialog closes
@@ -78,12 +81,14 @@ Two fields in one modal:
 
 1. **Share code** — `XXXX-XXXX-XXXX`, formatted via `formatSyncCode` (same input UX as today:
    `autoCapitalize="characters"`, `autoCorrect="off"`, `spellCheck={false}`).
-2. **Name this album** — helper text: *"Shown only on your device — you can rename it anytime."*
-   **Required.** The owner's album name is never fetched into view or used to prefill this field.
+2. **Name this album** — prefilled with the default **"Shared album"**; the joiner may edit it but it
+   **cannot be empty**. Helper text: *"Shown only on your device — you can rename it anytime."* The
+   owner's album name is never fetched into view or used to prefill this field.
 
 Behavior:
 
-- **Join** is disabled until *both* fields are non-empty (and while busy).
+- **Join** is disabled while the code or the name is empty, or while busy. Because the name is
+  prefilled with "Shared album", in the common case only the code must be entered.
 - On submit → `peekRemote(code)`:
   - `ok && kind:'album'` → `joinAlbumCode(peek, { displayName: name.trim() })` → close dialog + sheet.
   - `ok && kind:'collection'` → error: *"That's a Cloud code (for syncing your own devices), not a
@@ -124,11 +129,12 @@ album's Settings (joiner view).
 ### 5. Testing
 
 - **`JoinAlbumDialog`:**
-  - Join disabled until both code and name are present.
+  - Name field defaults to "Shared album"; **Join** is disabled when the code is empty or the name is
+    cleared.
   - Each `peekRemote` failure `reason` renders its matching message.
   - A `kind:'collection'` peek renders the "Cloud code, not a share" message.
   - A successful `kind:'album'` peek calls `joinAlbumCode` with `{ displayName }` equal to the trimmed
-    name.
+    name — including the unedited default "Shared album".
 - **Name/owner-hiding guard:** after a join, the album resolves to the joiner's chosen name (assert
   the owner's snapshot name is not shown) — protects the core new requirement.
 - **`AlbumSharing`:** tapping **👥 Shared** on a non-shared album advances to the access-level choice
@@ -141,10 +147,8 @@ Your albums
 ┌────────────────────┐
 │ [ album cards … ]  │
 └────────────────────┘
- [ ➕ New album ]
- [ 📥 Join a shared album ]   ← new
- [ 👥 Groups (Coming soon) ]
- [ ☁️ Cloud sync ]            (only if a Cloud link exists)
+ [ ➕ New album ]   [ 📥 Join a shared album ]   ← Join takes the old "Groups (Coming soon)" slot
+ [ ☁️ Cloud sync ]                              (only if a Cloud link exists)
 
 Join dialog
 ┌──────────────────────────────┐
@@ -152,7 +156,7 @@ Join dialog
 │ Share code                   │
 │ [ XXXX-XXXX-XXXX ]           │
 │ Name this album              │
-│ [ ____________ ]             │
+│ [ Shared album ]             │
 │ Shown only on your device —  │
 │ you can rename it anytime.   │
 │      [ Cancel ]  [ Join ]    │
