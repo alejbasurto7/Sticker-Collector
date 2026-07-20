@@ -8,6 +8,7 @@ import ProgressBar from './components/ProgressBar';
 import AlbumView from './components/AlbumView';
 import SwapsView from './components/SwapsView';
 import StatsView from './components/StatsView';
+import SettingsView from './components/SettingsView';
 import SettingsDialog from './components/SettingsDialog';
 import ShareListDialog from './components/ShareListDialog';
 import AchievementToaster from './components/AchievementToaster';
@@ -141,7 +142,8 @@ export default function App() {
       <main className="content" key={`${activeAlbumId}-${edition}-${trackCC}`}>
         {tab === 'album' && <AlbumView />}
         {tab === 'swaps' && <SwapsView />}
-{tab === 'stats' && <StatsView />}
+        {tab === 'stats' && <StatsView />}
+        {tab === 'settings' && <SettingsView />}
       </main>
 
       <TabBar active={tab} onChange={setTab} openSwaps={openSwaps} />

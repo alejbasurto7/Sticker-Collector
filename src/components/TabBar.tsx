@@ -1,4 +1,4 @@
-export type Tab = 'album' | 'swaps' | 'stats';
+export type Tab = 'album' | 'swaps' | 'stats' | 'settings';
 
 interface Props {
   active: Tab;
@@ -9,7 +9,8 @@ interface Props {
 const TABS: { key: Tab; icon: string; label: string }[] = [
   { key: 'album', icon: '📖', label: 'Album' },
   { key: 'swaps', icon: '🔄', label: 'Swaps' },
-{ key: 'stats', icon: '📊', label: 'Stats' },
+  { key: 'stats', icon: '📊', label: 'Stats' },
+  { key: 'settings', icon: '⚙️', label: 'Settings' },
 ];
 
 export default function TabBar({ active, onChange, openSwaps }: Props) {
