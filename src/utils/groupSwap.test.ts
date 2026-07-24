@@ -4,6 +4,7 @@ import {
   memberStickerIds,
   computeGroupPool,
   computeGroupCandidates,
+  routeReceived,
   type GroupMember,
 } from './groupSwap';
 import type { ParsedList } from './import';
@@ -106,5 +107,37 @@ describe('computeGroupCandidates', () => {
     const c = computeGroupCandidates(members, list({ swaps: ['MEX-2'] }));
     expect(c.youGet).toEqual(['MEX-2']);
     expect(c.getQty['MEX-2']).toBe(1);
+  });
+});
+
+describe('routeReceived', () => {
+  it('routes to the only needer, unambiguously', () => {
+    const members = [w('A', { 'MEX-9': 1 }), w('B', { 'MEX-9': 0 })];
+    const r = routeReceived(members, { 'MEX-9': 1 });
+    expect(r.writes).toEqual({ B: { 'MEX-9': 1 } });
+    expect(r.ambiguous).toEqual([]);
+  });
+
+  it('splits two copies one-each with no ambiguity', () => {
+    const members = [w('A', { 'MEX-3': 0 }), w('B', { 'MEX-3': 0 })];
+    const r = routeReceived(members, { 'MEX-3': 2 });
+    expect(r.writes).toEqual({ A: { 'MEX-3': 1 }, B: { 'MEX-3': 1 } });
+    expect(r.ambiguous).toEqual([]);
+  });
+
+  it('auto-assigns the first needer and flags ambiguity when one copy, two needers', () => {
+    const members = [w('A', { 'MEX-7': 0 }), w('B', { 'MEX-7': 0 })];
+    const r = routeReceived(members, { 'MEX-7': 1 });
+    expect(r.writes).toEqual({ A: { 'MEX-7': 1 } });
+    expect(r.ambiguous).toEqual([
+      { id: 'MEX-7', chosenIds: ['A'], options: [{ id: 'A', name: 'A' }, { id: 'B', name: 'B' }] },
+    ]);
+  });
+
+  it('reminds to hand off to a view-only needer without writing it', () => {
+    const members = [w('A', { 'MEX-2': 1 }), v('V', { 'MEX-2': 0 })];
+    const r = routeReceived(members, { 'MEX-2': 1 });
+    expect(r.writes).toEqual({ A: { 'MEX-2': 1 } });
+    expect(r.handoffs).toEqual([{ id: 'MEX-2', memberId: 'V', memberName: 'V' }]);
   });
 });

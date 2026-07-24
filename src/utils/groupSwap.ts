@@ -129,3 +129,56 @@ export function computeGroupCandidates(
   }
   return { youGive, giveQty, youGet, getQty, giveReserved, getReserved };
 }
+
+export interface ReceiveRouting {
+  /** albumId -> stickerId -> copies to ADD (positive). */
+  writes: Record<string, Record<string, number>>;
+  /** stickers where a limited number of copies was auto-split among 2+ writable needers. */
+  ambiguous: { id: string; chosenIds: string[]; options: { id: string; name: string }[] }[];
+  /** view-only members missing a received sticker — physical hand-off reminders, never written. */
+  handoffs: { id: string; memberId: string; memberName: string }[];
+}
+
+function addWrite(
+  writes: Record<string, Record<string, number>>,
+  albumId: string,
+  id: string,
+  n: number,
+) {
+  (writes[albumId] ??= {})[id] = (writes[albumId][id] ?? 0) + n;
+}
+
+/** Default routing of received copies to writable needers; view-only needs become reminders. */
+export function routeReceived(
+  members: GroupMember[],
+  received: Record<string, number>,
+): ReceiveRouting {
+  const idSets = new Map(members.map((m) => [m.id, memberStickerIds(m)]));
+  const writes: Record<string, Record<string, number>> = {};
+  const ambiguous: ReceiveRouting['ambiguous'] = [];
+  const handoffs: ReceiveRouting['handoffs'] = [];
+
+  for (const [id, qty] of Object.entries(received)) {
+    if (qty <= 0) continue;
+    const includers = members.filter((m) => idSets.get(m.id)!.has(id));
+    const writableNeeders = includers.filter((m) => m.writable && (m.counts[id] ?? 0) === 0);
+    const assign = Math.min(writableNeeders.length, qty);
+    for (let k = 0; k < assign; k++) addWrite(writes, writableNeeders[k].id, id, 1);
+    const extra = qty - assign;
+    if (extra > 0) {
+      const target = includers.find((m) => m.writable);
+      if (target) addWrite(writes, target.id, id, extra);
+    }
+    if (writableNeeders.length > qty && writableNeeders.length > 1) {
+      ambiguous.push({
+        id,
+        chosenIds: writableNeeders.slice(0, qty).map((m) => m.id),
+        options: writableNeeders.map((m) => ({ id: m.id, name: m.name })),
+      });
+    }
+    for (const vm of includers.filter((m) => !m.writable && (m.counts[id] ?? 0) === 0)) {
+      handoffs.push({ id, memberId: vm.id, memberName: vm.name });
+    }
+  }
+  return { writes, ambiguous, handoffs };
+}
