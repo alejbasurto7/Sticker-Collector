@@ -238,3 +238,36 @@ describe('applyInternalMove', () => {
     expect(st.albums.find((a) => a.id === 'C')!.counts['MEX-7']).toBe(1);
   });
 });
+
+describe('combined-swap CRUD', () => {
+  let gid: string;
+  beforeEach(() => {
+    useCollection.setState({ groups: [] } as any, false);
+    gid = useCollection.getState().createGroup('Kids', ['A', 'B']);
+  });
+
+  it('creates a combined swap on the group with receivingQty', () => {
+    const sid = useCollection.getState().createCombinedSwap(gid, {
+      name: 'Carlos', theirNeeds: [], theirSwaps: [], giving: ['MEX-9'], receiving: ['MEX-3'],
+      receivingQty: { 'MEX-3': 2 },
+    });
+    const g = useCollection.getState().groups.find((x) => x.id === gid)!;
+    expect(g.swaps[0].id).toBe(sid);
+    expect(g.swaps[0].receiving).toEqual(['MEX-3']);
+    expect(g.swaps[0].receivingQty).toEqual({ 'MEX-3': 2 });
+    expect(g.swaps[0].status).toBe('open');
+  });
+
+  it('updates and deletes a combined swap', () => {
+    const sid = useCollection.getState().createCombinedSwap(gid, {
+      name: 'x', theirNeeds: [], theirSwaps: [], giving: [], receiving: [],
+    });
+    useCollection.getState().updateCombinedSwap(gid, sid, { name: 'Renamed', giving: ['MEX-1'] });
+    let g = useCollection.getState().groups.find((x) => x.id === gid)!;
+    expect(g.swaps[0].name).toBe('Renamed');
+    expect(g.swaps[0].giving).toEqual(['MEX-1']);
+    useCollection.getState().deleteCombinedSwap(gid, sid);
+    g = useCollection.getState().groups.find((x) => x.id === gid)!;
+    expect(g.swaps).toEqual([]);
+  });
+});

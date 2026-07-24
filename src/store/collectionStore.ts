@@ -126,6 +126,28 @@ interface CollectionState {
   /** Record a physical internal move of one copy of `stickerId` from one album to another. */
   applyInternalMove: (fromId: string, toId: string, stickerId: string) => void;
 
+  // Combined (group) swaps
+  createCombinedSwap: (
+    groupId: string,
+    input: {
+      name: string; notes?: string;
+      theirNeeds: string[]; theirSwaps: string[]; theirNeedsQty?: Record<string, number>;
+      giving: string[]; receiving: string[];
+      givingQty?: Record<string, number>; receivingQty?: Record<string, number>;
+    },
+  ) => string;
+  updateCombinedSwap: (
+    groupId: string, swapId: string,
+    patch: {
+      name?: string; notes?: string;
+      giving?: string[]; receiving?: string[];
+      givingQty?: Record<string, number>; receivingQty?: Record<string, number>;
+      theirNeeds?: string[]; theirSwaps?: string[]; theirNeedsQty?: Record<string, number>;
+      deselectedGiving?: string[]; deselectedReceiving?: string[];
+    },
+  ) => void;
+  deleteCombinedSwap: (groupId: string, swapId: string) => void;
+
   // Collection actions
   addOne: (id: string) => void;
   removeOne: (id: string) => void;
@@ -311,6 +333,15 @@ function applyAlbumDeltas(
   return patch;
 }
 
+/** Map over a group's swaps by id, replacing the matched swap with `fn(swap)`. */
+function patchGroupSwap(
+  groups: AlbumGroup[], groupId: string, swapId: string, fn: (sw: Swap) => Swap,
+): AlbumGroup[] {
+  return groups.map((g) =>
+    g.id !== groupId ? g : { ...g, swaps: g.swaps.map((sw) => (sw.id === swapId ? fn(sw) : sw)) },
+  );
+}
+
 export const useCollection = create<CollectionState>()(
   persist(
     (set) => ({
@@ -487,6 +518,53 @@ export const useCollection = create<CollectionState>()(
 
       applyInternalMove: (fromId, toId, stickerId) =>
         set((s) => applyAlbumDeltas(s, { [fromId]: { [stickerId]: -1 }, [toId]: { [stickerId]: 1 } })),
+
+      createCombinedSwap: (groupId, input) => {
+        const id = newId();
+        const swap: Swap = {
+          id,
+          name: input.name.trim() || 'Untitled swap',
+          notes: input.notes?.trim() || undefined,
+          createdAt: Date.now(),
+          status: 'open',
+          theirNeeds: input.theirNeeds,
+          theirSwaps: input.theirSwaps,
+          theirNeedsQty: input.theirNeedsQty,
+          giving: input.giving,
+          receiving: input.receiving,
+          givingQty: input.givingQty,
+          receivingQty: input.receivingQty,
+        };
+        set((s) => ({
+          groups: s.groups.map((g) => (g.id === groupId ? { ...g, swaps: [swap, ...g.swaps] } : g)),
+        }));
+        return id;
+      },
+
+      updateCombinedSwap: (groupId, swapId, patch) =>
+        set((s) => ({
+          groups: patchGroupSwap(s.groups, groupId, swapId, (sw) => ({
+            ...sw,
+            ...(patch.name !== undefined ? { name: patch.name } : {}),
+            ...(patch.notes !== undefined ? { notes: patch.notes.trim() || undefined } : {}),
+            ...(patch.giving ? { giving: patch.giving } : {}),
+            ...(patch.receiving ? { receiving: patch.receiving } : {}),
+            ...(patch.givingQty ? { givingQty: patch.givingQty } : {}),
+            ...(patch.receivingQty ? { receivingQty: patch.receivingQty } : {}),
+            ...(patch.theirNeeds ? { theirNeeds: patch.theirNeeds } : {}),
+            ...(patch.theirSwaps ? { theirSwaps: patch.theirSwaps } : {}),
+            ...(patch.theirNeedsQty ? { theirNeedsQty: patch.theirNeedsQty } : {}),
+            ...(patch.deselectedGiving ? { deselectedGiving: patch.deselectedGiving } : {}),
+            ...(patch.deselectedReceiving ? { deselectedReceiving: patch.deselectedReceiving } : {}),
+          })),
+        })),
+
+      deleteCombinedSwap: (groupId, swapId) =>
+        set((s) => ({
+          groups: s.groups.map((g) =>
+            g.id !== groupId ? g : { ...g, swaps: g.swaps.filter((sw) => sw.id !== swapId) },
+          ),
+        })),
 
       addOne: (id) =>
         set((s) => {
