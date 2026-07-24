@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { polyfillCountryFlagEmojis } from 'country-flag-emoji-polyfill';
 import App from './App';
+import './pwa/installPrompt'; // registers beforeinstallprompt capture at boot
 import './styles.css';
 
 // Windows desktop fonts lack country-flag glyphs, so flag emoji fall back to
