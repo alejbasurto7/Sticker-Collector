@@ -123,6 +123,8 @@ interface CollectionState {
   renameGroup: (id: string, name: string) => void;
   setGroupMembers: (id: string, memberIds: string[]) => void;
   disbandGroup: (id: string) => void;
+  /** Record a physical internal move of one copy of `stickerId` from one album to another. */
+  applyInternalMove: (fromId: string, toId: string, stickerId: string) => void;
 
   // Collection actions
   addOne: (id: string) => void;
@@ -277,6 +279,36 @@ function withActivity(
     activityDays: s.activityDays.includes(today) ? s.activityDays : [...s.activityDays, today].sort(),
     completedOn,
   };
+}
+
+/**
+ * Apply per-album count deltas (albumId -> stickerId -> ±n) across the active album
+ * (top-level `counts`) and any parked `albums`, clamped ≥ 0. The active album's counts
+ * live only at the top level (its parked snapshot is refreshed on switch), so its delta
+ * is applied there and skipped in the `albums` map. Returns just the fields that changed.
+ */
+function applyAlbumDeltas(
+  s: CollectionState,
+  deltas: Record<string, Record<string, number>>,
+): { counts?: Counts; albums?: AlbumSnapshot[] } {
+  const patch: { counts?: Counts; albums?: AlbumSnapshot[] } = {};
+  const activeDelta = deltas[s.activeAlbumId];
+  if (activeDelta) {
+    const counts = { ...s.counts };
+    for (const [id, d] of Object.entries(activeDelta)) counts[id] = clampCount((counts[id] ?? 0) + d);
+    patch.counts = counts;
+  }
+  const touchesParked = s.albums.some((a) => a.id !== s.activeAlbumId && deltas[a.id]);
+  if (touchesParked) {
+    patch.albums = s.albums.map((a) => {
+      const d = a.id === s.activeAlbumId ? undefined : deltas[a.id];
+      if (!d) return a;
+      const counts = { ...a.counts };
+      for (const [id, n] of Object.entries(d)) counts[id] = clampCount((counts[id] ?? 0) + n);
+      return { ...a, counts };
+    });
+  }
+  return patch;
 }
 
 export const useCollection = create<CollectionState>()(
@@ -452,6 +484,9 @@ export const useCollection = create<CollectionState>()(
         })),
 
       disbandGroup: (id) => set((s) => ({ groups: s.groups.filter((g) => g.id !== id) })),
+
+      applyInternalMove: (fromId, toId, stickerId) =>
+        set((s) => applyAlbumDeltas(s, { [fromId]: { [stickerId]: -1 }, [toId]: { [stickerId]: 1 } })),
 
       addOne: (id) =>
         set((s) => {

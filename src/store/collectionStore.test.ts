@@ -210,3 +210,31 @@ describe('group CRUD', () => {
     expect(useCollection.getState().groups.find((x) => x.id === id)).toBeUndefined();
   });
 });
+
+describe('applyInternalMove', () => {
+  beforeEach(() => {
+    useCollection.setState({
+      counts: { 'MEX-7': 2 }, activeAlbumId: 'A',
+      albums: [snap('A', { counts: { 'MEX-7': 2 } }), snap('B', { counts: { 'MEX-7': 0 } })],
+    } as any, false);
+  });
+
+  it('moves a copy from the active album to a parked album', () => {
+    useCollection.getState().applyInternalMove('A', 'B', 'MEX-7');
+    const st = useCollection.getState();
+    expect(st.counts['MEX-7']).toBe(1);
+    expect(st.albums.find((a) => a.id === 'B')!.counts['MEX-7']).toBe(1);
+  });
+
+  it('moves a copy between two parked albums without touching the active mirror', () => {
+    useCollection.setState({
+      counts: { 'MEX-7': 9 }, activeAlbumId: 'A',
+      albums: [snap('A', { counts: { 'MEX-7': 9 } }), snap('B', { counts: { 'MEX-7': 3 } }), snap('C', { counts: { 'MEX-7': 0 } })],
+    } as any, false);
+    useCollection.getState().applyInternalMove('B', 'C', 'MEX-7');
+    const st = useCollection.getState();
+    expect(st.counts['MEX-7']).toBe(9);
+    expect(st.albums.find((a) => a.id === 'B')!.counts['MEX-7']).toBe(2);
+    expect(st.albums.find((a) => a.id === 'C')!.counts['MEX-7']).toBe(1);
+  });
+});
