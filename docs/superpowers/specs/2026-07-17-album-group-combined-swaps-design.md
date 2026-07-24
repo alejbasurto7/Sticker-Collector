@@ -1,6 +1,6 @@
 # Album Groups & Combined Swaps — Design
 
-**Date:** 2026-07-17 (revised 2026-07-24 for the per-album sync/sharing + Settings/Library reorg landings)
+**Date:** 2026-07-17 (revised 2026-07-24 for the per-album sync/sharing + Settings/Library reorg landings, and view-only membership for read-only shares)
 **Status:** Approved (pending spec review)
 
 ## Problem
@@ -58,8 +58,12 @@ and **UI placement (§E)**.
 4. **Groups sync across your own Cloud devices.** Groups ride the Cloud channel's collection
    payload and 3-way-merge like the rest of it (§A). Members you own that aren't Cloud simply
    don't appear on your other devices; the group operates on whatever members are present.
-5. **Members must be albums you own** (`role !== 'joiner'`). Excludes read-only lock-outs,
-   device-remapped joined ids, and cross-owner write propagation.
+5. **Members are writable albums; read-only shares join as view-only.** Full members are any
+   album you can write — your own (Local/Cloud/owner-Shared) **and collaborative joined
+   shares** (co-editing propagates the settled swap to the co-owner, which is the point). A
+   **read-only joined share** can't be written, so it joins as a **view-only member**: its
+   needs show in the combined view (acquire-and-hand-off), but it never gives, never receives a
+   settled copy, and isn't an internal-move target (§B/§D).
 
 ## A. Data model, storage & sync
 
@@ -80,11 +84,15 @@ groups: AlbumGroup[];
 - **Combined swaps live on the group**, not inside any single `AlbumSnapshot`. Each album
   keeps its own `swaps` for solo trades; the group holds the combined ones.
 - An album belongs to **at most one** group.
-- **Membership = owned albums only.** A member's derived mode may be Local, Cloud, or
-  owner-Shared, but **not a joined share** (`isJoiner`/`role === 'joiner'` in
-  [albumMode.ts](../../../src/sync/albumMode.ts)). Joined albums are force-locked when
-  read-only, carry device-remapped ids that don't travel, and writing settlement into them
-  would push to another person. The Library "add members" picker filters to owned albums.
+- **Membership = writable members + view-only read-only shares.** A **writable** member is any
+  album where `!forcedReadOnly(link)` ([albumMode.ts](../../../src/sync/albumMode.ts)) — your
+  own Local/Cloud/owner-Shared albums and **collaborative joined shares** (a collaborative
+  joiner can write counts; structural edits like edition/CC stay locked, but combined swaps
+  only touch counts). A **read-only joined share** (`forcedReadOnly`) can't be written, so it is
+  admitted only as a **view-only member** (§B/§D). Writing a writable member's counts may
+  propagate to a co-owner — for a collaborative share that is the intended effect (the swap
+  really happened). A joined share's local id may be device-remapped, so it can resolve-out on
+  another device (handled by per-device resolution below).
 - **No shared-edition / shared-trackCC constraint.** Members may differ in `edition` and
   `trackCC`; §B nets per sticker over *participating* members, so differing layouts are fine.
 
@@ -194,10 +202,12 @@ The pool nets the whole family against a **per-sticker** target. For a sticker `
   Each member's layout is built with `buildAlbumFromType(activeType, { variant: edition,
   enabledOptional })` (as `applyEdition`/`computeStatsFor` do), so no global singleton is
   mutated and a parked member with a different edition/trackCC is handled correctly.
-- **target(X)** = number of participating members.
-- **held(X)** = sum of `counts[X]` over the participating members only.
-- **deficit** = number of participating members with `count == 0`.
-- **surplus** = Σ `max(0, count − 1)` over participating members.
+- **target(X)** = number of **writable** participating members.
+- **held(X)** = sum of `counts[X]` over the writable participating members only.
+- **deficit** = number of writable participating members with `count == 0`.
+- **surplus** = Σ `max(0, count − 1)` over writable participating members.
+
+  (View-only participating members do not enter these — they are handled below.)
 
 From these:
 
@@ -206,8 +216,17 @@ From these:
 - **external get** when `held < target`: want `target − held` copies from outsiders.
 - **external give** when `held > target`: `held − target` true spares to offer outsiders.
 
-A sticker is an external **give** or an external **get** or **neither** — never both.
-Internal moves can accompany either.
+Among **writable** members a sticker is an external **give** or an external **get** or
+**neither** — never both; internal moves can accompany either.
+
+**View-only (read-only joined) members.** A read-only share can't be written and its spares
+aren't yours, so it participates as an *informational needer only*: each sticker it is missing
+is added to the combined **get** list (so you can acquire a copy to hand to the owner) and
+tagged with a "hand off to owner" note, but it never contributes to **surplus/gives**, is
+never a settlement target, and is excluded from **internal moves** and the writable netting
+above. So the "never both give and get" invariant is a property of the writable members; a
+writable surplus that happens to match a view-only need is surfaced as a *suggested hand-off*,
+not an automatic move.
 
 Restricting `held` and `target` to *participating* members makes differing `edition` /
 `trackCC` fall out naturally, and means stale counts for an untracked section (counts
@@ -248,6 +267,8 @@ computeGroupCandidates(members, parsedOtherList, reservations) -> {
   ⚠️-flagged if the dad double-books it on purpose). This keeps netting honest whether he
   trades solo or combined.
 - The give/get chip lists show quantities on **both** sides.
+- **View-only members** add their missing stickers to `youGet` (acquire-and-hand-off) but never
+  to `youGive`; `giveQty` is computed from **writable** surplus only.
 
 ## D. Settlement routing at close
 
@@ -260,6 +281,9 @@ copy to an album before applying counts via the active-or-parked helper (§A).
 - *Ambiguous* (fewer copies than needing albums): auto-assign to the **first needing member
   in group `memberIds` order** (predictable, not clever — the dad overrides when it matters),
   and show a `→ Kai's album [change ▾]` control so he can flip it to match physical reality.
+- *View-only needer:* a received copy for a read-only member is **never written** — it shows a
+  `🤝 give to <owner> — not recorded` reminder instead. Auto-routing fills **writable** needers
+  first; a view-only need never consumes a writable album's target.
 
 **Given copy** → fully automatic, **no override**. The surplus is fungible: after handing
 over a spare (`held > target`), every album still keeps its needed copy regardless of which
@@ -288,6 +312,9 @@ You received (3)
 [ 🤝 Mark as swapped ]
 ```
 
+If a view-only member (say Grandpa's read-only album) also needed Neymar, the close screen
+would show `Neymar #9   🤝 give to Grandpa — not recorded` instead of writing a count.
+
 ## E. UI surfaces & scope
 
 The Settings/Library reorg already reserved the surfaces this feature needs; there is **no
@@ -297,9 +324,10 @@ new tab.
 
 **Group management → Library sheet.** The reserved `👥 Groups` entry in
 [LibrarySheet.tsx](../../../src/components/LibrarySheet.tsx) opens a **Groups** screen: create
-a group, name it, pick ≥2 **owned** member albums, disband it. Member picker filters out
-joined shares (`isJoiner`). Album cards there reuse the existing monogram/mode-badge/progress
-treatment (progress via `computeStatsFor`).
+a group, name it, pick ≥2 members, disband it. The picker offers **writable** albums as full
+members and **read-only shares as view-only** members (badged `view-only`); a group needs ≥2
+*writable* members to run a combined swap. Album cards reuse the existing
+monogram/mode-badge/progress treatment (progress via `computeStatsFor`).
 
 **Combined pool → a lens on the Swaps tab.** When the active album is a *resolvable* member of
 a group, `SwapsView` shows a segmented toggle:
@@ -316,16 +344,17 @@ a group, `SwapsView` shows a segmented toggle:
   target, via the active-or-parked helper).
 - **Album lens** = today's per-album swaps, unchanged.
 - **Album tab and Stats tab stay per-album, always.**
-- The combined lens only appears for **editable** albums; it is not offered on a read-only
-  joined album (which can't be a member anyway) and respects the Swaps-tab read-only gating the
-  sharing spec added.
+- The combined lens is reached from a **writable** member's Swaps tab. A read-only member's own
+  Swaps tab stays view-only (the sharing spec's gating), so you drive the group's combined swaps
+  from one of its writable members — never from the read-only one.
 
 **Explicitly out of scope (YAGNI):**
 
 - A merged album-*browsing* grid or combined stats / achievements — both stay per-album.
 - Groups spanning different album *types*, nested / overlapping groups, or an album in two
   groups.
-- **Grouping a joined (someone else's) shared album** — owner-only membership for now.
+- **Recording into a read-only share** — view-only members are never written; the app only
+  reminds you to hand the sticker to its owner.
 - The math supports any N ≥ 2 members; the UI just needs to be sane for a small family.
 
 ## F. Testing & edge cases
@@ -347,9 +376,53 @@ unit-tested with **vitest** alongside [swap.test.ts](../../../src/utils/swap.tes
 | rollback / undo combined swap | reverses `settledByAlbum` per album |
 | member album deleted while in a group | pruned from `memberIds`; group auto-disbands if it drops below 2 |
 | member not present on this device | resolved-out; group inert if < 2 resolvable members |
-| joined (read-only or collaborative) album | not offerable as a member |
+| collaborative joined share | offerable as a full (writable) member; settling propagates to the co-owner |
+| read-only joined share | offerable only as a **view-only** member: contributes needs, no gives, no settled write |
+| view-only member needs a received sticker | shows in the get list; at close shows `🤝 give to owner`, writes nothing |
 | **`mergeGroups`** | independent group add on each device → union; same-group member add on each → member union; group delete vs. base honored; `name` scalar convergence; group `swaps` via `mergeSwaps` |
 | Cloud row without `groups` key | treated as `[]` (back-compat) |
+
+## G. Manual smoke test (post-implementation)
+
+> The feature is **not implemented yet**; this is the acceptance script to run once it is.
+
+**Run the app from the implementation worktree:**
+
+```bash
+cd <worktree>          # this session: .claude/worktrees/album-group-combined-swaps
+npm install            # first time only (already done in this worktree)
+npm run dev            # Vite dev server, base '/'; open the printed URL (default http://localhost:5173)
+```
+
+State is local (`localStorage` key `figuritas-collection-v1`); to reset, clear site data. The
+sync/multi-device rows (10, 13) need two browser profiles sharing a Cloud/Shared code.
+
+**Precondition — two albums + a group:**
+
+1. Album switcher → Library sheet → **＋ New album**, twice. Name them **Leo** and **Kai**.
+2. Library sheet → **👥 Groups → New group** → name **Kids** → select Leo + Kai → **Save**.
+   - ✓ Group appears; opening Leo's or Kai's **Swaps** tab shows a `[ Leo | Kids (both) ]` toggle.
+
+**Scenarios** (each independent; set counts by tapping cells on each album):
+
+| # | Set up | Do | Expect |
+|---|--------|----|--------|
+| 1 Internal move | Leo `MEX-7`×2, Kai ×0 | open **Kids** lens | `MEX-7` in neither give nor get; listed under **Internal moves** Leo→Kai; **Apply** → Leo ×1, Kai ×1 |
+| 2 Get ×2 | Leo & Kai `MEX-3`×0 | Kids → New combined swap; paste `MEX 🇲🇽: 3 (×2)`; Find matches | **You can get** shows `MEX-3` **×2** |
+| 3 Surplus + internal | Leo `MEX-9`×3, Kai ×0 | open Kids lens | `MEX-9` under Internal moves (Leo→Kai) **and** offered as **give ×1** |
+| 4 Mixed CC | Leo trackCC on, `CC-5`×0; Kai trackCC off | Kids swap vs a list offering `CC-5` | `CC-5` offered as get (target 1, Leo only); Kai never involved |
+| 5 Both-need, 1 copy | Leo & Kai `MEX-7`×0; combined swap receiving **1× MEX-7** | Mark as swapped | auto → **Leo** (first member) with `→ Kai [change ▾]`; confirm → chosen ×1, other still 0 |
+| 6 Two copies | Leo & Kai `MEX-3`×0; receiving **2× MEX-3** | Mark as swapped | +1 to **each**, no prompt |
+| 7 Give auto | Leo `MEX-9`×2, Kai ×1; combined swap giving 1× `MEX-9` | Mark as swapped | decrements **Leo** (the holder), "from Leo" label, **no** override control |
+| 8 Reservation | promise Leo's `MEX-9` spare in a **solo** Leo swap (leave open); then Kids → New combined swap vs a list needing `MEX-9` | — | `MEX-9` not auto-offered / ⚠️ flagged |
+| 9 Rollback | close a combined swap (scenario 5) | swap detail → rollback / undo | per-album counts revert **exactly** to pre-swap |
+| 10 Collaborative member | on profile B create an album, share **collaborative**; on profile A join it and add to a group | settle a combined swap adding a sticker to it | count updates on A **and** propagates to B on next sync |
+| 11 View-only member | join a **read-only** share; add it to a group as **view-only** | Kids lens, then a swap receiving a sticker it needs | its needs appear in **get**; at close shows `🤝 give to <owner> — not recorded`; **no** count written; it never appears in the give list |
+| 12 Member delete | delete **Kai** | — | Kai pruned from Kids; group **auto-disbands** (< 2 members) |
+| 13 Cross-device group | make Leo & Kai **Cloud**; set up Cloud sync on profile B (same code); create the group on A | open B | group **Kids** appears with both members; combined lens works |
+
+**Regression:** an album in **no** group shows **no** lens toggle on its Swaps tab and behaves
+exactly as today.
 
 ## Files touched (anticipated)
 
