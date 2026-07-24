@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { useCollection } from '../store/collectionStore';
 import { APP_VERSION, APP_COMMIT, BUILD_TIME_LABEL } from '../version';
 import AlbumHelpSteps from './AlbumHelpSteps';
+import ShareAppScreen from './ShareAppScreen';
 
-type Screen = 'root' | 'help' | 'about';
+type Screen = 'root' | 'help' | 'about' | 'share';
 
 /** `‹ Back` control shown at the top of each sub-screen. */
 function BackButton({ onBack }: { onBack: () => void }) {
@@ -20,6 +21,16 @@ export default function SettingsView() {
   const theme = useCollection((s) => s.theme);
   const toggleTheme = useCollection((s) => s.toggleTheme);
   const dark = theme === 'dark';
+
+  if (screen === 'share') {
+    return (
+      <div className="settings-view">
+        <BackButton onBack={() => setScreen('root')} />
+        <h2 className="settings-title">Share app</h2>
+        <ShareAppScreen />
+      </div>
+    );
+  }
 
   if (screen === 'help') {
     return (
@@ -83,6 +94,10 @@ export default function SettingsView() {
 
       <section className="settings-section">
         <div className="settings-card">
+          <button type="button" className="setting-nav-row" onClick={() => setScreen('share')}>
+            <span className="setting-row-title">📤 Share app</span>
+            <span className="setting-nav-chevron" aria-hidden="true">›</span>
+          </button>
           <button type="button" className="setting-nav-row" onClick={() => setScreen('help')}>
             <span className="setting-row-title">How to modify my album</span>
             <span className="setting-nav-chevron" aria-hidden="true">›</span>
