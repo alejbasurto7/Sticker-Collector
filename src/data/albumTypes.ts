@@ -28,13 +28,35 @@ export interface AlbumType {
   name: string;
   variants: AlbumVariant[];
   defaultVariant: string;
-  sections: SectionDef[];     // album order
+  sections: SectionDef[];                    // canonical section registry; array order = base/fallback order
+  sectionOrder?: Record<string, string[]>;   // variantId → ordered section ids; absent = base order
   templates: Record<string, SectionTemplate>;
 }
 
 /** Resolve a section's numbers for a variant (override or base). */
 function numbersFor(section: SectionDef, variant: string): string[] {
   return section.numbersByVariant?.[variant] ?? section.numbers;
+}
+
+/**
+ * The sections for a variant in display order. A variant with a `sectionOrder`
+ * override is ordered by it; otherwise the base `sections` order is used.
+ * Self-healing: unknown/duplicate ids are dropped, and any section missing from
+ * the override is appended in base order — so a section is never lost to a stale
+ * override. Pure; never mutates inputs.
+ */
+export function orderedSectionsFor(type: AlbumType, variant: string): SectionDef[] {
+  const order = type.sectionOrder?.[variant];
+  if (!order) return type.sections;
+  const byId = new Map(type.sections.map((s) => [s.id, s]));
+  const seen = new Set<string>();
+  const listed: SectionDef[] = [];
+  for (const id of order) {
+    const s = byId.get(id);
+    if (s && !seen.has(id)) { listed.push(s); seen.add(id); }
+  }
+  for (const s of type.sections) if (!seen.has(s.id)) listed.push(s);
+  return listed;
 }
 
 /**
@@ -48,7 +70,7 @@ export function buildAlbumFromType(
 ): Album {
   const pages: Page[] = [];
   const stickers: Sticker[] = [];
-  for (const section of type.sections) {
+  for (const section of orderedSectionsFor(type, opts.variant)) {
     if (section.optional && !opts.enabledOptional.includes(section.id)) continue;
     const numbers = numbersFor(section, opts.variant);
     const stickerIds: string[] = [];

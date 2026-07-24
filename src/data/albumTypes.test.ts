@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildAlbumFromType, editionInfoFor, type AlbumType, activeType, templateFor, pagesSupportPages } from './albumTypes';
+import { buildAlbumFromType, editionInfoFor, orderedSectionsFor, type AlbumType, activeType, templateFor, pagesSupportPages } from './albumTypes';
 import { album } from './sampleAlbum';
 
 const FIXTURE: AlbumType = {
@@ -106,5 +106,64 @@ describe('pagesSupportPages', () => {
       stickerIds: ['1'],
     };
     expect(pagesSupportPages([orphan])).toBe(false);
+  });
+});
+
+describe('orderedSectionsFor', () => {
+  const base: AlbumType = {
+    id: 'demo', name: 'Demo',
+    variants: [{ id: 'na', label: 'NA' }, { id: 'latam', label: 'LATAM' }],
+    defaultVariant: 'na', templates: {},
+    sections: [
+      { id: 'A', code: 'A', emoji: '', title: 'A', type: 'team', templateId: '', numbers: [], foils: [] },
+      { id: 'B', code: 'B', emoji: '', title: 'B', type: 'team', templateId: '', numbers: [], foils: [] },
+      { id: 'C', code: 'C', emoji: '', title: 'C', type: 'team', templateId: '', numbers: [], foils: [] },
+    ],
+  };
+
+  it('returns the base sections (same array) when the variant has no override', () => {
+    expect(orderedSectionsFor(base, 'na')).toBe(base.sections);
+  });
+
+  it('applies a full override order', () => {
+    const t = { ...base, sectionOrder: { latam: ['C', 'A', 'B'] } };
+    expect(orderedSectionsFor(t, 'latam').map((s) => s.id)).toEqual(['C', 'A', 'B']);
+    expect(orderedSectionsFor(t, 'na').map((s) => s.id)).toEqual(['A', 'B', 'C']); // other variant untouched
+  });
+
+  it('appends sections missing from a partial override, in base order', () => {
+    const t = { ...base, sectionOrder: { latam: ['C'] } };
+    expect(orderedSectionsFor(t, 'latam').map((s) => s.id)).toEqual(['C', 'A', 'B']);
+  });
+
+  it('drops unknown ids and dedupes repeated ids', () => {
+    const t = { ...base, sectionOrder: { latam: ['Z', 'B', 'B', 'A'] } };
+    expect(orderedSectionsFor(t, 'latam').map((s) => s.id)).toEqual(['B', 'A', 'C']);
+  });
+});
+
+describe('buildAlbumFromType — per-variant order', () => {
+  const t: AlbumType = {
+    id: 'demo', name: 'Demo',
+    variants: [{ id: 'na', label: 'NA' }, { id: 'latam', label: 'LATAM' }],
+    defaultVariant: 'na', templates: {},
+    sections: [
+      { id: 'A', code: 'A', emoji: '', title: 'A', type: 'team', templateId: '', numbers: ['1'], foils: [] },
+      { id: 'B', code: 'B', emoji: '', title: 'B', type: 'team', templateId: '', numbers: ['1'], foils: [] },
+      { id: 'X', code: 'X', emoji: '', title: 'X', type: 'extra', templateId: '', optional: true, numbers: ['1'], foils: [] },
+    ],
+    sectionOrder: { latam: ['B', 'X', 'A'] },
+  };
+
+  it('builds pages in the variant-specific order', () => {
+    expect(buildAlbumFromType(t, { variant: 'na', enabledOptional: ['X'] }).pages.map((p) => p.id))
+      .toEqual(['A', 'B', 'X']);
+    expect(buildAlbumFromType(t, { variant: 'latam', enabledOptional: ['X'] }).pages.map((p) => p.id))
+      .toEqual(['B', 'X', 'A']);
+  });
+
+  it('still excludes an optional section when not enabled, regardless of order', () => {
+    expect(buildAlbumFromType(t, { variant: 'latam', enabledOptional: [] }).pages.map((p) => p.id))
+      .toEqual(['B', 'A']); // X (optional) dropped; remaining kept in override order
   });
 });
