@@ -1,20 +1,22 @@
 import { useRef } from 'react';
-import { type AlbumType } from '../../data/albumTypes';
-import { addSection, moveSection, deleteSection } from '../registryOps';
+import { type AlbumType, orderedSectionsFor } from '../../data/albumTypes';
+import { addSection, moveSectionForVariant, deleteSection } from '../registryOps';
 import { type Confirm } from './useConfirm';
 
 interface SectionListProps {
   type: AlbumType;
   selectedSectionId: string;
+  orderVariantId: string;
   onSelectSection: (id: string) => void;
   onUpdateType: (mut: (t: AlbumType) => AlbumType) => void;
   confirm: Confirm;
 }
 
 export default function SectionList({
-  type, selectedSectionId, onSelectSection, onUpdateType, confirm,
+  type, selectedSectionId, orderVariantId, onSelectSection, onUpdateType, confirm,
 }: SectionListProps) {
   const dragFrom = useRef<number | null>(null);
+  const rows = orderedSectionsFor(type, orderVariantId);
 
   const handleAddSection = () => {
     const before = new Set(type.sections.map((s) => s.id));
@@ -43,9 +45,9 @@ export default function SectionList({
     dragFrom.current = null;
 
     const target = e.currentTarget as HTMLElement;
-    const rows = Array.from(target.querySelectorAll<HTMLElement>('[data-row-index]'));
+    const rowEls = Array.from(target.querySelectorAll<HTMLElement>('[data-row-index]'));
     let toIndex = from;
-    for (const row of rows) {
+    for (const row of rowEls) {
       const rect = row.getBoundingClientRect();
       const mid = rect.top + rect.height / 2;
       if (e.clientY > mid) {
@@ -54,7 +56,7 @@ export default function SectionList({
     }
 
     if (toIndex !== from) {
-      onUpdateType((t) => moveSection(t, from, toIndex));
+      onUpdateType((t) => moveSectionForVariant(t, orderVariantId, from, toIndex));
     }
   };
 
@@ -65,10 +67,10 @@ export default function SectionList({
         onPointerUp={handleListPointerUp}
         style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 8 }}
       >
-        {type.sections.length === 0 && (
+        {rows.length === 0 && (
           <p style={{ opacity: 0.6, fontSize: 13 }}>No sections yet.</p>
         )}
-        {type.sections.map((s, i) => (
+        {rows.map((s, i) => (
           <div
             key={s.id}
             data-row-index={i}
@@ -91,13 +93,13 @@ export default function SectionList({
             <button
               className="builder-btn builder-btn--sm"
               disabled={i === 0}
-              onClick={(e) => { e.stopPropagation(); onUpdateType((t) => moveSection(t, i, i - 1)); }}
+              onClick={(e) => { e.stopPropagation(); onUpdateType((t) => moveSectionForVariant(t, orderVariantId, i, i - 1)); }}
               aria-label="Move up"
             >↑</button>
             <button
               className="builder-btn builder-btn--sm"
-              disabled={i === type.sections.length - 1}
-              onClick={(e) => { e.stopPropagation(); onUpdateType((t) => moveSection(t, i, i + 1)); }}
+              disabled={i === rows.length - 1}
+              onClick={(e) => { e.stopPropagation(); onUpdateType((t) => moveSectionForVariant(t, orderVariantId, i, i + 1)); }}
               aria-label="Move down"
             >↓</button>
             <button
