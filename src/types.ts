@@ -1,7 +1,11 @@
 export type PageType = 'intro' | 'team' | 'extra';
 
-/** Album edition. Differs only in the Coca-Cola page size (NA: 12, LATAM: 14). */
-export type Edition = 'na' | 'latam';
+/**
+ * A variant id *within* an album type (e.g. the FWC type's 'na' / 'latam', or the
+ * Adrenalyn type's 'base'). The id space is per-type, so this is a plain string —
+ * pair it with an album's `albumTypeId` to resolve the concrete layout.
+ */
+export type Edition = string;
 
 export interface Sticker {
   /** Stable unique id, e.g. "FWC-00" or "MEX-1". */

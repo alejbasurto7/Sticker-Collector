@@ -1,20 +1,22 @@
 import { forwardRef } from 'react';
-import { ALBUM_TYPE, APP_NAME } from '../config';
+import { APP_NAME } from '../config';
 import type { Stats } from '../utils/stats';
 import ProgressRing from './ProgressRing';
 
 interface Props {
   stats: Stats;
   albumName: string;
+  /** Display name of the album's collection type, e.g. "Adrenalyn WC 2026". */
+  albumTypeName: string;
 }
 
 /** Composed card used for the "share stats as image" export. */
-const ShareCard = forwardRef<HTMLDivElement, Props>(({ stats, albumName }, ref) => {
+const ShareCard = forwardRef<HTMLDivElement, Props>(({ stats, albumName, albumTypeName }, ref) => {
   return (
     <div className="share-card" ref={ref}>
       <div className="sc-title">{albumName}</div>
       <div className="sc-album">
-        {ALBUM_TYPE} · {stats.totalStickers} stickers
+        {albumTypeName} · {stats.totalStickers} stickers
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>

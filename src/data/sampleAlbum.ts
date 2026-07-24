@@ -1,30 +1,25 @@
 import type { Album, Edition, Page, Sticker } from '../types';
-import type { SectionDef } from './albumTypes';
-import { activeType, buildAlbumFromType, editionInfoFor } from './albumTypes';
+import type { AlbumType, SectionDef } from './albumTypes';
+import { activeType, buildAlbumFromType, typeById, setActiveTypeContext } from './albumTypes';
 
-/** Per-edition metadata, derived from the active type's variants + CC section. */
-export const EDITION_INFO = editionInfoFor(activeType) as Record<
-  Edition,
-  { label: string; region: string; ccCount: number }
->;
+/** Default variant = the active type's default (fallback for the top-level mirror). */
+export const DEFAULT_EDITION: Edition = activeType.defaultVariant;
 
-/** Default edition = the active type's default variant. */
-export const DEFAULT_EDITION: Edition = activeType.defaultVariant as Edition;
-
-/** A new album does not track the Coca-Cola extras section until the user opts in. */
+/** A new album does not track opt-in extra sections (e.g. Coca-Cola) until the user asks. */
 export const DEFAULT_TRACK_CC = false;
 
-/** Emoji used for the Coca-Cola section, reused by the Settings switch. */
-export const CC_EMOJI = activeType.sections.find((s) => s.id === 'CC')?.emoji ?? '🥤';
+/** Ids of a type's opt-in sections, enabled only while `trackCC` is on (else none).
+ *  For the FWC type this is `['CC']`; a type with no optional section yields `[]`. */
+const enabledOptional = (type: AlbumType, trackCC: boolean): string[] =>
+  trackCC ? type.sections.filter((s) => s.optional).map((s) => s.id) : [];
 
-/** Optional sections enabled by the CC toggle (the FWC type's one optional section). */
-const enabledOptional = (trackCC: boolean): string[] => (trackCC ? ['CC'] : []);
+// The album type whose layout is currently live at the top level (the active album's
+// type). Kept in step with albumTypes' currentType so the import resolver matches the
+// right section set. Rebuilt by applyAlbumLayout().
+let liveType: AlbumType = activeType;
 
-// Live module bindings: rebuilt by applyEdition() and read fresh on each render/call.
-export let album: Album = buildAlbumFromType(activeType, {
-  variant: DEFAULT_EDITION,
-  enabledOptional: enabledOptional(DEFAULT_TRACK_CC),
-});
+// Live module bindings: rebuilt by applyAlbumLayout() and read fresh on each render/call.
+export let album: Album = buildAlbumFor(activeType.id, DEFAULT_EDITION, DEFAULT_TRACK_CC);
 
 /** Lookup helpers, rebuilt alongside the album. */
 export let stickerById: Record<string, Sticker> = indexStickers(album);
@@ -38,22 +33,22 @@ function indexPages(a: Album): Record<string, Page> {
 }
 
 /**
- * Rebuild the album for the given edition (variant) and Coca-Cola tracking.
- * Existing count data is unaffected.
+ * Rebuild the live album for the given album type + variant + opt-in tracking, and
+ * point template/import lookups at that type. Existing count data is unaffected.
  */
-export function applyEdition(edition: Edition, trackCC: boolean): void {
-  album = buildAlbumFor(edition, trackCC);
+export function applyAlbumLayout(albumTypeId: string | undefined, variant: Edition, trackCC: boolean): void {
+  liveType = typeById(albumTypeId);
+  setActiveTypeContext(albumTypeId);
+  album = buildAlbumFor(albumTypeId, variant, trackCC);
   stickerById = indexStickers(album);
   pageById = indexPages(album);
 }
 
-/** Build an album layout for an arbitrary edition + CC tracking, without mutating
+/** Build an album layout for an arbitrary type + variant + tracking, without mutating
  *  the live `album` singleton. Used by per-album stats for parked albums. */
-export function buildAlbumFor(edition: Edition, trackCC: boolean): Album {
-  return buildAlbumFromType(activeType, {
-    variant: edition,
-    enabledOptional: enabledOptional(trackCC),
-  });
+export function buildAlbumFor(albumTypeId: string | undefined, variant: Edition, trackCC: boolean): Album {
+  const type = typeById(albumTypeId);
+  return buildAlbumFromType(type, { variant, enabledOptional: enabledOptional(type, trackCC) });
 }
 
 /** Order/accent/punctuation-insensitive key for a country name ("Congo DR" ↔ "DR Congo"). */
@@ -76,7 +71,7 @@ function nameKey(s: string): string {
  * "FWC" — the `number` picks the one that actually contains it.
  */
 function findSection(label: string, number: string): SectionDef | undefined {
-  const sections = activeType.sections;
+  const sections = liveType.sections;
   const num = number.trim();
   const holdsNumber = (s: SectionDef) => Boolean(stickerById[`${s.id}-${num}`]);
   // The label's ASCII letters (GHA🇬🇭 → GHA, "Congo DR" → CONGODR).

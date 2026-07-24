@@ -1306,6 +1306,22 @@ button {
   gap: 4px;
   color: var(--text-dim);
 }
+/* Collection picker (first-run onboarding + New-album step): a vertical list of
+   selectable collection cards, reusing the edition-card look outside the 2-col grid. */
+.collection-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0 4px;
+}
+.collection-picker-card {
+  width: 100%;
+  margin-bottom: 0;
+  text-align: left;
+}
+.collection-picker-card .swap-top {
+  align-items: center;
+}
 .settings-version {
   margin: 14px 0 0;
   text-align: center;

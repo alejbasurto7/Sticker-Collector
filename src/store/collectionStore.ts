@@ -2,7 +2,8 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Counts, Edition, Swap } from '../types';
 import type { CollectionPayload } from '../sync/payload';
-import { album, applyEdition, DEFAULT_EDITION, DEFAULT_TRACK_CC } from '../data/sampleAlbum';
+import { album, applyAlbumLayout, DEFAULT_EDITION, DEFAULT_TRACK_CC } from '../data/sampleAlbum';
+import { ACTIVE_ALBUM_TYPE_ID, typeById } from '../data/albumTypes';
 import { computeReservations, settleSwapCounts, reverseSettlement } from '../utils/swap';
 
 type ImportMode = 'replace' | 'merge';
@@ -24,8 +25,27 @@ const PERSIST_KEY = 'figuritas-collection-v1';
  * What's New gate in App.tsx so first-time users never see release notes for features
  * that are already new to them.
  */
-export const HAD_PERSISTED_COLLECTION =
-  typeof localStorage !== 'undefined' && localStorage.getItem(PERSIST_KEY) != null;
+const PERSISTED_RAW =
+  typeof localStorage !== 'undefined' ? localStorage.getItem(PERSIST_KEY) : null;
+
+export const HAD_PERSISTED_COLLECTION = PERSISTED_RAW != null;
+
+/**
+ * Whether the persisted save already uses the multi-album shape (has an `albums`
+ * array). Distinguishes a pre-multi-album *upgrader* (no albums array — its single
+ * album must be seeded from the top-level fields) from a current user who simply has
+ * no albums yet (brand-new install, or deleted them all → show the collection picker).
+ * Read once from the raw blob at load, before Zustand's shallow merge hides the shape.
+ */
+const PERSISTED_HAS_ALBUMS = (() => {
+  if (!PERSISTED_RAW) return false;
+  try {
+    const parsed = JSON.parse(PERSISTED_RAW) as { state?: { albums?: unknown } };
+    return Array.isArray(parsed?.state?.albums);
+  } catch {
+    return false;
+  }
+})();
 
 /**
  * The full collecting state of a single album. The active album's fields are
@@ -35,6 +55,10 @@ export const HAD_PERSISTED_COLLECTION =
 export interface AlbumSnapshot {
   id: string;
   albumName: string;
+  /** Which collection this album belongs to (AlbumType id, e.g. '2026-fwc' or
+   *  '2026-fwc-adrenalyn'). Optional so legacy/foreign snapshots (older saves and
+   *  cross-device payloads) load and default to the active type via typeById(). */
+  albumTypeId?: string;
   counts: Counts;
   swaps: Swap[];
   edition: Edition;
@@ -55,6 +79,9 @@ interface CollectionState {
   edition: Edition;
   trackCC: boolean;
   albumName: string;
+  /** Collection type of the active album (AlbumType id). Always a concrete id at the
+   *  top level — loadSnapshot defaults legacy/foreign albums to the active type. */
+  albumTypeId: string;
   /** When true the active album is locked (read-only): sticker cells ignore taps. */
   locked: boolean;
   /** Album-tab layout for the All filter on the active album ('compact' | 'pages'). */
@@ -109,8 +136,9 @@ interface CollectionState {
   /** Set the active album's All-filter layout, mirroring into its parked snapshot. */
   setAlbumLayout: (layout: AlbumLayout) => void;
 
-  // Album management
-  createAlbum: () => void;
+  // Album management. Optionally pick the collection type + variant + name (the
+  // collection picker / New-album flow pass these); all default sensibly when omitted.
+  createAlbum: (opts?: { albumTypeId?: string; variantId?: string; name?: string }) => void;
   switchAlbum: (id: string) => void;
   deleteAlbum: (id: string) => void;
   /** Record the user's manual album order (local-only display preference). */
@@ -178,6 +206,7 @@ function snapshotActive(s: CollectionState): AlbumSnapshot {
   return {
     id: s.activeAlbumId,
     albumName: s.albumName,
+    albumTypeId: s.albumTypeId,
     counts: s.counts,
     swaps: s.swaps,
     edition: s.edition,
@@ -198,6 +227,7 @@ function loadSnapshot(a: AlbumSnapshot) {
     swaps: a.swaps,
     edition: a.edition,
     trackCC: a.trackCC,
+    albumTypeId: a.albumTypeId ?? ACTIVE_ALBUM_TYPE_ID,
     locked: a.locked ?? false,
     albumLayout: a.albumLayout ?? 'compact',
     albumName: a.albumName,
@@ -279,6 +309,7 @@ export const useCollection = create<CollectionState>()(
       edition: DEFAULT_EDITION,
       trackCC: DEFAULT_TRACK_CC,
       albumName: DEFAULT_ALBUM_NAME,
+      albumTypeId: ACTIVE_ALBUM_TYPE_ID,
       locked: false,
       albumLayout: 'compact',
       activityDays: [],
@@ -287,33 +318,26 @@ export const useCollection = create<CollectionState>()(
       importSeq: 0,
       theme: 'dark',
       hasSeenAlbumOnboarding: false,
-      activeAlbumId: DEFAULT_ALBUM_ID,
-      albums: [
-        {
-          id: DEFAULT_ALBUM_ID,
-          albumName: DEFAULT_ALBUM_NAME,
-          counts: {},
-          swaps: [],
-          edition: DEFAULT_EDITION,
-          trackCC: DEFAULT_TRACK_CC,
-          locked: false,
-          albumLayout: 'compact',
-          activityDays: [],
-          completedOn: null,
-          unlockedAchievements: {},
-        },
-      ],
+      // Brand-new installs start album-less: the collection picker (App.tsx, shown when
+      // albums is empty) creates the user's first album instead of seeding a default one.
+      // Returning users are re-seeded from persisted data in onRehydrateStorage.
+      activeAlbumId: '',
+      albums: [],
 
-      createAlbum: () =>
+      createAlbum: (opts) =>
         set((s) => {
           const id = newId();
-          const albumName = nextAlbumName(s.albums.map((a) => a.albumName));
+          const albumTypeId = opts?.albumTypeId ?? ACTIVE_ALBUM_TYPE_ID;
+          const type = typeById(albumTypeId);
+          const edition = opts?.variantId ?? type.defaultVariant;
+          const albumName = opts?.name?.trim() || nextAlbumName(s.albums.map((a) => a.albumName));
           const fresh: AlbumSnapshot = {
             id,
             albumName,
+            albumTypeId,
             counts: {},
             swaps: [],
-            edition: DEFAULT_EDITION,
+            edition,
             trackCC: DEFAULT_TRACK_CC,
             locked: false,
             albumLayout: 'compact',
@@ -322,11 +346,12 @@ export const useCollection = create<CollectionState>()(
             completedOn: null,
             unlockedAchievements: {},
           };
-          // Park the album we're leaving, then make the new one active & live.
+          // Park the album we're leaving (none on a first-run empty store), then make
+          // the new one active & live.
           const albums = s.albums
             .map((a) => (a.id === s.activeAlbumId ? snapshotActive(s) : a))
             .concat(fresh);
-          applyEdition(fresh.edition, fresh.trackCC);
+          applyAlbumLayout(fresh.albumTypeId, fresh.edition, fresh.trackCC);
           return { albums, activeAlbumId: id, ...loadSnapshot(fresh) };
         }),
 
@@ -338,37 +363,24 @@ export const useCollection = create<CollectionState>()(
           const albums = s.albums.map((a) =>
             a.id === s.activeAlbumId ? snapshotActive(s) : a,
           );
-          applyEdition(target.edition, target.trackCC);
+          applyAlbumLayout(target.albumTypeId, target.edition, target.trackCC);
           return { albums, activeAlbumId: id, ...loadSnapshot(target) };
         }),
 
       deleteAlbum: (id) =>
         set((s) => {
           const remaining = s.albums.filter((a) => a.id !== id);
-          // Never leave the app album-less: rebuild a fresh default if this was the last one.
+          // Deleting the last album returns the user to the collection picker (albums: []),
+          // rather than silently rebuilding a default album they never chose. The App gate
+          // renders the picker whenever albums is empty, so no view sees a missing album.
           if (remaining.length === 0) {
-            const fresh: AlbumSnapshot = {
-              id: newId(),
-              albumName: DEFAULT_ALBUM_NAME,
-              counts: {},
-              swaps: [],
-              edition: DEFAULT_EDITION,
-              trackCC: DEFAULT_TRACK_CC,
-              locked: false,
-              albumLayout: 'compact',
-              firstStickerAt: undefined,
-              activityDays: [],
-              completedOn: null,
-              unlockedAchievements: {},
-            };
-            applyEdition(fresh.edition, fresh.trackCC);
-            return { albums: [fresh], activeAlbumId: fresh.id, ...loadSnapshot(fresh) };
+            return { albums: [], activeAlbumId: '' };
           }
           // Deleting the active album means promoting another one to live; deleting a
           // parked album just drops it and leaves the active fields untouched.
           if (id === s.activeAlbumId) {
             const target = remaining[0];
-            applyEdition(target.edition, target.trackCC);
+            applyAlbumLayout(target.albumTypeId, target.edition, target.trackCC);
             return { albums: remaining, activeAlbumId: target.id, ...loadSnapshot(target) };
           }
           return { albums: remaining };
@@ -384,13 +396,13 @@ export const useCollection = create<CollectionState>()(
 
       setEdition: (edition) =>
         set((s) => {
-          applyEdition(edition, s.trackCC);
+          applyAlbumLayout(s.albumTypeId, edition, s.trackCC);
           return { edition };
         }),
 
       setTrackCC: (trackCC) =>
         set((s) => {
-          applyEdition(s.edition, trackCC);
+          applyAlbumLayout(s.albumTypeId, s.edition, trackCC);
           return { trackCC };
         }),
 
@@ -588,13 +600,13 @@ export const useCollection = create<CollectionState>()(
           const albums = [...kept, ...cloudAlbums];
           const activeInCloud = cloudAlbums.find((a) => a.id === s.activeAlbumId);
           if (activeInCloud) {
-            applyEdition(activeInCloud.edition, activeInCloud.trackCC);
+            applyAlbumLayout(activeInCloud.albumTypeId, activeInCloud.edition, activeInCloud.trackCC);
             return { albums, ...loadSnapshot(activeInCloud) };
           }
           if (!albums.some((a) => a.id === s.activeAlbumId)) {
             const fallback = albums[0];
             if (!fallback) return { albums };
-            applyEdition(fallback.edition, fallback.trackCC);
+            applyAlbumLayout(fallback.albumTypeId, fallback.edition, fallback.trackCC);
             return { albums, activeAlbumId: fallback.id, ...loadSnapshot(fallback) };
           }
           return { albums }; // active is a shared/private album — leave top-level alone
@@ -606,7 +618,7 @@ export const useCollection = create<CollectionState>()(
             ? s.albums.map((a) => (a.id === albumId ? snapshot : a))
             : [...s.albums, snapshot];
           if (s.activeAlbumId === albumId) {
-            applyEdition(snapshot.edition, snapshot.trackCC);
+            applyAlbumLayout(snapshot.albumTypeId, snapshot.edition, snapshot.trackCC);
             return { albums, ...loadSnapshot(snapshot) };
           }
           return { albums };
@@ -614,16 +626,33 @@ export const useCollection = create<CollectionState>()(
     }),
     {
       name: PERSIST_KEY,
-      // Rebuild the album to match the persisted edition + CC tracking before first render.
+      // Rebuild the album to match the persisted type + edition + CC tracking, and
+      // reconcile the album list across the brand-new / upgrader / returning cases.
       onRehydrateStorage: () => (state) => {
         if (!state) return;
-        applyEdition(state.edition ?? DEFAULT_EDITION, state.trackCC ?? DEFAULT_TRACK_CC);
-        // Pre-multi-album saves have no album list: seed it from the live fields so
-        // the active album is represented and its name matches the top level.
-        if (!state.activeAlbumId) state.activeAlbumId = DEFAULT_ALBUM_ID;
-        if (!Array.isArray(state.albums) || state.albums.length === 0) {
+        // Tag every album with a collection type (pre-multi-type saves have none).
+        if (Array.isArray(state.albums)) {
+          for (const a of state.albums) if (!a.albumTypeId) a.albumTypeId = ACTIVE_ALBUM_TYPE_ID;
+        }
+        if (!state.albumTypeId) state.albumTypeId = ACTIVE_ALBUM_TYPE_ID;
+        applyAlbumLayout(state.albumTypeId, state.edition ?? DEFAULT_EDITION, state.trackCC ?? DEFAULT_TRACK_CC);
+
+        // Brand-new install: no persisted collection → stay album-less so the collection
+        // picker (App.tsx) creates the first album instead of a default being seeded.
+        if (!HAD_PERSISTED_COLLECTION) return;
+
+        if (!PERSISTED_HAS_ALBUMS) {
+          // Pre-multi-album upgrader: top-level collection data but no album list. Seed one
+          // from the live fields so the existing collection becomes the user's first album.
+          if (!state.activeAlbumId) state.activeAlbumId = DEFAULT_ALBUM_ID;
           state.albums = [snapshotActive(state)];
-        } else if (!state.albums.some((a) => a.id === state.activeAlbumId)) {
+          return;
+        }
+
+        // Multi-album save. If the user deleted every album (albums: []), leave it empty
+        // so the picker runs. Otherwise make sure the active album is present + name-synced.
+        if (state.albums.length === 0) return;
+        if (!state.albums.some((a) => a.id === state.activeAlbumId)) {
           state.albums = [...state.albums, snapshotActive(state)];
         } else {
           state.albums = state.albums.map((a) =>

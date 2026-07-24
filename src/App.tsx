@@ -21,6 +21,7 @@ import WhatsNewDialog from './components/WhatsNewDialog';
 import { shouldShowWhatsNew } from './whatsNew/gate';
 import { LATEST_WHATS_NEW_ID } from './whatsNew/releases';
 import AlbumOnboardingDialog from './components/AlbumOnboardingDialog';
+import CollectionPickerOnboarding from './components/CollectionPickerOnboarding';
 import { shouldShowAlbumOnboarding } from './onboarding/gate';
 
 export default function App() {
@@ -36,6 +37,7 @@ export default function App() {
   const edition = useCollection((s) => s.edition);
   const trackCC = useCollection((s) => s.trackCC);
   const activeAlbumId = useCollection((s) => s.activeAlbumId);
+  const albums = useCollection((s) => s.albums);
   const switchAlbum = useCollection((s) => s.switchAlbum);
   const theme = useCollection((s) => s.theme);
   const locked = useCollection((s) => s.locked);
@@ -102,6 +104,12 @@ export default function App() {
   // edition/trackCC are deps so totals recompute when the album layout changes.
   const stats = useMemo(() => computeStats(counts), [counts, edition, trackCC]);
   const openSwaps = swaps.filter((s) => s.status === 'open').length;
+
+  // No albums yet (brand-new install, or the last album was deleted): show the collection
+  // picker and nothing else, so no view ever renders against a missing active album.
+  if (albums.length === 0) {
+    return <CollectionPickerOnboarding />;
+  }
 
   return (
     <div className="app">

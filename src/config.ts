@@ -3,5 +3,5 @@
 /** Display name of the app, used in share exports, titles, etc. */
 export const APP_NAME = 'Sticker Collector';
 
-/** The album's edition/type label, shown under the album name. */
-export const ALBUM_TYPE = '🇺🇸 🇲🇽 🇨🇦 FIFA World Cup 2026';
+// The album's collection/type label now comes from the album's own AlbumType.name
+// (see src/data/albumTypes.ts) so each album shows its real collection.

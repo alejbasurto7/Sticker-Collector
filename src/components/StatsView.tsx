@@ -8,6 +8,7 @@ import ProgressBar from './ProgressBar';
 import BarChart from './BarChart';
 import Achievements from './Achievements';
 import ShareCard from './ShareCard';
+import { typeById } from '../data/albumTypes';
 
 type PageSort = 'album' | 'pct-desc' | 'az';
 type PageFilter = 'all' | 'incomplete' | 'complete';
@@ -16,6 +17,7 @@ export default function StatsView() {
   const counts = useCollection((s) => s.counts);
   const swaps = useCollection((s) => s.swaps);
   const albumName = useCollection((s) => s.albumName);
+  const albumTypeId = useCollection((s) => s.albumTypeId);
   const firstStickerAt = useCollection((s) => s.firstStickerAt);
   const activityDays = useCollection((s) => s.activityDays);
   const completedOn = useCollection((s) => s.completedOn);
@@ -189,7 +191,7 @@ export default function StatsView() {
           sits outside the .app flex container and can't disturb the layout. */}
       {createPortal(
         <div style={{ position: 'fixed', left: -9999, top: 0, width: 360 }} aria-hidden>
-          <ShareCard ref={shareRef} stats={stats} albumName={albumName} />
+          <ShareCard ref={shareRef} stats={stats} albumName={albumName} albumTypeName={typeById(albumTypeId).name} />
         </div>,
         document.body,
       )}

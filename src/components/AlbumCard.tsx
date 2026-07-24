@@ -36,8 +36,8 @@ export default function AlbumCard({
   const name = useResolvedAlbumName(album.id, album.albumName);
   const mode = useAlbumMode(album.id);
   const stats = useMemo(
-    () => computeStatsFor(album.counts, album.edition, album.trackCC),
-    [album.counts, album.edition, album.trackCC],
+    () => computeStatsFor(album.counts, album.albumTypeId, album.edition, album.trackCC),
+    [album.counts, album.albumTypeId, album.edition, album.trackCC],
   );
   const badge = MODE_BADGE[mode];
   const pct = displayPct(stats.completionPct);

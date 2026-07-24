@@ -3,7 +3,7 @@ import { useCollection, orderAlbums } from '../store/collectionStore';
 import { useAlbumMode, useResolvedAlbumName } from '../sync/useAlbumMode';
 import { MODE_BADGE } from '../sync/albumMode';
 import { monogram, coverTint } from '../utils/albumCover';
-import { ALBUM_TYPE } from '../config';
+import { typeById } from '../data/albumTypes';
 
 interface Props {
   onOpen: () => void;
@@ -14,6 +14,7 @@ interface Props {
 export default function AlbumSwitcher({ onOpen }: Props) {
   const activeAlbumId = useCollection((s) => s.activeAlbumId);
   const albumName = useCollection((s) => s.albumName);
+  const albumTypeId = useCollection((s) => s.albumTypeId);
   const albums = useCollection((s) => s.albums);
   const albumOrder = useCollection((s) => s.albumOrder);
   const name = useResolvedAlbumName(activeAlbumId, albumName);
@@ -47,7 +48,7 @@ export default function AlbumSwitcher({ onOpen }: Props) {
           {multi && <span className="album-switcher-count">{index + 1}/{total}</span>}
           <span className={`album-switcher-mode mode-pill mode-${mode}`}>{badge.icon} {badge.label}</span>
         </span>
-        <span className="album-switcher-type">{ALBUM_TYPE}</span>
+        <span className="album-switcher-type">{typeById(albumTypeId).name}</span>
       </span>
       <span className="album-switcher-caret" aria-hidden="true">▾</span>
     </button>

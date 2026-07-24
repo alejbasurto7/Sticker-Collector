@@ -4,7 +4,11 @@ import { useCollection, orderAlbums } from '../store/collectionStore';
 import { useSyncMeta } from '../store/syncStore';
 import AlbumCard from './AlbumCard';
 import { isSyncConfigured } from '../lib/supabase';
+import { ALBUM_TYPES } from '../data/albumTypes';
 import JoinAlbumDialog from './JoinAlbumDialog';
+
+/** Available collections. When there's more than one, the New-album step lets the user pick. */
+const TYPES = Object.values(ALBUM_TYPES);
 
 interface Props {
   onClose: () => void;
@@ -16,9 +20,9 @@ export default function LibrarySheet({ onClose, onManageAlbum, onOpenCloudSync }
   const albums = useCollection((s) => s.albums);
   const albumOrder = useCollection((s) => s.albumOrder);
   const activeAlbumId = useCollection((s) => s.activeAlbumId);
+  const albumTypeId = useCollection((s) => s.albumTypeId);
   const switchAlbum = useCollection((s) => s.switchAlbum);
   const createAlbum = useCollection((s) => s.createAlbum);
-  const setAlbumName = useCollection((s) => s.setAlbumName);
   const reorderAlbums = useCollection((s) => s.reorderAlbums);
   // A whole-collection Cloud link only exists once the user has set up Cloud sync
   // (via a per-album Sharing → Cloud). Until then there's nothing to manage here.
@@ -27,6 +31,9 @@ export default function LibrarySheet({ onClose, onManageAlbum, onOpenCloudSync }
   // New-album naming step, and a short confirmation after it lands in the list.
   const [naming, setNaming] = useState(false);
   const [draft, setDraft] = useState('');
+  // Collection for the new album (defaults to the current album's type). Only surfaced
+  // as a picker when more than one collection exists.
+  const [draftType, setDraftType] = useState(albumTypeId);
   const [justCreated, setJustCreated] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
 
@@ -51,9 +58,9 @@ export default function LibrarySheet({ onClose, onManageAlbum, onOpenCloudSync }
   }
 
   function confirmCreate() {
-    createAlbum(); // creates AND makes the new album active
     const trimmed = draft.trim();
-    if (trimmed) setAlbumName(trimmed); // override the auto-generated default
+    // Creates the album with the chosen collection + name AND makes it active.
+    createAlbum({ albumTypeId: draftType, name: trimmed || undefined });
     setNaming(false);
     // Stay in the sheet so the new album is visibly added to the list (marked
     // "Current"); confirm it by name so the user knows it was created.
@@ -153,7 +160,7 @@ export default function LibrarySheet({ onClose, onManageAlbum, onOpenCloudSync }
           <button
             type="button"
             className="btn primary full"
-            onClick={() => { setDraft(''); setJustCreated(null); setNaming(true); }}
+            onClick={() => { setDraft(''); setDraftType(albumTypeId); setJustCreated(null); setNaming(true); }}
           >
             ➕ New album
           </button>
@@ -182,6 +189,31 @@ export default function LibrarySheet({ onClose, onManageAlbum, onOpenCloudSync }
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h2>New album</h2>
             <p className="modal-sub">Give your new album a name. You can change it later from its settings.</p>
+            {TYPES.length > 1 && (
+              <div className="settings-field">
+                <span className="settings-field-label">Collection</span>
+                <div className="collection-picker-list">
+                  {TYPES.map((t) => {
+                    const selected = t.id === draftType;
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        className="swap-card edition-card collection-picker-card"
+                        style={{ borderColor: selected ? 'var(--green)' : undefined }}
+                        aria-pressed={selected}
+                        onClick={() => setDraftType(t.id)}
+                      >
+                        <div className="swap-top">
+                          <span className="swap-name">{t.name}</span>
+                          {selected && <span className="pill open">selected</span>}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             <div className="settings-field">
               <label htmlFor="new-album-name" className="settings-field-label">Album name</label>
               <input

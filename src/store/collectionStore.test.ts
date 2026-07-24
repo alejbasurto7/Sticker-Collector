@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useCollection, orderAlbums } from './collectionStore';
+import { ALBUM_TYPES, ACTIVE_ALBUM_TYPE_ID } from '../data/albumTypes';
 
 const snap = (id: string, over = {}) => ({ id, albumName: id, counts: {}, swaps: [], edition: 'latam' as const, trackCC: true, locked: false, activityDays: [], completedOn: null, unlockedAchievements: {}, ...over });
 
@@ -163,6 +164,51 @@ describe('orderAlbums (pure)', () => {
   });
   it('ignores ids in the order that no longer exist', () => {
     expect(orderAlbums([A, B], ['Z', 'B', 'A']).map((a) => a.id)).toEqual(['B', 'A']);
+  });
+});
+
+describe('createAlbum (collection type + name)', () => {
+  beforeEach(resetToSingleAlbum);
+
+  it('creates an album of the given type + default variant + name and makes it active', () => {
+    const otherId = Object.keys(ALBUM_TYPES).find((id) => id !== ACTIVE_ALBUM_TYPE_ID)!;
+    expect(otherId).toBeTruthy(); // a second collection exists to exercise this
+    const variant = ALBUM_TYPES[otherId].defaultVariant;
+    useCollection.getState().createAlbum({ albumTypeId: otherId, name: "Leo's" });
+    const s = useCollection.getState();
+    const active = s.albums.find((a) => a.id === s.activeAlbumId)!;
+    expect(active.albumTypeId).toBe(otherId);
+    expect(active.edition).toBe(variant);
+    expect(active.albumName).toBe("Leo's");
+    expect(s.albumTypeId).toBe(otherId); // top-level mirror follows the new album
+  });
+
+  it('defaults to the active type + an auto name when no opts are given', () => {
+    useCollection.getState().createAlbum();
+    const s = useCollection.getState();
+    const active = s.albums.find((a) => a.id === s.activeAlbumId)!;
+    expect(active.albumTypeId).toBe(ACTIVE_ALBUM_TYPE_ID);
+    expect(active.albumName).toBeTruthy();
+  });
+
+  it('creates the very first album on an empty (album-less) store', () => {
+    useCollection.setState({ albums: [], activeAlbumId: '' } as any, false);
+    useCollection.getState().createAlbum({ albumTypeId: ACTIVE_ALBUM_TYPE_ID, name: 'First' });
+    const s = useCollection.getState();
+    expect(s.albums).toHaveLength(1);
+    expect(s.activeAlbumId).toBe(s.albums[0].id);
+    expect(s.albumName).toBe('First');
+  });
+});
+
+describe('deleteAlbum to zero', () => {
+  beforeEach(resetToSingleAlbum);
+  it('leaves the store album-less (→ collection picker) instead of rebuilding a default', () => {
+    const active = useCollection.getState().activeAlbumId;
+    useCollection.getState().deleteAlbum(active);
+    const s = useCollection.getState();
+    expect(s.albums).toEqual([]);
+    expect(s.activeAlbumId).toBe('');
   });
 });
 

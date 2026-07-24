@@ -94,15 +94,35 @@ export function editionInfoFor(
 export { ALBUM_TYPES, ACTIVE_ALBUM_TYPE_ID };
 export const activeType: AlbumType = ALBUM_TYPES[ACTIVE_ALBUM_TYPE_ID];
 
+/** Resolve an album type by id, falling back to the active type for unknown/absent
+ *  ids (legacy albums and cross-device payloads may carry no albumTypeId). */
+export function typeById(albumTypeId: string | undefined): AlbumType {
+  return (albumTypeId != null && ALBUM_TYPES[albumTypeId]) || activeType;
+}
+
+/**
+ * The album type whose layout is currently live (the active album's type). Rebuilt
+ * by applyAlbumLayout() so template lookups resolve against the active album's own
+ * definition — e.g. an Adrenalyn album no longer borrows the FWC type's templates.
+ * Defaults to the active type so non-runtime callers (tests) see the default album.
+ */
+let currentType: AlbumType = activeType;
+
+/** Point template/layout lookups at the given album type. Called by applyAlbumLayout. */
+export function setActiveTypeContext(albumTypeId: string | undefined): void {
+  currentType = typeById(albumTypeId);
+}
+
 /**
  * The printed-album template for a page, or undefined to use the flow grid. A
  * section uses its template only when the template's real-slot count matches the
  * page's sticker count (so e.g. NA's 12-sticker CC falls back to the flow grid).
+ * Resolves against the currently-live album type (see setActiveTypeContext).
  */
 export function templateFor(page: Page): SectionTemplate | undefined {
-  const section = activeType.sections.find((s) => s.id === page.id);
+  const section = currentType.sections.find((s) => s.id === page.id);
   if (!section) return undefined;
-  const t = activeType.templates[section.templateId];
+  const t = currentType.templates[section.templateId];
   if (!t) return undefined;
   return realSlotCount(t) === page.stickerIds.length ? t : undefined;
 }

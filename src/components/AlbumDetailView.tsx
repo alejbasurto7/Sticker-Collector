@@ -4,9 +4,8 @@ import { useSyncMeta } from '../store/syncStore';
 import { resolveAlbumName } from '../sync/albumMode';
 import { useForcedReadOnly, useIsJoiner } from '../sync/useAlbumMode';
 import { DEFAULT_JOIN_NAME } from '../sync/joinAlbum';
-import { album, CC_EMOJI, EDITION_INFO } from '../data/sampleAlbum';
-import { ALBUM_TYPE } from '../config';
-import type { Edition } from '../types';
+import { album } from '../data/sampleAlbum';
+import { typeById, editionInfoFor } from '../data/albumTypes';
 import { buildListExport } from '../utils/listExport';
 import { copyToClipboard } from '../utils/share';
 import { deleteAlbumEverywhere } from '../sync/engine';
@@ -18,15 +17,21 @@ interface Props {
   onClose: () => void;
 }
 
-const ORDER: Edition[] = ['latam', 'na'];
-
 /** Per-album settings hub. App switches to this album before opening, so every
  *  control edits the mirrored active-album state — never a parked snapshot. */
 export default function AlbumDetailView({ onClose }: Props) {
+  const albumTypeId = useCollection((s) => s.albumTypeId);
   const edition = useCollection((s) => s.edition);
   const setEdition = useCollection((s) => s.setEdition);
   const trackCC = useCollection((s) => s.trackCC);
   const setTrackCC = useCollection((s) => s.setTrackCC);
+
+  // Variant picker + opt-in section toggle are driven by THIS album's type: a type
+  // with a single variant and no optional section (e.g. Adrenalyn) shows neither.
+  const albumType = typeById(albumTypeId);
+  const editionInfo = editionInfoFor(albumType);
+  const optionalSection = albumType.sections.find((s) => s.optional);
+  const variantOrder = albumType.variants.map((v) => v.id);
   const albumLayout = useCollection((s) => s.albumLayout);
   const setAlbumLayout = useCollection((s) => s.setAlbumLayout);
   const albumName = useCollection((s) => s.albumName);
@@ -89,7 +94,7 @@ export default function AlbumDetailView({ onClose }: Props) {
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h2>{displayName}</h2>
-        <p className="modal-sub">{ALBUM_TYPE}</p>
+        <p className="modal-sub">{albumType.name}</p>
 
         {/* ---------- Name / transfer / sharing ---------- */}
         <section className="settings-section">
@@ -150,60 +155,62 @@ export default function AlbumDetailView({ onClose }: Props) {
           </div>
         </section>
 
-        {/* ---------- Coca-Cola tracking ---------- */}
-        <section className="settings-section">
-          <h3 className="settings-heading">Coca-Cola tracking</h3>
-          <button
-            type="button"
-            className="setting-toggle"
-            role="switch"
-            aria-checked={trackCC}
-            onClick={() => setTrackCC(!trackCC)}
-            disabled={joinedShare}
-          >
-            <span className="setting-label">
-              {CC_EMOJI} {trackCC ? 'Untrack' : 'Track'} Coca-Cola stickers
-            </span>
-            <span className={`switch${trackCC ? ' on' : ''}`} aria-hidden="true">
-              <span className="knob" />
-            </span>
-          </button>
+        {/* ---------- Coca-Cola tracking (only for types with an opt-in section) ---------- */}
+        {optionalSection && (
+          <section className="settings-section">
+            <h3 className="settings-heading">Coca-Cola tracking</h3>
+            <button
+              type="button"
+              className="setting-toggle"
+              role="switch"
+              aria-checked={trackCC}
+              onClick={() => setTrackCC(!trackCC)}
+              disabled={joinedShare}
+            >
+              <span className="setting-label">
+                {optionalSection.emoji} {trackCC ? 'Untrack' : 'Track'} Coca-Cola stickers
+              </span>
+              <span className={`switch${trackCC ? ' on' : ''}`} aria-hidden="true">
+                <span className="knob" />
+              </span>
+            </button>
 
-          <p className="modal-sub" style={{ margin: '12px 0 0' }}>
-            {joinedShare
-              ? 'Only the album’s owner can change Coca-Cola tracking.'
-              : trackCC
-                ? 'The editions differ only in the Coca-Cola page size. Switching keeps all your existing stickers — it just shows or hides the extra slots.'
-                : 'Turn on Coca-Cola tracking above to choose between the NORAM and LATAM editions.'}
-          </p>
+            <p className="modal-sub" style={{ margin: '12px 0 0' }}>
+              {joinedShare
+                ? 'Only the album’s owner can change Coca-Cola tracking.'
+                : trackCC
+                  ? 'The editions differ only in the Coca-Cola page size. Switching keeps all your existing stickers — it just shows or hides the extra slots.'
+                  : 'Turn on Coca-Cola tracking above to choose between the NORAM and LATAM editions.'}
+            </p>
 
-          {trackCC && (
-            <div className="edition-grid">
-              {ORDER.map((key) => {
-                const info = EDITION_INFO[key];
-                const selected = edition === key;
-                return (
-                  <button
-                    key={key}
-                    className="swap-card edition-card"
-                    style={{ borderColor: selected ? 'var(--green)' : undefined }}
-                    onClick={() => setEdition(key)}
-                    disabled={joinedShare}
-                  >
-                    <div className="swap-top">
-                      <span className="swap-name">{info.label}</span>
-                      {selected && <span className="pill open">current</span>}
-                    </div>
-                    <div className="swap-summary edition-summary">
-                      <span>{info.region}</span>
-                      <span>Coca-Cola: {info.ccCount} stickers</span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </section>
+            {trackCC && (
+              <div className="edition-grid">
+                {variantOrder.map((key) => {
+                  const info = editionInfo[key];
+                  const selected = edition === key;
+                  return (
+                    <button
+                      key={key}
+                      className="swap-card edition-card"
+                      style={{ borderColor: selected ? 'var(--green)' : undefined }}
+                      onClick={() => setEdition(key)}
+                      disabled={joinedShare}
+                    >
+                      <div className="swap-top">
+                        <span className="swap-name">{info.label}</span>
+                        {selected && <span className="pill open">current</span>}
+                      </div>
+                      <div className="swap-summary edition-summary">
+                        <span>{info.region}</span>
+                        <span>Coca-Cola: {info.ccCount} stickers</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        )}
 
         {/* ---------- Danger zone ---------- */}
         <section className="settings-section">
@@ -237,7 +244,7 @@ export default function AlbumDetailView({ onClose }: Props) {
               <div style={{ fontWeight: 700, fontSize: '1rem' }}>
                 {displayName}
               </div>
-              <div style={{ color: 'var(--text-dim)', fontSize: '0.85rem' }}>{ALBUM_TYPE}</div>
+              <div style={{ color: 'var(--text-dim)', fontSize: '0.85rem' }}>{albumType.name}</div>
             </div>
             <div className="btn-row">
               <button className="btn full" onClick={() => setConfirmingDelete(false)}>Cancel</button>

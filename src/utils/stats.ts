@@ -107,14 +107,16 @@ export function computeStats(counts: Counts, history?: CollectionHistory): Stats
   return statsForAlbum(album, counts, history);
 }
 
-/** Stats for a specific album layout — pure, no dependence on the live singleton. */
+/** Stats for a specific album's layout (type + variant) — pure, no dependence on the
+ *  live singleton. Used for parked (non-active) albums, which may be a different type. */
 export function computeStatsFor(
   counts: Counts,
-  edition: Edition,
+  albumTypeId: string | undefined,
+  variant: Edition,
   trackCC: boolean,
   history?: CollectionHistory,
 ): Stats {
-  return statsForAlbum(buildAlbumFor(edition, trackCC), counts, history);
+  return statsForAlbum(buildAlbumFor(albumTypeId, variant, trackCC), counts, history);
 }
 
 function statsForAlbum(a: Album, counts: Counts, history?: CollectionHistory): Stats {
