@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Counts, Edition, Swap } from '../types';
+import type { AlbumGroup, Counts, Edition, Swap } from '../types';
 import type { CollectionPayload } from '../sync/payload';
 import { album, applyEdition, DEFAULT_EDITION, DEFAULT_TRACK_CC } from '../data/sampleAlbum';
 import { computeReservations, settleSwapCounts, reverseSettlement } from '../utils/swap';
@@ -94,6 +94,8 @@ interface CollectionState {
    * Missing/empty (legacy) means "no manual order" → natural `albums` order.
    */
   albumOrder?: string[];
+  /** User-defined album groups for combined swapping. Synced in a later stage. */
+  groups: AlbumGroup[];
 
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
@@ -115,6 +117,12 @@ interface CollectionState {
   deleteAlbum: (id: string) => void;
   /** Record the user's manual album order (local-only display preference). */
   reorderAlbums: (orderedIds: string[]) => void;
+
+  // Album groups (combined swapping)
+  createGroup: (name: string, memberIds: string[]) => string;
+  renameGroup: (id: string, name: string) => void;
+  setGroupMembers: (id: string, memberIds: string[]) => void;
+  disbandGroup: (id: string) => void;
 
   // Collection actions
   addOne: (id: string) => void;
@@ -287,6 +295,7 @@ export const useCollection = create<CollectionState>()(
       importSeq: 0,
       theme: 'dark',
       hasSeenAlbumOnboarding: false,
+      groups: [],
       activeAlbumId: DEFAULT_ALBUM_ID,
       albums: [
         {
@@ -424,6 +433,25 @@ export const useCollection = create<CollectionState>()(
         }),
 
       reorderAlbums: (orderedIds) => set({ albumOrder: orderedIds }),
+
+      createGroup: (name, memberIds) => {
+        const id = newId();
+        const group: AlbumGroup = { id, name: name.trim() || 'Group', memberIds: [...memberIds], swaps: [] };
+        set((s) => ({ groups: [...s.groups, group] }));
+        return id;
+      },
+
+      renameGroup: (id, name) =>
+        set((s) => ({
+          groups: s.groups.map((g) => (g.id === id ? { ...g, name: name.trim() || g.name } : g)),
+        })),
+
+      setGroupMembers: (id, memberIds) =>
+        set((s) => ({
+          groups: s.groups.map((g) => (g.id === id ? { ...g, memberIds: [...memberIds] } : g)),
+        })),
+
+      disbandGroup: (id) => set((s) => ({ groups: s.groups.filter((g) => g.id !== id) })),
 
       addOne: (id) =>
         set((s) => {

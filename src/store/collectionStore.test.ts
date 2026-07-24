@@ -185,3 +185,28 @@ describe('reorderAlbums', () => {
     expect(orderAlbums(st.albums, st.albumOrder).map((a) => a.id)).toEqual(['S', 'A']);
   });
 });
+
+describe('group CRUD', () => {
+  beforeEach(() => {
+    useCollection.setState({ groups: [] } as any, false);
+  });
+
+  it('creates a group with trimmed name and members, returning its id', () => {
+    const id = useCollection.getState().createGroup('  Kids  ', ['A', 'S']);
+    const g = useCollection.getState().groups.find((x) => x.id === id)!;
+    expect(g.name).toBe('Kids');
+    expect(g.memberIds).toEqual(['A', 'S']);
+    expect(g.swaps).toEqual([]);
+  });
+
+  it('renames, replaces members, and disbands', () => {
+    const id = useCollection.getState().createGroup('G', ['A', 'S']);
+    useCollection.getState().renameGroup(id, 'Family');
+    useCollection.getState().setGroupMembers(id, ['A', 'S', 'B']);
+    const g = useCollection.getState().groups.find((x) => x.id === id)!;
+    expect(g.name).toBe('Family');
+    expect(g.memberIds).toEqual(['A', 'S', 'B']);
+    useCollection.getState().disbandGroup(id);
+    expect(useCollection.getState().groups.find((x) => x.id === id)).toBeUndefined();
+  });
+});
