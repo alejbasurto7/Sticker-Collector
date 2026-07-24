@@ -426,6 +426,10 @@ export const useCollection = create<CollectionState>()(
       deleteAlbum: (id) =>
         set((s) => {
           const remaining = s.albums.filter((a) => a.id !== id);
+          // Drop the deleted album from any group; auto-disband a group left with <2 members.
+          const groups = s.groups
+            .map((g) => (g.memberIds.includes(id) ? { ...g, memberIds: g.memberIds.filter((m) => m !== id) } : g))
+            .filter((g) => g.memberIds.length >= 2);
           // Never leave the app album-less: rebuild a fresh default if this was the last one.
           if (remaining.length === 0) {
             const fresh: AlbumSnapshot = {
@@ -443,16 +447,16 @@ export const useCollection = create<CollectionState>()(
               unlockedAchievements: {},
             };
             applyEdition(fresh.edition, fresh.trackCC);
-            return { albums: [fresh], activeAlbumId: fresh.id, ...loadSnapshot(fresh) };
+            return { albums: [fresh], activeAlbumId: fresh.id, groups, ...loadSnapshot(fresh) };
           }
           // Deleting the active album means promoting another one to live; deleting a
           // parked album just drops it and leaves the active fields untouched.
           if (id === s.activeAlbumId) {
             const target = remaining[0];
             applyEdition(target.edition, target.trackCC);
-            return { albums: remaining, activeAlbumId: target.id, ...loadSnapshot(target) };
+            return { albums: remaining, activeAlbumId: target.id, groups, ...loadSnapshot(target) };
           }
-          return { albums: remaining };
+          return { albums: remaining, groups };
         }),
 
       setTheme: (theme) => set({ theme }),

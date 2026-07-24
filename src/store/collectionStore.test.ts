@@ -314,3 +314,25 @@ describe('closeCombinedSwap / rollbackCombinedSwap', () => {
     expect(st.groups[0].swaps[0].settledByAlbum).toBeUndefined();
   });
 });
+
+describe('deleteAlbum prunes groups', () => {
+  beforeEach(() => {
+    useCollection.setState({
+      activeAlbumId: 'A', counts: {}, groups: [],
+      albums: [snap('A'), snap('B'), snap('C')],
+    } as any, false);
+  });
+
+  it('removes a deleted member and keeps a group with ≥2 members', () => {
+    const gid = useCollection.getState().createGroup('G', ['A', 'B', 'C']);
+    useCollection.getState().deleteAlbum('C');
+    const g = useCollection.getState().groups.find((x) => x.id === gid)!;
+    expect(g.memberIds).toEqual(['A', 'B']);
+  });
+
+  it('auto-disbands a group that drops below 2 members', () => {
+    const gid = useCollection.getState().createGroup('G', ['B', 'C']);
+    useCollection.getState().deleteAlbum('C');
+    expect(useCollection.getState().groups.find((x) => x.id === gid)).toBeUndefined();
+  });
+});
