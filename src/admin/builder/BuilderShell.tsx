@@ -208,6 +208,7 @@ export default function BuilderShell() {
         {step === 'sections' && (
           <SectionsStep
             type={type}
+            key={type.id}
             selectedSectionId={selectedSectionId}
             onSelectSection={setSelectedSectionId}
             onUpdateType={updateType}

@@ -140,6 +140,11 @@ describe('orderedSectionsFor', () => {
     const t = { ...base, sectionOrder: { latam: ['Z', 'B', 'B', 'A'] } };
     expect(orderedSectionsFor(t, 'latam').map((s) => s.id)).toEqual(['B', 'A', 'C']);
   });
+
+  it('treats an empty override as no override (base order, same reference)', () => {
+    const t = { ...base, sectionOrder: { latam: [] } };
+    expect(orderedSectionsFor(t, 'latam')).toBe(base.sections);
+  });
 });
 
 describe('buildAlbumFromType — per-variant order', () => {

@@ -25,6 +25,7 @@ export default function SectionsStep({
     ? orderVariantId
     : type.defaultVariant;
   const hasOverride = !!type.sectionOrder?.[activeVariantId];
+  const editsBase = activeVariantId === type.defaultVariant && !hasOverride;
 
   return (
     <div>
@@ -54,8 +55,10 @@ export default function SectionsStep({
             )}
           </div>
           <p style={{ fontSize: 12, opacity: 0.6, margin: '6px 0 0' }}>
-            Reordering changes the sequence for this variant only. A section's identity,
-            numbers, and template are shared across variants.
+            {editsBase
+              ? 'You are editing the base order, shared by every variant without its own custom order.'
+              : 'Reordering changes the sequence for this variant only.'}
+            {' '}A section's identity, numbers, and template are shared across variants.
           </p>
         </div>
       )}

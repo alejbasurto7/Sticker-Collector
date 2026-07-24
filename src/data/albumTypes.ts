@@ -47,7 +47,7 @@ function numbersFor(section: SectionDef, variant: string): string[] {
  */
 export function orderedSectionsFor(type: AlbumType, variant: string): SectionDef[] {
   const order = type.sectionOrder?.[variant];
-  if (!order) return type.sections;
+  if (!order || order.length === 0) return type.sections;
   const byId = new Map(type.sections.map((s) => [s.id, s]));
   const seen = new Set<string>();
   const listed: SectionDef[] = [];
