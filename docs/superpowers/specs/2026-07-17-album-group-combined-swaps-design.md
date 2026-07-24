@@ -1,6 +1,6 @@
 # Album Groups & Combined Swaps — Design
 
-**Date:** 2026-07-17
+**Date:** 2026-07-17 (revised 2026-07-24 for the per-album sync/sharing + Settings/Library reorg landings)
 **Status:** Approved (pending spec review)
 
 ## Problem
@@ -21,6 +21,30 @@ We want to let him work two (or more) albums **as one pool for swapping**:
 
 Scope is **swapping only** — browsing/editing and stats stay per-album.
 
+## Context: what changed under this spec
+
+This spec was first written before two features landed in `main`. It has been revised to fit
+them:
+
+- **Per-album sync & sharing** ([spec](2026-07-17-per-album-sync-sharing-design.md)). Sync is
+  no longer whole-document last-write-wins. Each album is **Local** (device only), **Cloud**
+  (your own devices, one shared row), or **Shared** (its own row/code, owner + joiners).
+  Merging is a client-side, field-level **3-way merge** ([merge.ts](../../../src/sync/merge.ts),
+  [engine.ts](../../../src/sync/engine.ts)); mode is **derived** from
+  [syncStore.ts](../../../src/store/syncStore.ts) metadata, not stored on the album.
+- **Settings/Library reorg** ([spec](2026-07-19-settings-library-reorg-design.md)). The old
+  `EditionDialog` is gone; albums now live behind a header **album switcher** →
+  **Library sheet** ([LibrarySheet.tsx](../../../src/components/LibrarySheet.tsx),
+  [AlbumSwitcher.tsx](../../../src/components/AlbumSwitcher.tsx)), with per-album config on an
+  [AlbumDetailView](../../../src/components/AlbumDetailView.tsx). That reorg **explicitly
+  reserved a `👥 Groups` entry in the Library sheet for this feature**, and added
+  `computeStatsFor(counts, edition, trackCC)` — per-album layout stats without touching the
+  global `album` singleton.
+
+The **core pool logic (§B–§D) is unaffected** by these — it is pure `counts` math. What the
+landings change is the group entity's **storage/sync (§A)**, **membership eligibility (§A)**,
+and **UI placement (§E)**.
+
 ## Key decisions
 
 1. **Persistent album group.** The user links albums once into a named group. The combined
@@ -31,16 +55,21 @@ Scope is **swapping only** — browsing/editing and stats stay per-album.
 3. **Auto-route with override at close.** Settlement auto-assigns every copy it can resolve
    unambiguously; a genuinely ambiguous *received* copy is auto-assigned but overridable on
    the close screen. The *give* side is fully automatic (fungible surplus — see §D).
+4. **Groups sync across your own Cloud devices.** Groups ride the Cloud channel's collection
+   payload and 3-way-merge like the rest of it (§A). Members you own that aren't Cloud simply
+   don't appear on your other devices; the group operates on whatever members are present.
+5. **Members must be albums you own** (`role !== 'joiner'`). Excludes read-only lock-outs,
+   device-remapped joined ids, and cross-owner write propagation.
 
-## A. Data model & storage
+## A. Data model, storage & sync
 
-A new top-level concept in the collection store, alongside `albums`:
+### The group entity
 
 ```ts
 interface AlbumGroup {
   id: string;
   name: string;          // e.g. "Kids' World Cup"
-  memberIds: string[];   // AlbumSnapshot ids, ≥2
+  memberIds: string[];   // AlbumSnapshot ids the user owns, ≥2
   swaps: Swap[];         // the group's combined swaps (separate from each album's own swaps)
 }
 
@@ -51,14 +80,19 @@ groups: AlbumGroup[];
 - **Combined swaps live on the group**, not inside any single `AlbumSnapshot`. Each album
   keeps its own `swaps` for solo trades; the group holds the combined ones.
 - An album belongs to **at most one** group.
+- **Membership = owned albums only.** A member's derived mode may be Local, Cloud, or
+  owner-Shared, but **not a joined share** (`isJoiner`/`role === 'joiner'` in
+  [albumMode.ts](../../../src/sync/albumMode.ts)). Joined albums are force-locked when
+  read-only, carry device-remapped ids that don't travel, and writing settlement into them
+  would push to another person. The Library "add members" picker filters to owned albums.
 - **No shared-edition / shared-trackCC constraint.** Members may differ in `edition` and
-  `trackCC`; the only requirement is the same album *type* (globally fixed today, so
-  effectively no constraint). See §B for how differing layouts are handled per sticker.
+  `trackCC`; §B nets per sticker over *participating* members, so differing layouts are fine.
 
 ### `Swap` gains two optional fields
 
 The same `Swap` type, `NewSwapDialog`, and `SwapClose` are reused for combined swaps. Two
-optional fields carry the group-specific data:
+optional fields carry the group-specific data (the `Swap` type already gained `notes?`
+independently — unrelated):
 
 ```ts
 interface Swap {
@@ -82,27 +116,84 @@ interface Swap {
 
 Solo (per-album) swaps are unchanged and keep using `settledDelta`.
 
-### Active/parked mirroring hazard
+### Sync — groups ride the Cloud channel
 
-The store mirrors the **active** album's fields (`counts`, `swaps`, …) at the top level and
-parks the other albums as `AlbumSnapshot`s in `albums`. Combined operations write to
-**multiple albums at once** — some parked, possibly the active one. Every cross-album write
-(`closeSwap`/`rollbackSwap` for a combined swap, and `applyInternalMove`) must update the
-parked snapshot **and**, when a touched album is the active one, the mirrored top-level
-`counts`. The plan must handle this consistently (e.g. a helper that patches an album's
-counts whether it is active or parked). This is the main implementation hazard.
+Groups are added to the Cloud channel so they sync across the user's own devices. **Only the
+Cloud channel** carries them; Shared album rows (`AlbumPayload`) do **not** — a group is never
+visible to a share's other participant.
 
-### Sync
+```ts
+interface CollectionPayload {
+  kind: 'collection';
+  v: 1;
+  albums: AlbumSnapshot[];
+  deletedAlbumIds?: Record<string, number>;
+  groups?: AlbumGroup[];   // NEW — Cloud-synced, 3-way merged
+}
+```
 
-`groups` joins the serialized sync payload. Conflict resolution is unchanged:
-whole-document last-write-wins.
+A new pure `mergeGroups(base, local, remote)` slots into
+[mergeCollection](../../../src/sync/merge.ts), following the engine's existing lossless-biased
+rules:
+
+| Part | Rule | Same-id collision tie-break |
+|---|---|---|
+| group set (by id) | 3-way vs. base set: add on one side kept; edit kept; delete honored (base distinguishes add-vs-delete — **no tombstones**, exactly like `mergeSwaps`) | edit vs. delete → keep |
+| `name` | `scalar3` (side differing from base wins) | both changed → fixed lexical comparator (matches the `albumName` rule) |
+| `memberIds` | 3-way per member id vs. base set | both changed → **union** (never silently drop a member) |
+| `swaps` | reuse `mergeSwaps` on the group's swap array | as in `mergeSwaps` |
+
+`serialize.ts` (`sliceCloudPayload` / `reconstructActive`) and
+`applyMergedCollection` ([collectionStore.ts](../../../src/store/collectionStore.ts)) are
+extended to carry and rebuild `groups`. Because `base` (in `syncStore.bases.collection`)
+already stores the whole merged payload, no extra base plumbing is needed beyond including
+`groups`. **Back-compat:** rows written before this feature have no `groups` key → treated as
+`[]`; the key is added on the next push (same pattern as `deletedAlbumIds`).
+
+### Per-device member resolution
+
+Member ids resolve only on a device that has the album:
+
+- **Cloud** members carry the same id across all your devices (they travel in the collection
+  payload) → resolve everywhere.
+- **Local** members exist on one device only; an **owner-Shared** member exists only where
+  that share is linked → do not travel.
+
+So every consumer resolves a group's members against the **local** `albums` and operates on
+the present subset. A group with **fewer than 2 resolvable members** on a device is shown but
+**inert** there (no combined pool, no combined-swap creation). This is consistent with the
+engine's "absence never deletes" philosophy and means cross-device groups are useful exactly
+when their members are Cloud.
+
+### Active/parked mirroring & cross-album writes
+
+The store mirrors the **active** album's fields at the top level and parks the others in
+`albums`. Combined operations (`closeSwap`/`rollbackSwap` for a combined swap, and
+`applyInternalMove`) write to **multiple members at once** — some parked, possibly the active
+one. There is already a precedent to reuse: **`applyMergedAlbum(albumId, snapshot)`**
+([collectionStore.ts](../../../src/store/collectionStore.ts)) patches an album's fields whether
+it is active or parked. Combined writes go through the same active-or-parked helper.
+
+Because writing a member's counts is an ordinary store edit, the sync engine will push the
+touched channels: a **Cloud** member fans out on the Cloud row (to your other devices), an
+**owner-Shared** member on its own row, a **Local** member not at all. There is no atomic
+multi-album transaction, so partial propagation (one member offline) is possible but
+self-heals on the next sync.
+
+> **Merge caveat (pre-existing, not introduced here).** `mergeCounts` breaks a same-sticker
+> collision with `Math.max(local, remote)`. On an **owner-Shared collaborative** member, a
+> settled **give (−1)** can be resurrected if a co-editor also changed that sticker before the
+> merge. This already affects *solo* swaps on collaborative albums; combined swaps inherit it,
+> no worse. It is one more reason the common, safe case is grouping albums you don't co-edit.
 
 ## B. Combined pool math
 
 The pool nets the whole family against a **per-sticker** target. For a sticker `X`:
 
-- **participating members** = group members whose album *layout includes* `X`
-  (built from each member's `edition` + `trackCC`).
+- **participating members** = *resolvable* group members whose album *layout includes* `X`.
+  Each member's layout is built with `buildAlbumFromType(activeType, { variant: edition,
+  enabledOptional })` (as `applyEdition`/`computeStatsFor` do), so no global singleton is
+  mutated and a parked member with a different edition/trackCC is handled correctly.
 - **target(X)** = number of participating members.
 - **held(X)** = sum of `counts[X]` over the participating members only.
 - **deficit** = number of participating members with `count == 0`.
@@ -161,7 +252,7 @@ computeGroupCandidates(members, parsedOtherList, reservations) -> {
 ## D. Settlement routing at close
 
 `SwapClose` in group mode confirms what was actually exchanged (as today), then routes each
-copy to an album before applying counts.
+copy to an album before applying counts via the active-or-parked helper (§A).
 
 **Received copy** → the participating albums missing it are the targets:
 
@@ -199,43 +290,50 @@ You received (3)
 
 ## E. UI surfaces & scope
 
-**Group management** lives in the Settings dialog ([EditionDialog.tsx](../../../src/components/EditionDialog.tsx)),
-next to the album controls: a small **"Groups"** section to create a group, name it, pick
-≥2 member albums, and disband it.
+The Settings/Library reorg already reserved the surfaces this feature needs; there is **no
+Trade tab** (the bottom bar is `Album · Swaps · Stats · ⚙️ Settings` —
+[TabBar.tsx](../../../src/components/TabBar.tsx)), so the combined pool is a **lens**, not a
+new tab.
 
-**The combined pool is a lens on the Swaps + Trade tabs** — not a new "active context" that
-hijacks the whole app. When the active album is a group member, those two tabs show a
-segmented toggle:
+**Group management → Library sheet.** The reserved `👥 Groups` entry in
+[LibrarySheet.tsx](../../../src/components/LibrarySheet.tsx) opens a **Groups** screen: create
+a group, name it, pick ≥2 **owned** member albums, disband it. Member picker filters out
+joined shares (`isJoiner`). Album cards there reuse the existing monogram/mode-badge/progress
+treatment (progress via `computeStatsFor`).
+
+**Combined pool → a lens on the Swaps tab.** When the active album is a *resolvable* member of
+a group, `SwapsView` shows a segmented toggle:
 
 ```
 [ Leo's album  |  Kids' World Cup (both) ]
 ```
 
 - **Combined lens → Swaps tab:** the group's combined swaps, a "New combined swap" button
-  (§C), and settlement via the §D close screen. Plus a small **"Internal moves (N)"** panel
-  listing the netted A↔B shuffles, each with a one-tap **Apply** (decrements the source
-  album, increments the target) so counts stay truthful after the dad physically moves a
-  sticker. Apply calls a new store action `applyInternalMove(stickerId, fromId, toId)`.
-- **Combined lens → Trade tab:** the export / QR is built from the **combined** pool.
+  (§C), settlement via the §D close screen, a **"Share combined list"** action that exports/QRs
+  the combined pool (replacing the old spec's "Trade tab" idea), and a small
+  **"Internal moves (N)"** panel listing the netted A↔B shuffles, each with a one-tap
+  **Apply** (`applyInternalMove(stickerId, fromId, toId)` — decrement source, increment
+  target, via the active-or-parked helper).
+- **Album lens** = today's per-album swaps, unchanged.
 - **Album tab and Stats tab stay per-album, always.**
-
-The combined lens for an album is derived from membership
-(`groups.find(g => g.memberIds.includes(activeAlbumId))`); no separate "active group" state
-is needed.
+- The combined lens only appears for **editable** albums; it is not offered on a read-only
+  joined album (which can't be a member anyway) and respects the Swaps-tab read-only gating the
+  sharing spec added.
 
 **Explicitly out of scope (YAGNI):**
 
 - A merged album-*browsing* grid or combined stats / achievements — both stay per-album.
 - Groups spanning different album *types*, nested / overlapping groups, or an album in two
   groups.
-- The math supports any N ≥ 2 members; the UI just needs to be sane for a small family, not
-  capped or specially built for large N.
+- **Grouping a joined (someone else's) shared album** — owner-only membership for now.
+- The math supports any N ≥ 2 members; the UI just needs to be sane for a small family.
 
 ## F. Testing & edge cases
 
-New logic is pure functions (pool math, group candidates, settlement routing), unit-tested
-with **vitest** alongside [swap.test.ts](../../../src/utils/swap.test.ts), plus a few
-assertions added to `scripts/test-logic.ts`.
+New logic is pure functions (pool math, group candidates, settlement routing, `mergeGroups`),
+unit-tested with **vitest** alongside [swap.test.ts](../../../src/utils/swap.test.ts) and
+[merge.test.ts](../../../src/sync/merge.test.ts), plus a few assertions in
+`scripts/test-logic.ts`.
 
 | Case | Expected |
 |---|---|
@@ -244,26 +342,32 @@ assertions added to `scripts/test-logic.ts`.
 | `A=3, B=0` | external **give ×1** + internal move |
 | mixed trackCC (`CC-5` in A only) | target 1; B never receives/needs it |
 | spare promised in a member's **solo** swap | not offered again in a combined swap (reservation roll-up) |
-| ambiguous receive (both need, 1 copy) | auto-assign one, override available |
+| ambiguous receive (both need, 1 copy) | auto-assign first member, override available |
 | combined give | can't strip a member's solo-reserved spare (give floor holds per album) |
 | rollback / undo combined swap | reverses `settledByAlbum` per album |
 | member album deleted while in a group | pruned from `memberIds`; group auto-disbands if it drops below 2 |
-| sync of two devices editing a group | whole-document last-write-wins (unchanged) |
+| member not present on this device | resolved-out; group inert if < 2 resolvable members |
+| joined (read-only or collaborative) album | not offerable as a member |
+| **`mergeGroups`** | independent group add on each device → union; same-group member add on each → member union; group delete vs. base honored; `name` scalar convergence; group `swaps` via `mergeSwaps` |
+| Cloud row without `groups` key | treated as `[]` (back-compat) |
 
 ## Files touched (anticipated)
 
 - `src/types.ts` — `AlbumGroup`; `Swap.receivingQty`, `Swap.settledByAlbum`.
 - `src/store/collectionStore.ts` — `groups` state; group CRUD (create / rename / add-member /
-  remove-member / disband); combined-swap CRUD; combined `closeSwap` / `rollbackSwap` writing
-  `settledByAlbum`; `applyInternalMove`; member-delete pruning; rehydrate + `applyRemoteState`
-  reconciliation for `groups`.
+  remove-member / disband, owned-only); combined-swap CRUD; combined `closeSwap` /
+  `rollbackSwap` writing `settledByAlbum` through the active-or-parked helper; `applyInternalMove`;
+  member-delete pruning + auto-disband; `applyMergedCollection` rebuild of `groups`.
 - `src/utils/swap.ts` (or a new `src/utils/groupSwap.ts`) — pool math (`computeGroupPool`),
   `computeGroupCandidates`, group reservation roll-up, settlement routing helper.
+- `src/utils/stats.ts` — reuse `computeStatsFor` / member-layout build for the pool + group cards.
 - `src/utils/listExport.ts` / export path — build the combined export from the pool.
+- `src/sync/payload.ts` — `CollectionPayload.groups?`.
+- `src/sync/serialize.ts` — carry `groups` in the Cloud slice + reconstruct.
+- `src/sync/merge.ts` — `mergeGroups`, wired into `mergeCollection`.
 - `src/components/NewSwapDialog.tsx` — group mode (candidates + two-sided quantities).
 - `src/components/SwapClose.tsx` — per-received-copy album routing UI.
-- `src/components/SwapsView.tsx` / `TradeView` — the album ↔ combined segmented lens.
-- `src/components/EditionDialog.tsx` — Groups management section.
-- New "Internal moves" panel component.
-- `src/sync/serialize.ts` — include `groups` in the payload.
-- Tests: `src/utils/*.test.ts`, `scripts/test-logic.ts`.
+- `src/components/SwapsView.tsx` — album ↔ combined segmented lens + internal-moves panel + share.
+- `src/components/LibrarySheet.tsx` — `👥 Groups` entry → Groups screen (new component).
+- New: Groups management screen/component, Internal-moves panel component.
+- Tests: `src/utils/*.test.ts`, `src/sync/merge.test.ts`, `scripts/test-logic.ts`.
