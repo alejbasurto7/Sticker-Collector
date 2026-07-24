@@ -21,3 +21,62 @@ export function memberStickerIds(m: GroupMember): Set<string> {
   });
   return new Set(album.stickers.map((s) => s.id));
 }
+
+export interface InternalMove {
+  id: string;
+  fromId: string;
+  toId: string;
+}
+
+export interface GroupPool {
+  /** id -> external copies wanted from outsiders (writable gaps + view-only needs). */
+  get: Record<string, number>;
+  /** id -> copies that can be settled into a writable album (writable gaps only). */
+  writableGet: Record<string, number>;
+  /** id -> external spare copies available to give away (writable surplus only). */
+  give: Record<string, number>;
+  /** concrete copies to shuffle between writable members. */
+  internalMoves: InternalMove[];
+}
+
+/** Net the whole group per sticker; see the module's netting rule. Deterministic. */
+export function computeGroupPool(members: GroupMember[]): GroupPool {
+  const idSets = new Map<string, Set<string>>();
+  for (const m of members) idSets.set(m.id, memberStickerIds(m));
+
+  const domain = new Set<string>();
+  for (const set of idSets.values()) for (const id of set) domain.add(id);
+
+  const get: Record<string, number> = {};
+  const writableGet: Record<string, number> = {};
+  const give: Record<string, number> = {};
+  const internalMoves: InternalMove[] = [];
+
+  for (const id of [...domain].sort()) {
+    const deficitIds: string[] = []; // writable members with count 0
+    const surplusUnits: string[] = []; // one entry per writable spare copy, labelled by member id
+    let viewDeficit = 0;
+    for (const m of members) {
+      if (!idSets.get(m.id)!.has(id)) continue;
+      const c = m.counts[id] ?? 0;
+      if (m.writable) {
+        if (c === 0) deficitIds.push(m.id);
+        for (let k = 0; k < Math.max(0, c - 1); k++) surplusUnits.push(m.id);
+      } else if (c === 0) {
+        viewDeficit++;
+      }
+    }
+    const deficit = deficitIds.length;
+    const surplus = surplusUnits.length;
+    const g = Math.max(0, surplus - deficit);
+    const wGet = Math.max(0, deficit - surplus);
+    if (g > 0) give[id] = g;
+    if (wGet > 0) writableGet[id] = wGet;
+    if (wGet + viewDeficit > 0) get[id] = wGet + viewDeficit;
+    const pairs = Math.min(deficit, surplus);
+    for (let k = 0; k < pairs; k++) {
+      internalMoves.push({ id, fromId: surplusUnits[k], toId: deficitIds[k] });
+    }
+  }
+  return { get, writableGet, give, internalMoves };
+}

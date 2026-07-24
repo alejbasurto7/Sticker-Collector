@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { memberStickerIds, type GroupMember } from './groupSwap';
+import type { Counts } from '../types';
+import {
+  memberStickerIds,
+  computeGroupPool,
+  type GroupMember,
+} from './groupSwap';
 
 const member = (over: Partial<GroupMember> = {}): GroupMember => ({
   id: 'a', name: 'A', counts: {}, edition: 'latam', trackCC: false, writable: true, ...over,
@@ -16,5 +21,53 @@ describe('memberStickerIds', () => {
     expect(memberStickerIds(member({ trackCC: true, edition: 'latam' })).has('CC-14')).toBe(true);
     expect(memberStickerIds(member({ trackCC: true, edition: 'na' })).has('CC-14')).toBe(false);
     expect(memberStickerIds(member({ trackCC: true, edition: 'na' })).has('CC-5')).toBe(true);
+  });
+});
+
+const w = (id: string, counts: Counts): GroupMember =>
+  ({ id, name: id, counts, edition: 'latam', trackCC: false, writable: true });
+const v = (id: string, counts: Counts): GroupMember =>
+  ({ id, name: id, counts, edition: 'latam', trackCC: false, writable: false });
+
+describe('computeGroupPool', () => {
+  it('A=2,B=0 → internal move A→B, nothing external', () => {
+    const pool = computeGroupPool([w('A', { 'MEX-7': 2 }), w('B', { 'MEX-7': 0 })]);
+    expect(pool.give['MEX-7']).toBeUndefined();
+    expect(pool.get['MEX-7']).toBeUndefined();
+    expect(pool.internalMoves).toEqual([{ id: 'MEX-7', fromId: 'A', toId: 'B' }]);
+  });
+
+  it('both missing → external get ×2', () => {
+    const pool = computeGroupPool([w('A', { 'MEX-3': 0 }), w('B', { 'MEX-3': 0 })]);
+    expect(pool.get['MEX-3']).toBe(2);
+    expect(pool.writableGet['MEX-3']).toBe(2);
+    expect(pool.give['MEX-3']).toBeUndefined();
+  });
+
+  it('A=3,B=0 → external give ×1 AND internal move', () => {
+    const pool = computeGroupPool([w('A', { 'MEX-9': 3 }), w('B', { 'MEX-9': 0 })]);
+    expect(pool.give['MEX-9']).toBe(1);
+    expect(pool.get['MEX-9']).toBeUndefined();
+    expect(pool.internalMoves).toEqual([{ id: 'MEX-9', fromId: 'A', toId: 'B' }]);
+  });
+
+  it('A=2,B=1 → external give ×1, no move', () => {
+    const pool = computeGroupPool([w('A', { 'MEX-4': 2 }), w('B', { 'MEX-4': 1 })]);
+    expect(pool.give['MEX-4']).toBe(1);
+    expect(pool.internalMoves).toEqual([]);
+  });
+
+  it('mixed trackCC: CC-5 only in A → target 1, only A can need it', () => {
+    const a: GroupMember = { id: 'A', name: 'A', counts: { 'CC-5': 0 }, edition: 'latam', trackCC: true, writable: true };
+    const b: GroupMember = { id: 'B', name: 'B', counts: {}, edition: 'latam', trackCC: false, writable: true };
+    const pool = computeGroupPool([a, b]);
+    expect(pool.get['CC-5']).toBe(1);
+  });
+
+  it('view-only member adds to get but not to give/writableGet', () => {
+    const pool = computeGroupPool([w('A', { 'MEX-2': 1 }), v('V', { 'MEX-2': 0 })]);
+    expect(pool.get['MEX-2']).toBe(1);
+    expect(pool.writableGet['MEX-2']).toBeUndefined();
+    expect(pool.give['MEX-2']).toBeUndefined();
   });
 });
