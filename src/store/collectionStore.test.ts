@@ -336,3 +336,28 @@ describe('deleteAlbum prunes groups', () => {
     expect(useCollection.getState().groups.find((x) => x.id === gid)).toBeUndefined();
   });
 });
+
+describe('applyMergedCollection adopts groups', () => {
+  beforeEach(() => {
+    useCollection.setState({
+      activeAlbumId: 'A', counts: {}, groups: [],
+      albums: [snap('A', { counts: {} }), snap('S')],
+    } as any, false);
+  });
+
+  it('adopts the merged group set from the payload', () => {
+    const groups = [{ id: 'g1', name: 'Kids', memberIds: ['A', 'S'], swaps: [] }];
+    useCollection.getState().applyMergedCollection(
+      { kind: 'collection', v: 1, albums: [snap('A')], groups } as any, new Set(['S']),
+    );
+    expect(useCollection.getState().groups).toEqual(groups);
+  });
+
+  it('clears groups when the merged payload has none', () => {
+    useCollection.setState({ groups: [{ id: 'g1', name: 'x', memberIds: ['A', 'S'], swaps: [] }] } as any, false);
+    useCollection.getState().applyMergedCollection(
+      { kind: 'collection', v: 1, albums: [snap('A')] } as any, new Set(['S']),
+    );
+    expect(useCollection.getState().groups).toEqual([]);
+  });
+});

@@ -780,18 +780,19 @@ export const useCollection = create<CollectionState>()(
           // e.g. a just-created swap on the active shared album).
           const cloudAlbums = payload.albums.filter((a) => !nonCloudIds.has(a.id));
           const albums = [...kept, ...cloudAlbums];
+          const groups = payload.groups ?? [];
           const activeInCloud = cloudAlbums.find((a) => a.id === s.activeAlbumId);
           if (activeInCloud) {
             applyEdition(activeInCloud.edition, activeInCloud.trackCC);
-            return { albums, ...loadSnapshot(activeInCloud) };
+            return { albums, groups, ...loadSnapshot(activeInCloud) };
           }
           if (!albums.some((a) => a.id === s.activeAlbumId)) {
             const fallback = albums[0];
-            if (!fallback) return { albums };
+            if (!fallback) return { albums, groups };
             applyEdition(fallback.edition, fallback.trackCC);
-            return { albums, activeAlbumId: fallback.id, ...loadSnapshot(fallback) };
+            return { albums, activeAlbumId: fallback.id, groups, ...loadSnapshot(fallback) };
           }
-          return { albums }; // active is a shared/private album — leave top-level alone
+          return { albums, groups }; // active is a shared/private album — leave top-level alone
         }),
 
       applyMergedAlbum: (albumId, snapshot) =>
