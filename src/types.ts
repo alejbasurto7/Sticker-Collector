@@ -86,4 +86,27 @@ export interface Swap {
    * before this field existed.
    */
   settledDelta?: Record<string, number>;
+  /**
+   * Combined (group) swaps only. Copies to RECEIVE per sticker id — a combined swap
+   * can be missing the same sticker in more than one album. Absent/≤1 means one copy.
+   */
+  receivingQty?: Record<string, number>;
+  /**
+   * Combined (group) swaps only. Per-album net count change settlement applied
+   * (albumId -> stickerId -> delta). Replaces the flat `settledDelta` for group swaps;
+   * rollbackSwap / undoLastTrade reverse it per album.
+   */
+  settledByAlbum?: Record<string, Record<string, number>>;
+}
+
+/**
+ * A user-defined grouping of albums (of the same type) worked as one pool for
+ * swapping. `memberIds` reference AlbumSnapshot ids the user can settle into;
+ * `swaps` are the group's combined swaps (kept apart from each album's own swaps).
+ */
+export interface AlbumGroup {
+  id: string;
+  name: string;
+  memberIds: string[];
+  swaps: Swap[];
 }
