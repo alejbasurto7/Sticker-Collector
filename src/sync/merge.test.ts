@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { mergeCounts, scalar3, mergeSwaps, mergeAlbum, mergeCollection } from './merge';
+import { mergeCounts, scalar3, mergeSwaps, mergeAlbum, mergeCollection, mergeGroups } from './merge';
 import { PAYLOAD_V, type CollectionPayload } from './payload';
-import type { Swap } from '../types';
+import type { AlbumGroup, Swap } from '../types';
 import type { AlbumSnapshot } from '../store/collectionStore';
 
 describe('mergeCounts', () => {
@@ -230,5 +230,42 @@ describe('mergeCollection', () => {
     const m = mergeCollection(base, local, remote, new Set(['x']));
     expect(m.albums.map((a) => a.id)).toEqual([]);
     expect(m.deletedAlbumIds).toEqual(['x']);
+  });
+});
+
+const grp = (over: Partial<AlbumGroup> = {}): AlbumGroup =>
+  ({ id: 'g1', name: 'Kids', memberIds: ['A', 'B'], swaps: [], ...over });
+
+describe('mergeGroups', () => {
+  it('keeps a group added on either side (first-join union)', () => {
+    expect(mergeGroups([], [grp()], []).map((g) => g.id)).toEqual(['g1']);
+    expect(mergeGroups([], [], [grp()]).map((g) => g.id)).toEqual(['g1']);
+  });
+
+  it('unions member additions from both sides', () => {
+    const base = [grp({ memberIds: ['A'] })];
+    const local = [grp({ memberIds: ['A', 'B'] })];
+    const remote = [grp({ memberIds: ['A', 'C'] })];
+    expect(mergeGroups(base, local, remote)[0].memberIds).toEqual(['A', 'B', 'C']);
+  });
+
+  it('honors a member removed on one side, unchanged on the other', () => {
+    const base = [grp({ memberIds: ['A', 'B'] })];
+    const local = [grp({ memberIds: ['A'] })];
+    const remote = [grp({ memberIds: ['A', 'B'] })];
+    expect(mergeGroups(base, local, remote)[0].memberIds).toEqual(['A']);
+  });
+
+  it('honors a group deleted on one side, unchanged on the other', () => {
+    const base = [grp()];
+    expect(mergeGroups(base, [], [grp()])).toEqual([]);
+  });
+
+  it('converges on name regardless of argument order', () => {
+    const base = [grp({ name: 'Kids' })];
+    const a = mergeGroups(base, [grp({ name: 'Boys' })], [grp({ name: 'Kids' })])[0].name;
+    const b = mergeGroups(base, [grp({ name: 'Kids' })], [grp({ name: 'Boys' })])[0].name;
+    expect(a).toBe('Boys');
+    expect(b).toBe('Boys');
   });
 });
