@@ -1,4 +1,4 @@
-import type { Counts, Edition, Swap } from '../types';
+import type { AlbumGroup, Counts, Edition, Swap } from '../types';
 // Type-only imports (erased at build) — keeps this module free of the store's
 // runtime (localStorage/zustand), so it's importable in a plain Node test env.
 import type { AlbumSnapshot, Theme, AlbumLayout } from '../store/collectionStore';
@@ -26,6 +26,7 @@ export interface SyncPayload {
   albumLayout: AlbumLayout;
   albums: AlbumSnapshot[];
   activeAlbumId: string;
+  groups?: AlbumGroup[];
 }
 
 /** The read-only slice of collection state the slicers need. */
@@ -34,6 +35,7 @@ export interface SliceState {
   locked: boolean; firstStickerAt?: number; activityDays: string[]; completedOn: string | null;
   unlockedAchievements: Record<string, number>; albumLayout: AlbumLayout;
   albums: AlbumSnapshot[]; activeAlbumId: string;
+  groups?: AlbumGroup[];
 }
 
 /** Build the active album's snapshot from the live top-level fields. */
@@ -61,7 +63,11 @@ export function cloudManagedIds(albumIds: string[], albumLinkIds: string[], priv
 }
 
 export function sliceCloudPayload(s: SliceState, managedIds: Set<string>): CollectionPayload {
-  return { kind: 'collection', v: PAYLOAD_V, albums: allAlbums(s).filter((a) => managedIds.has(a.id)) };
+  return {
+    kind: 'collection', v: PAYLOAD_V,
+    albums: allAlbums(s).filter((a) => managedIds.has(a.id)),
+    ...(s.groups?.length ? { groups: s.groups } : {}),
+  };
 }
 
 export function sliceAlbumPayload(

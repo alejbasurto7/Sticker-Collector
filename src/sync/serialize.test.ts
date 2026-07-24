@@ -159,3 +159,23 @@ describe('normalizeRemote', () => {
     expect(normalizeRemote({})).toBeNull();
   });
 });
+
+describe('sliceCloudPayload groups', () => {
+  const baseState: any = {
+    counts: {}, swaps: [], edition: 'latam', trackCC: false, albumName: 'A', locked: false,
+    activityDays: [], completedOn: null, unlockedAchievements: {}, albumLayout: 'compact',
+    activeAlbumId: 'A',
+    albums: [{ id: 'A', albumName: 'A', counts: {}, swaps: [], edition: 'latam', trackCC: false, locked: false, activityDays: [], completedOn: null, unlockedAchievements: {} }],
+  };
+
+  it('omits groups when there are none', () => {
+    const p = sliceCloudPayload({ ...baseState, groups: [] }, new Set(['A']));
+    expect('groups' in p).toBe(false);
+  });
+
+  it('carries groups when present', () => {
+    const groups = [{ id: 'g1', name: 'Kids', memberIds: ['A', 'B'], swaps: [] }];
+    const p = sliceCloudPayload({ ...baseState, groups }, new Set(['A']));
+    expect(p.groups).toEqual(groups);
+  });
+});
