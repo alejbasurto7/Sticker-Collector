@@ -147,6 +147,15 @@ interface CollectionState {
     },
   ) => void;
   deleteCombinedSwap: (groupId: string, swapId: string) => void;
+  closeCombinedSwap: (
+    groupId: string, swapId: string,
+    settled: {
+      givenIds: string[]; receivedIds: string[];
+      giveQty?: Record<string, number>; receiveQty?: Record<string, number>;
+      settledByAlbum: Record<string, Record<string, number>>;
+    },
+  ) => void;
+  rollbackCombinedSwap: (groupId: string, swapId: string) => void;
 
   // Collection actions
   addOne: (id: string) => void;
@@ -565,6 +574,46 @@ export const useCollection = create<CollectionState>()(
             g.id !== groupId ? g : { ...g, swaps: g.swaps.filter((sw) => sw.id !== swapId) },
           ),
         })),
+
+      closeCombinedSwap: (groupId, swapId, settled) =>
+        set((s) => {
+          const group = s.groups.find((g) => g.id === groupId);
+          if (!group || !group.swaps.some((sw) => sw.id === swapId)) return s;
+          const patch = applyAlbumDeltas(s, settled.settledByAlbum);
+          const groups = patchGroupSwap(s.groups, groupId, swapId, (sw) => ({
+            ...sw,
+            status: 'closed',
+            closedAt: Date.now(),
+            giving: settled.givenIds,
+            receiving: settled.receivedIds,
+            givingQty: settled.giveQty,
+            receivingQty: settled.receiveQty,
+            settledByAlbum: settled.settledByAlbum,
+            deselectedGiving: [],
+            deselectedReceiving: [],
+          }));
+          return { ...patch, groups };
+        }),
+
+      rollbackCombinedSwap: (groupId, swapId) =>
+        set((s) => {
+          const group = s.groups.find((g) => g.id === groupId);
+          const target = group?.swaps.find((sw) => sw.id === swapId);
+          if (!group || !target || target.status !== 'closed' || !target.settledByAlbum) return s;
+          const reversed: Record<string, Record<string, number>> = {};
+          for (const [aid, d] of Object.entries(target.settledByAlbum)) {
+            reversed[aid] = {};
+            for (const [id, n] of Object.entries(d)) reversed[aid][id] = -n;
+          }
+          const patch = applyAlbumDeltas(s, reversed);
+          const groups = patchGroupSwap(s.groups, groupId, swapId, (sw) => ({
+            ...sw,
+            status: 'open',
+            closedAt: undefined,
+            settledByAlbum: undefined,
+          }));
+          return { ...patch, groups };
+        }),
 
       addOne: (id) =>
         set((s) => {

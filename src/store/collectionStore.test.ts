@@ -271,3 +271,46 @@ describe('combined-swap CRUD', () => {
     expect(g.swaps).toEqual([]);
   });
 });
+
+describe('closeCombinedSwap / rollbackCombinedSwap', () => {
+  let gid: string;
+  beforeEach(() => {
+    useCollection.setState({
+      counts: { 'MEX-9': 2 }, activeAlbumId: 'A', groups: [],
+      albums: [snap('A', { counts: { 'MEX-9': 2 } }), snap('B', { counts: { 'MEX-3': 0 } })],
+    } as any, false);
+    gid = useCollection.getState().createGroup('Kids', ['A', 'B']);
+  });
+
+  it('applies per-album deltas, marks closed, and stores settledByAlbum', () => {
+    const sid = useCollection.getState().createCombinedSwap(gid, {
+      name: 'c', theirNeeds: [], theirSwaps: [], giving: ['MEX-9'], receiving: ['MEX-3'],
+    });
+    useCollection.getState().closeCombinedSwap(gid, sid, {
+      givenIds: ['MEX-9'], receivedIds: ['MEX-3'],
+      settledByAlbum: { A: { 'MEX-9': -1 }, B: { 'MEX-3': 1 } },
+    });
+    const st = useCollection.getState();
+    expect(st.counts['MEX-9']).toBe(1);
+    expect(st.albums.find((a) => a.id === 'B')!.counts['MEX-3']).toBe(1);
+    const sw = st.groups[0].swaps[0];
+    expect(sw.status).toBe('closed');
+    expect(sw.settledByAlbum).toEqual({ A: { 'MEX-9': -1 }, B: { 'MEX-3': 1 } });
+  });
+
+  it('rollback reverses the exact per-album deltas and reopens', () => {
+    const sid = useCollection.getState().createCombinedSwap(gid, {
+      name: 'c', theirNeeds: [], theirSwaps: [], giving: ['MEX-9'], receiving: ['MEX-3'],
+    });
+    useCollection.getState().closeCombinedSwap(gid, sid, {
+      givenIds: ['MEX-9'], receivedIds: ['MEX-3'],
+      settledByAlbum: { A: { 'MEX-9': -1 }, B: { 'MEX-3': 1 } },
+    });
+    useCollection.getState().rollbackCombinedSwap(gid, sid);
+    const st = useCollection.getState();
+    expect(st.counts['MEX-9']).toBe(2);
+    expect(st.albums.find((a) => a.id === 'B')!.counts['MEX-3']).toBe(0);
+    expect(st.groups[0].swaps[0].status).toBe('open');
+    expect(st.groups[0].swaps[0].settledByAlbum).toBeUndefined();
+  });
+});
