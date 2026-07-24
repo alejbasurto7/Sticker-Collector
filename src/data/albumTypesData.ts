@@ -2145,6 +2145,74 @@ export const ALBUM_TYPES: Record<string, AlbumType> = {
         ]
       }
     }
+  },
+  "2026-fwc-adrenalyn": {
+    "id": "2026-fwc-adrenalyn",
+    "name": "Adrenalyn WC 2026",
+    "variants": [
+      {
+        "id": "base",
+        "label": "Base"
+      }
+    ],
+    "defaultVariant": "base",
+    "sections": [
+      {
+        "id": "section",
+        "code": "",
+        "emoji": "",
+        "title": "Golden Ballers",
+        "type": "intro",
+        "templateId": "",
+        "numbers": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9"
+        ],
+        "foils": []
+      },
+      {
+        "id": "section-2",
+        "code": "",
+        "emoji": "",
+        "title": "Algeria",
+        "type": "team",
+        "templateId": "template",
+        "numbers": [
+          "10",
+          "11",
+          "12",
+          "13",
+          "14",
+          "15",
+          "16",
+          "17",
+          "18",
+          "19",
+          "20",
+          "21"
+        ],
+        "foils": []
+      }
+    ],
+    "templates": {
+      "template-2": {
+        "id": "template-2",
+        "pageAspect": 0.963,
+        "stickerWidthPct": 22.75,
+        "pages": [
+          {
+            "slots": []
+          }
+        ]
+      }
+    }
   }
 };
 
