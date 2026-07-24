@@ -5,6 +5,7 @@ import {
   computeGroupPool,
   computeGroupCandidates,
   routeReceived,
+  routeGiven,
   type GroupMember,
 } from './groupSwap';
 import type { ParsedList } from './import';
@@ -139,5 +140,33 @@ describe('routeReceived', () => {
     const r = routeReceived(members, { 'MEX-2': 1 });
     expect(r.writes).toEqual({ A: { 'MEX-2': 1 } });
     expect(r.handoffs).toEqual([{ id: 'MEX-2', memberId: 'V', memberName: 'V' }]);
+  });
+});
+
+describe('routeGiven', () => {
+  it('decrements from the writable member holding the spare', () => {
+    const members = [w('A', { 'MEX-9': 2 }), w('B', { 'MEX-9': 1 })];
+    const r = routeGiven(members, { 'MEX-9': 1 });
+    expect(r.writes).toEqual({ A: { 'MEX-9': -1 } });
+    expect(r.short).toEqual({});
+  });
+
+  it('prefers the member with the most spares', () => {
+    const members = [w('A', { 'MEX-9': 2 }), w('B', { 'MEX-9': 4 })];
+    const r = routeGiven(members, { 'MEX-9': 1 });
+    expect(r.writes).toEqual({ B: { 'MEX-9': -1 } });
+  });
+
+  it("skips a spare reserved by that album's own solo swap", () => {
+    const members = [w('A', { 'MEX-9': 2 }), w('B', { 'MEX-9': 3 })];
+    const r = routeGiven(members, { 'MEX-9': 1 }, { A: { 'MEX-9': 1 } });
+    expect(r.writes).toEqual({ B: { 'MEX-9': -1 } });
+  });
+
+  it('records a shortfall when the pool cannot cover the give', () => {
+    const members = [w('A', { 'MEX-9': 1 }), w('B', { 'MEX-9': 1 })];
+    const r = routeGiven(members, { 'MEX-9': 1 });
+    expect(r.writes).toEqual({});
+    expect(r.short).toEqual({ 'MEX-9': 1 });
   });
 });

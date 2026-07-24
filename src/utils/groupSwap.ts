@@ -182,3 +182,41 @@ export function routeReceived(
   }
   return { writes, ambiguous, handoffs };
 }
+
+export interface GiveRouting {
+  /** albumId -> stickerId -> copies to REMOVE (negative). */
+  writes: Record<string, Record<string, number>>;
+  /** id -> copies the pool could not source (should not happen for pool-derived gives). */
+  short: Record<string, number>;
+}
+
+/** Route each given copy to a writable member with an unreserved spare (most spares first). */
+export function routeGiven(
+  members: GroupMember[],
+  given: Record<string, number>,
+  reservedSpares: Record<string, Record<string, number>> = {},
+): GiveRouting {
+  const idSets = new Map(members.map((m) => [m.id, memberStickerIds(m)]));
+  const writes: Record<string, Record<string, number>> = {};
+  const short: Record<string, number> = {};
+
+  for (const [id, qty] of Object.entries(given)) {
+    let remaining = qty;
+    const sources = members
+      .filter((m) => m.writable && idSets.get(m.id)!.has(id))
+      .map((m) => ({
+        id: m.id,
+        avail: Math.max(0, (m.counts[id] ?? 0) - 1) - (reservedSpares[m.id]?.[id] ?? 0),
+      }))
+      .filter((s) => s.avail > 0)
+      .sort((a, b) => b.avail - a.avail); // most spares first; stable keeps member order on ties
+    for (const s of sources) {
+      if (remaining <= 0) break;
+      const take = Math.min(s.avail, remaining);
+      addWrite(writes, s.id, id, -take);
+      remaining -= take;
+    }
+    if (remaining > 0) short[id] = remaining;
+  }
+  return { writes, short };
+}
