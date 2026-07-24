@@ -3,8 +3,11 @@ import type { Counts } from '../types';
 import {
   memberStickerIds,
   computeGroupPool,
+  computeGroupCandidates,
   type GroupMember,
 } from './groupSwap';
+import type { ParsedList } from './import';
+import type { Reservations } from './swap';
 
 const member = (over: Partial<GroupMember> = {}): GroupMember => ({
   id: 'a', name: 'A', counts: {}, edition: 'latam', trackCC: false, writable: true, ...over,
@@ -69,5 +72,39 @@ describe('computeGroupPool', () => {
     expect(pool.get['MEX-2']).toBe(1);
     expect(pool.writableGet['MEX-2']).toBeUndefined();
     expect(pool.give['MEX-2']).toBeUndefined();
+  });
+});
+
+const list = (over: Partial<ParsedList> = {}): ParsedList =>
+  ({ needs: [], swaps: [], swapQty: {}, needQty: {}, all: {}, unmatched: [], ...over });
+
+describe('computeGroupCandidates', () => {
+  it('offers pooled surplus for their need, capped by their needed copies', () => {
+    const members = [w('A', { 'MEX-9': 3 }), w('B', { 'MEX-9': 3 })]; // pooled give = 4
+    const c = computeGroupCandidates(members, list({ needs: ['MEX-9'], needQty: { 'MEX-9': 2 } }));
+    expect(c.youGive).toEqual(['MEX-9']);
+    expect(c.giveQty['MEX-9']).toBe(2);
+  });
+
+  it('requests two copies when both writable members miss it', () => {
+    const members = [w('A', { 'MEX-3': 0 }), w('B', { 'MEX-3': 0 })];
+    const c = computeGroupCandidates(members, list({ swaps: ['MEX-3'], swapQty: { 'MEX-3': 5 } }));
+    expect(c.youGet).toEqual(['MEX-3']);
+    expect(c.getQty['MEX-3']).toBe(2);
+  });
+
+  it('flags a give whose only spare is reserved elsewhere', () => {
+    const members = [w('A', { 'MEX-9': 2 }), w('B', { 'MEX-9': 1 })]; // pooled give = 1
+    const reservations: Reservations = { committedGive: new Map([['MEX-9', 1]]), committedGet: new Set() };
+    const c = computeGroupCandidates(members, list({ needs: ['MEX-9'] }), reservations);
+    expect(c.youGive).toEqual(['MEX-9']);
+    expect(c.giveReserved.has('MEX-9')).toBe(true);
+  });
+
+  it('includes a view-only need in youGet', () => {
+    const members = [w('A', { 'MEX-2': 1 }), v('V', { 'MEX-2': 0 })];
+    const c = computeGroupCandidates(members, list({ swaps: ['MEX-2'] }));
+    expect(c.youGet).toEqual(['MEX-2']);
+    expect(c.getQty['MEX-2']).toBe(1);
   });
 });

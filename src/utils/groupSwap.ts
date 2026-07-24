@@ -1,4 +1,6 @@
 import type { Counts, Edition } from '../types';
+import type { ParsedList } from './import';
+import type { Reservations } from './swap';
 import { activeType, buildAlbumFromType } from '../data/albumTypes';
 
 /** A group member reduced to what pool math needs — no store/singleton dependency. */
@@ -79,4 +81,51 @@ export function computeGroupPool(members: GroupMember[]): GroupPool {
     }
   }
   return { get, writableGet, give, internalMoves };
+}
+
+export interface GroupCandidates {
+  youGive: string[];
+  giveQty: Record<string, number>;
+  youGet: string[];
+  getQty: Record<string, number>;
+  giveReserved: Set<string>;
+  getReserved: Set<string>;
+}
+
+/**
+ * Two-way overlap of another collector's parsed list against the group pool.
+ * Mirrors computeCandidates (swap.ts) but over pooled surplus/gaps; reservations
+ * flag (never hide) a spare already promised, or a sticker already being received.
+ */
+export function computeGroupCandidates(
+  members: GroupMember[],
+  other: ParsedList,
+  reservations?: Reservations,
+): GroupCandidates {
+  const pool = computeGroupPool(members);
+  const committedGive = reservations?.committedGive;
+  const committedGet = reservations?.committedGet;
+
+  const youGive: string[] = [];
+  const giveQty: Record<string, number> = {};
+  const giveReserved = new Set<string>();
+  const youGet: string[] = [];
+  const getQty: Record<string, number> = {};
+  const getReserved = new Set<string>();
+
+  for (const id of new Set(other.needs)) {
+    const spare = pool.give[id] ?? 0;
+    if (spare < 1) continue;
+    youGive.push(id);
+    giveQty[id] = Math.min(other.needQty?.[id] ?? 1, spare);
+    if ((committedGive?.get(id) ?? 0) >= spare) giveReserved.add(id);
+  }
+  for (const id of new Set(other.swaps)) {
+    const want = pool.get[id] ?? 0;
+    if (want < 1) continue;
+    youGet.push(id);
+    getQty[id] = Math.min(want, other.swapQty?.[id] ?? 1);
+    if (committedGet?.has(id)) getReserved.add(id);
+  }
+  return { youGive, giveQty, youGet, getQty, giveReserved, getReserved };
 }
