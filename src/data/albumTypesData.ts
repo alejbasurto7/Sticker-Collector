@@ -855,49 +855,6 @@ export const ALBUM_TYPES: Record<string, AlbumType> = {
         ]
       },
       {
-        "id": "CC",
-        "code": "CC",
-        "emoji": "🥤",
-        "title": "Coca-Cola",
-        "type": "extra",
-        "templateId": "cc-latam",
-        "optional": true,
-        "numbers": [
-          "1",
-          "2",
-          "3",
-          "4",
-          "5",
-          "6",
-          "7",
-          "8",
-          "9",
-          "10",
-          "11",
-          "12",
-          "13",
-          "14"
-        ],
-        "foils": [],
-        "numbersByVariant": {
-          "na": [
-            "1",
-            "2",
-            "3",
-            "4",
-            "5",
-            "6",
-            "7",
-            "8",
-            "9",
-            "10",
-            "11",
-            "12"
-          ]
-        },
-        "prefixNumbers": true
-      },
-      {
         "id": "BEL",
         "code": "BEL",
         "emoji": "🇧🇪",
@@ -1722,6 +1679,49 @@ export const ALBUM_TYPES: Record<string, AlbumType> = {
           "18",
           "19"
         ]
+      },
+      {
+        "id": "CC",
+        "code": "CC",
+        "emoji": "🥤",
+        "title": "Coca-Cola",
+        "type": "extra",
+        "templateId": "cc-latam",
+        "optional": true,
+        "numbers": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "10",
+          "11",
+          "12",
+          "13",
+          "14"
+        ],
+        "foils": [],
+        "numbersByVariant": {
+          "na": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+            "10",
+            "11",
+            "12"
+          ]
+        },
+        "prefixNumbers": true
       }
     ],
     "templates": {
@@ -2143,7 +2143,293 @@ export const ALBUM_TYPES: Record<string, AlbumType> = {
             ]
           }
         ]
+      },
+      "template": {
+        "id": "template",
+        "pageAspect": 0.963,
+        "stickerWidthPct": 22.75,
+        "pages": [
+          {
+            "slots": []
+          }
+        ]
+      },
+      "template-2": {
+        "id": "template-2",
+        "pageAspect": 0.963,
+        "stickerWidthPct": 22.75,
+        "pages": [
+          {
+            "slots": []
+          }
+        ]
+      },
+      "cc-latam-copy": {
+        "id": "cc-latam-copy",
+        "pageAspect": 0.963,
+        "stickerWidthPct": 19.25,
+        "pages": [
+          {
+            "slots": [
+              {
+                "x": 20,
+                "y": 45,
+                "orientation": "portrait"
+              },
+              {
+                "x": 50,
+                "y": 40,
+                "orientation": "portrait"
+              },
+              {
+                "x": 80,
+                "y": 35,
+                "orientation": "portrait"
+              },
+              {
+                "x": 20,
+                "y": 80,
+                "orientation": "portrait"
+              },
+              {
+                "x": 50,
+                "y": 75,
+                "orientation": "portrait"
+              },
+              {
+                "x": 80,
+                "y": 70,
+                "orientation": "portrait"
+              }
+            ]
+          },
+          {
+            "slots": [
+              {
+                "x": 20,
+                "y": 20,
+                "orientation": "portrait"
+              },
+              {
+                "x": 50,
+                "y": 20,
+                "orientation": "portrait"
+              },
+              {
+                "x": 80,
+                "y": 25,
+                "orientation": "portrait"
+              },
+              {
+                "x": 20,
+                "y": 50,
+                "orientation": "portrait"
+              },
+              {
+                "x": 50,
+                "y": 50,
+                "orientation": "portrait"
+              },
+              {
+                "x": 80,
+                "y": 55,
+                "orientation": "portrait"
+              },
+              {
+                "x": 20,
+                "y": 80,
+                "orientation": "portrait"
+              },
+              {
+                "x": 50,
+                "y": 80,
+                "orientation": "portrait"
+              }
+            ]
+          }
+        ]
+      },
+      "template-3": {
+        "id": "template-3",
+        "pageAspect": 0.963,
+        "stickerWidthPct": 22.75,
+        "pages": [
+          {
+            "slots": []
+          }
+        ]
+      },
+      "template-4": {
+        "id": "template-4",
+        "pageAspect": 0.963,
+        "stickerWidthPct": 22.75,
+        "pages": [
+          {
+            "slots": []
+          }
+        ]
+      },
+      "template-5": {
+        "id": "template-5",
+        "pageAspect": 0.963,
+        "stickerWidthPct": 22.75,
+        "pages": [
+          {
+            "slots": []
+          }
+        ]
+      },
+      "template-6": {
+        "id": "template-6",
+        "pageAspect": 0.963,
+        "stickerWidthPct": 22.75,
+        "pages": [
+          {
+            "slots": []
+          }
+        ]
+      },
+      "cc-latam-copy-2": {
+        "id": "cc-latam-copy-2",
+        "pageAspect": 0.963,
+        "stickerWidthPct": 19.25,
+        "pages": [
+          {
+            "slots": [
+              {
+                "x": 20,
+                "y": 45,
+                "orientation": "portrait"
+              },
+              {
+                "x": 50,
+                "y": 40,
+                "orientation": "portrait"
+              },
+              {
+                "x": 80,
+                "y": 35,
+                "orientation": "portrait"
+              },
+              {
+                "x": 20,
+                "y": 80,
+                "orientation": "portrait"
+              },
+              {
+                "x": 50,
+                "y": 75,
+                "orientation": "portrait"
+              },
+              {
+                "x": 80,
+                "y": 70,
+                "orientation": "portrait"
+              }
+            ]
+          },
+          {
+            "slots": [
+              {
+                "x": 20,
+                "y": 20,
+                "orientation": "portrait"
+              },
+              {
+                "x": 50,
+                "y": 20,
+                "orientation": "portrait"
+              },
+              {
+                "x": 80,
+                "y": 25,
+                "orientation": "portrait"
+              },
+              {
+                "x": 20,
+                "y": 50,
+                "orientation": "portrait"
+              },
+              {
+                "x": 50,
+                "y": 50,
+                "orientation": "portrait"
+              },
+              {
+                "x": 80,
+                "y": 55,
+                "orientation": "portrait"
+              },
+              {
+                "x": 20,
+                "y": 80,
+                "orientation": "portrait"
+              },
+              {
+                "x": 50,
+                "y": 80,
+                "orientation": "portrait"
+              }
+            ]
+          }
+        ]
       }
+    },
+    "sectionOrder": {
+      "latam": [
+        "FWC-trophy",
+        "FWC-world",
+        "MEX",
+        "RSA",
+        "KOR",
+        "CZE",
+        "CAN",
+        "BIH",
+        "QAT",
+        "SUI",
+        "BRA",
+        "MAR",
+        "HAI",
+        "SCO",
+        "USA",
+        "PAR",
+        "AUS",
+        "TUR",
+        "GER",
+        "CUW",
+        "CIV",
+        "ECU",
+        "NED",
+        "JPN",
+        "SWE",
+        "TUN",
+        "CC",
+        "BEL",
+        "EGY",
+        "IRN",
+        "NZL",
+        "ESP",
+        "CPV",
+        "KSA",
+        "URU",
+        "FRA",
+        "SEN",
+        "IRQ",
+        "NOR",
+        "ARG",
+        "ALG",
+        "AUT",
+        "JOR",
+        "POR",
+        "COD",
+        "UZB",
+        "COL",
+        "ENG",
+        "CRO",
+        "GHA",
+        "PAN",
+        "FWC-scroll"
+      ]
     }
   },
   "2026-fwc-adrenalyn": {
