@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   parseNumbers, fillNumbers, parseBulkLines, uniqueId, blankTemplate, newAlbumType,
   addVariant, updateVariant, removeVariant, setDefaultVariant,
-  addSection, updateSection, deleteSection, moveSection, bulkAddSections,
+  addSection, updateSection, deleteSection, moveSection, moveSectionForVariant, resetVariantOrder, bulkAddSections,
   newTemplate, cloneTemplate, deleteTemplate, copyTemplateToType,
 } from './registryOps';
 import type { AlbumType } from '../data/albumTypes';
@@ -123,5 +123,49 @@ describe('templates', () => {
     expect(Object.keys(types.to.templates)).toEqual(['shared', 'shared-2']);
     expect(types.to.templates['shared-2']).not.toBe(types.from.templates['shared']); // independent copy
     expect(types.from).toBe(reg.from); // source type untouched
+  });
+});
+
+describe('per-variant section order', () => {
+  // base + na variant; sections A, B, C; defaultVariant 'base'
+  const multi = () => {
+    let t = addVariant(T(), { id: 'na', label: 'NA' });
+    t = bulkAddSections(t, parseBulkLines('A,,\nB,,\nC,,'),
+      { templateId: '', numbers: [], foils: [], type: 'team' });
+    return t;
+  };
+
+  it('moveSectionForVariant edits the base sections for the default variant with no override', () => {
+    const t = moveSectionForVariant(multi(), 'base', 2, 0);
+    expect(t.sections.map((s) => s.id)).toEqual(['C', 'A', 'B']);
+    expect(t.sectionOrder).toBeUndefined(); // default edits base, no override written
+  });
+
+  it('moveSectionForVariant materializes an override for a non-default variant', () => {
+    const t = moveSectionForVariant(multi(), 'na', 2, 0);
+    expect(t.sectionOrder).toEqual({ na: ['C', 'A', 'B'] });
+    expect(t.sections.map((s) => s.id)).toEqual(['A', 'B', 'C']); // base untouched
+  });
+
+  it('moveSectionForVariant clamps the target and no-ops an out-of-range source', () => {
+    expect(moveSectionForVariant(multi(), 'na', 0, 99).sectionOrder).toEqual({ na: ['B', 'C', 'A'] });
+    expect(moveSectionForVariant(multi(), 'na', 5, 0)).toEqual(multi()); // from out of range
+  });
+
+  it('resetVariantOrder removes the entry (and clears the map when it empties)', () => {
+    const t = moveSectionForVariant(multi(), 'na', 2, 0);
+    expect(resetVariantOrder(t, 'na').sectionOrder).toBeUndefined();
+  });
+
+  it('deleteSection prunes the id from every variant order', () => {
+    const t = moveSectionForVariant(multi(), 'na', 2, 0); // sectionOrder.na = ['C','A','B']
+    const d = deleteSection(t, 'A');
+    expect(d.sections.map((s) => s.id)).toEqual(['B', 'C']);
+    expect(d.sectionOrder).toEqual({ na: ['C', 'B'] });
+  });
+
+  it("removeVariant drops that variant's section order", () => {
+    const t = moveSectionForVariant(multi(), 'na', 2, 0);
+    expect(removeVariant(t, 'na').sectionOrder).toBeUndefined();
   });
 });

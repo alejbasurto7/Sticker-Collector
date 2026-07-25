@@ -1,4 +1,5 @@
 import type { AlbumType, AlbumVariant, SectionDef } from '../data/albumTypes';
+import { orderedSectionsFor } from '../data/albumTypes';
 import type { PageType } from '../types';
 import type { SectionTemplate } from '../data/layoutGeometry';
 import { STANDARD_PAGE_ASPECT, STANDARD_STICKER_WIDTH_PCT } from '../data/layoutGeometry';
@@ -91,7 +92,14 @@ export function removeVariant(type: AlbumType, id: string): AlbumType {
     delete rest[id];
     return { ...s, numbersByVariant: rest };
   });
-  return { ...type, variants, defaultVariant, sections };
+  // Drop the removed variant's section-order override, if any.
+  let sectionOrder = type.sectionOrder;
+  if (sectionOrder && id in sectionOrder) {
+    const rest = { ...sectionOrder };
+    delete rest[id];
+    sectionOrder = Object.keys(rest).length ? rest : undefined;
+  }
+  return { ...type, variants, defaultVariant, sections, sectionOrder };
 }
 
 export function setDefaultVariant(type: AlbumType, id: string): AlbumType {
@@ -119,7 +127,17 @@ export function updateSection(type: AlbumType, sectionId: string, patch: Partial
 }
 
 export function deleteSection(type: AlbumType, sectionId: string): AlbumType {
-  return { ...type, sections: type.sections.filter((s) => s.id !== sectionId) };
+  const sections = type.sections.filter((s) => s.id !== sectionId);
+  let sectionOrder = type.sectionOrder;
+  if (sectionOrder) {
+    const next: Record<string, string[]> = {};
+    for (const [variantId, ids] of Object.entries(sectionOrder)) {
+      const kept = ids.filter((id) => id !== sectionId);
+      if (kept.length) next[variantId] = kept;
+    }
+    sectionOrder = Object.keys(next).length ? next : undefined;
+  }
+  return { ...type, sections, sectionOrder };
 }
 
 /** Move the section at `from` to index `to` (clamped); array order = album order. */
@@ -130,6 +148,33 @@ export function moveSection(type: AlbumType, from: number, to: number): AlbumTyp
   const [moved] = sections.splice(from, 1);
   sections.splice(target, 0, moved);
   return { ...type, sections };
+}
+
+/**
+ * Move the section at `from` to `to` within one variant's order. The default
+ * variant with no override edits the base `sections` array (via moveSection);
+ * any other case writes/updates sectionOrder[variantId], seeded from the
+ * variant's currently-resolved order. Array order = album order.
+ */
+export function moveSectionForVariant(
+  type: AlbumType, variantId: string, from: number, to: number,
+): AlbumType {
+  const editsBase = variantId === type.defaultVariant && !type.sectionOrder?.[variantId];
+  if (editsBase) return moveSection(type, from, to);
+  const ids = orderedSectionsFor(type, variantId).map((s) => s.id);
+  if (from < 0 || from >= ids.length) return type;
+  const target = Math.max(0, Math.min(ids.length - 1, to));
+  const [moved] = ids.splice(from, 1);
+  ids.splice(target, 0, moved);
+  return { ...type, sectionOrder: { ...type.sectionOrder, [variantId]: ids } };
+}
+
+/** Drop a variant's custom section order → it re-inherits the base order. */
+export function resetVariantOrder(type: AlbumType, variantId: string): AlbumType {
+  if (!type.sectionOrder?.[variantId]) return type;
+  const rest = { ...type.sectionOrder };
+  delete rest[variantId];
+  return { ...type, sectionOrder: Object.keys(rest).length ? rest : undefined };
 }
 
 /** Append one section per pasted line, all sharing a template + numbers/foils. */

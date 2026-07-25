@@ -2548,3 +2548,31 @@ textarea.notes-input {
   font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
+
+/* ---------- Settings → Share app ---------- */
+.share-url {
+  margin: 0;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  word-break: break-all;
+  -webkit-user-select: all;
+  user-select: all;
+}
+.install-steps {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+.install-steps li {
+  line-height: 1.4;
+}
+.install-note {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-dim);
+}
