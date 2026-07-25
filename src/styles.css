@@ -2493,6 +2493,20 @@ textarea.notes-input {
   font-weight: 800;
   white-space: nowrap;
 }
+/* Share-app slide: centred QR + link over the two headline actions. */
+.wn-share {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.wn-qr {
+  width: 104px;
+  height: 104px;
+  flex: none;
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
 
 /* ---------- Settings tab (full-screen view) ---------- */
 .settings-title {

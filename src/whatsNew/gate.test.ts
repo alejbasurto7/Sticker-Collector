@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { shouldShowWhatsNew } from './gate';
 
 describe('shouldShowWhatsNew', () => {
-  const latestId = '2026.07-albums';
+  const latestId = '2026.08-groups';
 
   it('suppresses on a fresh install (no persisted collection)', () => {
     expect(shouldShowWhatsNew({ existingUser: false, lastSeenId: undefined, latestId })).toBe(false);
