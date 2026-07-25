@@ -47,12 +47,18 @@ const liveAlbum = (variant: string, trackCC: boolean) =>
   buildAlbumFromType(activeType, { variant, enabledOptional: trackCC ? ['CC'] : [] });
 
 describe('2026-fwc definition (regression vs. today)', () => {
-  it('has the exact section order', () => {
-    const ids = activeType.sections.map((s) => s.id);
-    expect(ids.slice(0, 2)).toEqual(['FWC-trophy', 'FWC-world']);
-    expect(ids[2]).toBe('MEX');
-    expect(ids[ids.indexOf('TUN') + 1]).toBe('CC');
-    expect(ids[ids.length - 1]).toBe('FWC-scroll');
+  it('orders sections per edition — CC last for na, mid-album for latam', () => {
+    // na (default): base team order with the optional CC appended at the very end.
+    const na = orderedSectionsFor(activeType, 'na').map((s) => s.id);
+    expect(na.slice(0, 3)).toEqual(['FWC-trophy', 'FWC-world', 'MEX']);
+    expect(na[na.length - 2]).toBe('FWC-scroll');
+    expect(na[na.length - 1]).toBe('CC');
+    // latam (International): CC moves mid-album — right after TUN, before BEL —
+    // while the History scroll stays last.
+    const latam = orderedSectionsFor(activeType, 'latam').map((s) => s.id);
+    expect(latam[latam.indexOf('TUN') + 1]).toBe('CC');
+    expect(latam[latam.indexOf('CC') + 1]).toBe('BEL');
+    expect(latam[latam.length - 1]).toBe('FWC-scroll');
   });
 
   it('reproduces base totals and per-edition CC', () => {
