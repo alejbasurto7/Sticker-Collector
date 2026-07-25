@@ -3,8 +3,10 @@ import { useCollection } from '../store/collectionStore';
 import { parseExport } from '../utils/import';
 import { buildListFromIds } from '../utils/listExport';
 import { computeCandidates, computeReservations } from '../utils/swap';
+import { computeGroupCandidates } from '../utils/groupSwap';
 import { tapVerb } from '../utils/device';
 import type { Swap } from '../types';
+import type { GroupSwapCtx } from '../sync/groupMembers';
 import StickerChips from './StickerChips';
 
 interface Props {
@@ -12,6 +14,8 @@ interface Props {
   initialText?: string;
   /** When set, the dialog edits this existing swap instead of creating a new one. */
   editSwap?: Swap;
+  /** When set, runs in combined-swap "group mode" against the pool instead of one album. */
+  groupCtx?: GroupSwapCtx;
 }
 
 const SAMPLE = `Figuritas App - List
@@ -35,12 +39,16 @@ const sumCopies = (ids: Iterable<string>, qty: Map<string, number>) => {
   return n;
 };
 
-export default function NewSwapDialog({ onClose, initialText, editSwap }: Props) {
+export default function NewSwapDialog({ onClose, initialText, editSwap, groupCtx }: Props) {
   const counts = useCollection((s) => s.counts);
   const swaps = useCollection((s) => s.swaps);
   const albumName = useCollection((s) => s.albumName);
   const createSwap = useCollection((s) => s.createSwap);
   const updateSwap = useCollection((s) => s.updateSwap);
+  const createCombinedSwap = useCollection((s) => s.createCombinedSwap);
+  const updateCombinedSwap = useCollection((s) => s.updateCombinedSwap);
+  // In group mode, reservations roll up the group's combined swaps + every member's solo swaps.
+  const groupSwaps = useCollection((s) => s.groups.find((g) => g.id === groupCtx?.groupId)?.swaps ?? []);
 
   const isEdit = !!editSwap;
 
@@ -70,29 +78,46 @@ export default function NewSwapDialog({ onClose, initialText, editSwap }: Props)
   const [giveQty, setGiveQty] = useState<Map<string, number>>(
     () => new Map(Object.entries(editSwap?.givingQty ?? {})),
   );
+  // Group mode only: copies to RECEIVE per id (a combined swap can pull two copies of one
+  // sticker when both albums miss it). Seeded from the saved swap's receivingQty.
+  const [getQty, setGetQty] = useState<Map<string, number>>(
+    () => new Map(Object.entries(editSwap?.receivingQty ?? {})),
+  );
 
   // Live reservations across all open swaps, so spares already promised elsewhere are
   // never offered here and a sticker already being received is never chased again. When
-  // editing, exclude this swap so its own promises don't count against itself.
-  const reservations = useMemo(
-    () => computeReservations(swaps, editSwap?.id),
-    [swaps, editSwap?.id],
-  );
+  // editing, exclude this swap so its own promises don't count against itself. In group
+  // mode the pool is netted across members, so reservations roll up the group's combined
+  // swaps and each member's own solo swaps.
+  const reservations = useMemo(() => {
+    const source = groupCtx ? [...groupSwaps, ...groupCtx.members.flatMap((m) => m.swaps)] : swaps;
+    return computeReservations(source, editSwap?.id);
+  }, [groupCtx, groupSwaps, swaps, editSwap?.id]);
 
-  const candidates = useMemo(
-    () => (parsed ? computeCandidates(counts, parsed, reservations) : null),
-    [parsed, counts, reservations],
-  );
+  const candidates = useMemo(() => {
+    if (!parsed) return null;
+    return groupCtx
+      ? computeGroupCandidates(groupCtx.members, parsed, reservations)
+      : computeCandidates(counts, parsed, reservations);
+  }, [parsed, counts, reservations, groupCtx]);
 
   const findMatches = () => {
     const p = parseExport(text);
     setParsed(p);
-    const c = computeCandidates(counts, p, reservations);
     // Auto-select the freely available matches; leave anything already promised in
     // another open swap unselected so double-booking is an opt-in (the ⚠️ flags it).
-    setGive(new Set(c.youGive.filter((id) => !c.giveReserved.has(id))));
-    setGet(new Set(c.youGet.filter((id) => !c.getReserved.has(id))));
-    setGiveQty(new Map(Object.entries(c.giveQty)));
+    if (groupCtx) {
+      const c = computeGroupCandidates(groupCtx.members, p, reservations);
+      setGive(new Set(c.youGive.filter((id) => !c.giveReserved.has(id))));
+      setGet(new Set(c.youGet.filter((id) => !c.getReserved.has(id))));
+      setGiveQty(new Map(Object.entries(c.giveQty)));
+      setGetQty(new Map(Object.entries(c.getQty)));
+    } else {
+      const c = computeCandidates(counts, p, reservations);
+      setGive(new Set(c.youGive.filter((id) => !c.giveReserved.has(id))));
+      setGet(new Set(c.youGet.filter((id) => !c.getReserved.has(id))));
+      setGiveQty(new Map(Object.entries(c.giveQty)));
+    }
   };
 
   // Tooltip maps that mark candidates already spoken for in another open swap, so the
@@ -138,17 +163,32 @@ export default function NewSwapDialog({ onClose, initialText, editSwap }: Props)
       receiving: [...get],
       givingQty,
     };
-    if (editSwap) updateSwap(editSwap.id, common);
-    else createSwap(common);
+    if (groupCtx) {
+      // Persist the receive-side quantities too — the combined swap can pull ×N of one id.
+      const receivingQty: Record<string, number> = {};
+      for (const id of get) {
+        const q = getQty.get(id) ?? 1;
+        if (q > 1) receivingQty[id] = q;
+      }
+      const input = { ...common, receivingQty };
+      if (editSwap) updateCombinedSwap(groupCtx.groupId, editSwap.id, input);
+      else createCombinedSwap(groupCtx.groupId, input);
+    } else if (editSwap) {
+      updateSwap(editSwap.id, common);
+    } else {
+      createSwap(common);
+    }
     onClose();
   };
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h2>{isEdit ? 'Edit swap' : 'New swap'}</h2>
+        <h2>{isEdit ? 'Edit swap' : groupCtx ? 'New combined swap' : 'New swap'}</h2>
         <p className="modal-sub">
-          Name the swap and paste the other collector's exported list to find matches.
+          {groupCtx
+            ? "Name the swap and paste the other collector's list — matches run against the whole group pool."
+            : "Name the swap and paste the other collector's exported list to find matches."}
         </p>
 
         <div className="field-label">Swap name</div>
@@ -191,13 +231,17 @@ export default function NewSwapDialog({ onClose, initialText, editSwap }: Props)
             )}
 
             <div className="section-title">
-              You can get ({get.size}/{candidates.youGet.length})
+              You can get{' '}
+              {groupCtx
+                ? `(${sumCopies(get, getQty)}/${sumCopies(candidates.youGet, getQty)})`
+                : `(${get.size}/${candidates.youGet.length})`}
             </div>
             <StickerChips
               ids={displayIds(candidates.youGet, get)}
               selected={get}
               onToggle={(id) => toggle(get, setGet, id)}
               conflicts={getConflicts}
+              quantities={groupCtx ? getQty : undefined}
             />
             {candidates.getReserved.size > 0 && (
               <p className="reserved-note">

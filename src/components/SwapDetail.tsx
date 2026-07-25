@@ -6,6 +6,7 @@ import { computeConflicts, giveQtyOf } from '../utils/swap';
 import { isDesktop } from '../utils/device';
 import { buildSwapExport } from '../utils/listExport';
 import { copyToClipboard } from '../utils/share';
+import type { GroupSwapCtx } from '../sync/groupMembers';
 import StickerChips from './StickerChips';
 import SwapClose from './SwapClose';
 import NewSwapDialog from './NewSwapDialog';
@@ -15,17 +16,30 @@ import EditSwapDetails from './EditSwapDetails';
 const sameMembers = (set: Set<string>, arr: string[]) =>
   set.size === arr.length && arr.every((id) => set.has(id));
 
+/** Empty conflict shape for combined swaps (per-album conflict math is out of Stage-4 scope). */
+const NO_CONFLICTS = {
+  giving: new Set<string>(),
+  receiving: new Set<string>(),
+  giveSwapCounts: new Map<string, number>(),
+  recvSwapCounts: new Map<string, number>(),
+};
+
 interface Props {
   swap: Swap;
   onClose: () => void;
+  /** When set, this is a combined swap: rollback/delete/close use the group store actions. */
+  groupCtx?: GroupSwapCtx;
 }
 
-export default function SwapDetail({ swap, onClose }: Props) {
+export default function SwapDetail({ swap, onClose, groupCtx }: Props) {
   const swaps = useCollection((s) => s.swaps);
   const counts = useCollection((s) => s.counts);
   const deleteSwap = useCollection((s) => s.deleteSwap);
   const rollbackSwap = useCollection((s) => s.rollbackSwap);
   const updateSwap = useCollection((s) => s.updateSwap);
+  const deleteCombinedSwap = useCollection((s) => s.deleteCombinedSwap);
+  const rollbackCombinedSwap = useCollection((s) => s.rollbackCombinedSwap);
+  const updateCombinedSwap = useCollection((s) => s.updateCombinedSwap);
   const readOnly = useForcedReadOnly();
   const [closing, setClosing] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -52,7 +66,10 @@ export default function SwapDetail({ swap, onClose }: Props) {
     !sameMembers(deselectedGiving, swap.deselectedGiving ?? []) ||
     !sameMembers(deselectedReceiving, swap.deselectedReceiving ?? []);
 
-  const conflicts = useMemo(() => computeConflicts(swaps, counts), [swaps, counts]);
+  const conflicts = useMemo(
+    () => (groupCtx ? NO_CONFLICTS : computeConflicts(swaps, counts)),
+    [groupCtx, swaps, counts],
+  );
 
   // Build per-sticker tooltip maps for conflicted chips.
   const giveConflicts = useMemo(() => {
@@ -86,6 +103,9 @@ export default function SwapDetail({ swap, onClose }: Props) {
   // Copies (not distinct stickers) actively promised to give, and a lookup for chips.
   const giveQty = new Map(swap.giving.map((id) => [id, giveQtyOf(swap, id)]));
   const giveCopies = [...giving].reduce((n, id) => n + giveQtyOf(swap, id), 0);
+  // Combined swaps can receive ×N of one id; show that on the get chips + count.
+  const receiveQty = new Map(swap.receiving.map((id) => [id, Math.max(1, swap.receivingQty?.[id] ?? 1)]));
+  const receiveCopies = [...receiving].reduce((n, id) => n + (receiveQty.get(id) ?? 1), 0);
 
   const toggleGiving = (id: string) => {
     setJustSaved(false);
@@ -107,10 +127,12 @@ export default function SwapDetail({ swap, onClose }: Props) {
   };
 
   const save = () => {
-    updateSwap(swap.id, {
+    const patch = {
       deselectedGiving: [...deselectedGiving],
       deselectedReceiving: [...deselectedReceiving],
-    });
+    };
+    if (groupCtx) updateCombinedSwap(groupCtx.groupId, swap.id, patch);
+    else updateSwap(swap.id, patch);
     setJustSaved(true);
     if (savedTimer.current) clearTimeout(savedTimer.current);
     savedTimer.current = window.setTimeout(() => setJustSaved(false), 1500);
@@ -127,7 +149,8 @@ export default function SwapDetail({ swap, onClose }: Props) {
 
   const remove = () => {
     if (confirm(`Delete swap “${swap.name}”? This won't change your collection.`)) {
-      deleteSwap(swap.id);
+      if (groupCtx) deleteCombinedSwap(groupCtx.groupId, swap.id);
+      else deleteSwap(swap.id);
       onClose();
     }
   };
@@ -138,7 +161,8 @@ export default function SwapDetail({ swap, onClose }: Props) {
         `Roll back “${swap.name}”? Your collection counts will be restored and the swap reopened.`,
       )
     ) {
-      rollbackSwap(swap.id);
+      if (groupCtx) rollbackCombinedSwap(groupCtx.groupId, swap.id);
+      else rollbackSwap(swap.id);
       onClose();
     }
   };
@@ -185,11 +209,12 @@ export default function SwapDetail({ swap, onClose }: Props) {
           readOnly={!isOpen || readOnly}
         />
 
-        <div className="section-title">You get ({receiving.size})</div>
+        <div className="section-title">You get ({groupCtx ? receiveCopies : receiving.size})</div>
         <StickerChips
           ids={swap.receiving}
           selected={receiving}
           conflicts={recvConflicts}
+          quantities={groupCtx ? receiveQty : undefined}
           onToggle={toggleReceiving}
           readOnly={!isOpen || readOnly}
         />
@@ -224,7 +249,7 @@ export default function SwapDetail({ swap, onClose }: Props) {
               ↩ Rollback
             </button>
           )}
-          {!isOpen && !readOnly && (
+          {!isOpen && !readOnly && !groupCtx && (
             <button className="btn" onClick={() => setEditingDetails(true)}>
               ✎ Edit details
             </button>
@@ -253,6 +278,7 @@ export default function SwapDetail({ swap, onClose }: Props) {
         {closing && (
           <SwapClose
             swap={swap}
+            groupCtx={groupCtx}
             onClose={() => {
               setClosing(false);
               onClose();
@@ -260,7 +286,7 @@ export default function SwapDetail({ swap, onClose }: Props) {
           />
         )}
 
-        {editing && <NewSwapDialog editSwap={swap} onClose={() => setEditing(false)} />}
+        {editing && <NewSwapDialog editSwap={swap} groupCtx={groupCtx} onClose={() => setEditing(false)} />}
 
         {editingDetails && (
           <EditSwapDetails swap={swap} onClose={() => setEditingDetails(false)} />

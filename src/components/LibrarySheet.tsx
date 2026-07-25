@@ -14,9 +14,10 @@ interface Props {
   onClose: () => void;
   onManageAlbum: (id: string) => void; // App switches + opens the album detail
   onOpenCloudSync: () => void;         // manage the whole-collection Cloud link (only if one exists)
+  onOpenGroups: () => void;            // open the Album Groups management sheet
 }
 
-export default function LibrarySheet({ onClose, onManageAlbum, onOpenCloudSync }: Props) {
+export default function LibrarySheet({ onClose, onManageAlbum, onOpenCloudSync, onOpenGroups }: Props) {
   const albums = useCollection((s) => s.albums);
   const albumOrder = useCollection((s) => s.albumOrder);
   const activeAlbumId = useCollection((s) => s.activeAlbumId);
@@ -174,6 +175,9 @@ export default function LibrarySheet({ onClose, onManageAlbum, onOpenCloudSync }
             </button>
           )}
         </div>
+        <button type="button" className="btn full" style={{ marginTop: 8 }} onClick={onOpenGroups}>
+          👥 Groups
+        </button>
         {hasCloudLink && (
           <button type="button" className="btn full" style={{ marginTop: 8 }} onClick={onOpenCloudSync}>
             ☁️ Cloud sync

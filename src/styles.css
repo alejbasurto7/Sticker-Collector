@@ -2576,3 +2576,126 @@ textarea.notes-input {
   font-size: 0.9rem;
   color: var(--text-dim);
 }
+
+/* ===== Album groups & combined swaps (Stage 4) ===== */
+
+/* The album ↔ group lens toggle on the Swaps tab: a full-width .mini-seg above the toolbar. */
+.lens-seg {
+  margin-left: 0;
+  display: flex;
+  width: 100%;
+  margin-bottom: 10px;
+}
+.lens-seg button {
+  flex: 1;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Netted internal-move shuffles between the family's own albums. */
+.internal-moves {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  margin-top: 12px;
+}
+.internal-moves .section-title {
+  margin-top: 0;
+}
+.internal-move-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+}
+.internal-move-row + .internal-move-row {
+  border-top: 1px solid var(--border);
+}
+.internal-move-row .btn {
+  flex: none;
+}
+
+/* "view-only" tag on a read-only member card in the group picker. */
+.group-member-badge {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 8px;
+  white-space: nowrap;
+}
+
+/* Member picker row: a selectable album card with a leading checkbox. */
+.album-card.group-pick {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  gap: 10px;
+  align-items: center;
+}
+.album-card.group-pick.active {
+  border-color: var(--green-bright);
+}
+.album-card.group-pick:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.group-pick-check {
+  font-size: 18px;
+  line-height: 1;
+  flex: none;
+  padding-left: 4px;
+}
+
+/* Group list rows in the management sheet. */
+.group-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.group-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-right: auto;
+  min-width: 0;
+}
+.group-row .btn {
+  flex: none;
+}
+
+/* Per-copy routing preview under the combined close screen. */
+.close-routes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0 4px;
+}
+.close-route {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.close-route .route-change {
+  background: var(--bg-elev-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px 6px;
+  font-size: 13px;
+}
+.close-handoff {
+  color: var(--green);
+  font-weight: 600;
+}

@@ -1,6 +1,7 @@
 // Type-only import (erased at build) keeps this module free of the store's
 // runtime, so it stays importable in the plain-node Vitest env.
 import type { AlbumSnapshot } from '../store/collectionStore';
+import type { AlbumGroup } from '../types';
 
 /** Bump when the payload shape changes in a non-back-compatible way. */
 export const PAYLOAD_V = 1;
@@ -22,6 +23,8 @@ export interface CollectionPayload {
   albums: AlbumSnapshot[];
   /** Monotonic set of deleted album ids (tombstones). Absence is NOT a delete. */
   deletedAlbumIds?: string[];
+  /** Album groups (combined swapping). Synced across your own Cloud devices; omitted when empty. */
+  groups?: AlbumGroup[];
 }
 
 export type ChannelPayload = AlbumPayload | CollectionPayload;

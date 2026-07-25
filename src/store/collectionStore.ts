@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Counts, Edition, Swap } from '../types';
+import type { AlbumGroup, Counts, Edition, Swap } from '../types';
 import type { CollectionPayload } from '../sync/payload';
 import { album, applyAlbumLayout, DEFAULT_EDITION, DEFAULT_TRACK_CC } from '../data/sampleAlbum';
 import { ACTIVE_ALBUM_TYPE_ID, typeById } from '../data/albumTypes';
@@ -121,6 +121,8 @@ interface CollectionState {
    * Missing/empty (legacy) means "no manual order" → natural `albums` order.
    */
   albumOrder?: string[];
+  /** User-defined album groups for combined swapping. Synced in a later stage. */
+  groups: AlbumGroup[];
 
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
@@ -143,6 +145,45 @@ interface CollectionState {
   deleteAlbum: (id: string) => void;
   /** Record the user's manual album order (local-only display preference). */
   reorderAlbums: (orderedIds: string[]) => void;
+
+  // Album groups (combined swapping)
+  createGroup: (name: string, memberIds: string[]) => string;
+  renameGroup: (id: string, name: string) => void;
+  setGroupMembers: (id: string, memberIds: string[]) => void;
+  disbandGroup: (id: string) => void;
+  /** Record a physical internal move of one copy of `stickerId` from one album to another. */
+  applyInternalMove: (fromId: string, toId: string, stickerId: string) => void;
+
+  // Combined (group) swaps
+  createCombinedSwap: (
+    groupId: string,
+    input: {
+      name: string; notes?: string;
+      theirNeeds: string[]; theirSwaps: string[]; theirNeedsQty?: Record<string, number>;
+      giving: string[]; receiving: string[];
+      givingQty?: Record<string, number>; receivingQty?: Record<string, number>;
+    },
+  ) => string;
+  updateCombinedSwap: (
+    groupId: string, swapId: string,
+    patch: {
+      name?: string; notes?: string;
+      giving?: string[]; receiving?: string[];
+      givingQty?: Record<string, number>; receivingQty?: Record<string, number>;
+      theirNeeds?: string[]; theirSwaps?: string[]; theirNeedsQty?: Record<string, number>;
+      deselectedGiving?: string[]; deselectedReceiving?: string[];
+    },
+  ) => void;
+  deleteCombinedSwap: (groupId: string, swapId: string) => void;
+  closeCombinedSwap: (
+    groupId: string, swapId: string,
+    settled: {
+      givenIds: string[]; receivedIds: string[];
+      giveQty?: Record<string, number>; receiveQty?: Record<string, number>;
+      settledByAlbum: Record<string, Record<string, number>>;
+    },
+  ) => void;
+  rollbackCombinedSwap: (groupId: string, swapId: string) => void;
 
   // Collection actions
   addOne: (id: string) => void;
@@ -301,6 +342,45 @@ function withActivity(
   };
 }
 
+/**
+ * Apply per-album count deltas (albumId -> stickerId -> ±n) across the active album
+ * (top-level `counts`) and any parked `albums`, clamped ≥ 0. The active album's counts
+ * live only at the top level (its parked snapshot is refreshed on switch), so its delta
+ * is applied there and skipped in the `albums` map. Returns just the fields that changed.
+ */
+function applyAlbumDeltas(
+  s: CollectionState,
+  deltas: Record<string, Record<string, number>>,
+): { counts?: Counts; albums?: AlbumSnapshot[] } {
+  const patch: { counts?: Counts; albums?: AlbumSnapshot[] } = {};
+  const activeDelta = deltas[s.activeAlbumId];
+  if (activeDelta) {
+    const counts = { ...s.counts };
+    for (const [id, d] of Object.entries(activeDelta)) counts[id] = clampCount((counts[id] ?? 0) + d);
+    patch.counts = counts;
+  }
+  const touchesParked = s.albums.some((a) => a.id !== s.activeAlbumId && deltas[a.id]);
+  if (touchesParked) {
+    patch.albums = s.albums.map((a) => {
+      const d = a.id === s.activeAlbumId ? undefined : deltas[a.id];
+      if (!d) return a;
+      const counts = { ...a.counts };
+      for (const [id, n] of Object.entries(d)) counts[id] = clampCount((counts[id] ?? 0) + n);
+      return { ...a, counts };
+    });
+  }
+  return patch;
+}
+
+/** Map over a group's swaps by id, replacing the matched swap with `fn(swap)`. */
+function patchGroupSwap(
+  groups: AlbumGroup[], groupId: string, swapId: string, fn: (sw: Swap) => Swap,
+): AlbumGroup[] {
+  return groups.map((g) =>
+    g.id !== groupId ? g : { ...g, swaps: g.swaps.map((sw) => (sw.id === swapId ? fn(sw) : sw)) },
+  );
+}
+
 export const useCollection = create<CollectionState>()(
   persist(
     (set) => ({
@@ -318,6 +398,7 @@ export const useCollection = create<CollectionState>()(
       importSeq: 0,
       theme: 'dark',
       hasSeenAlbumOnboarding: false,
+      groups: [],
       // Brand-new installs start album-less: the collection picker (App.tsx, shown when
       // albums is empty) creates the user's first album instead of seeding a default one.
       // Returning users are re-seeded from persisted data in onRehydrateStorage.
@@ -370,20 +451,24 @@ export const useCollection = create<CollectionState>()(
       deleteAlbum: (id) =>
         set((s) => {
           const remaining = s.albums.filter((a) => a.id !== id);
+          // Drop the deleted album from any group; auto-disband a group left with <2 members.
+          const groups = s.groups
+            .map((g) => (g.memberIds.includes(id) ? { ...g, memberIds: g.memberIds.filter((m) => m !== id) } : g))
+            .filter((g) => g.memberIds.length >= 2);
           // Deleting the last album returns the user to the collection picker (albums: []),
           // rather than silently rebuilding a default album they never chose. The App gate
           // renders the picker whenever albums is empty, so no view sees a missing album.
           if (remaining.length === 0) {
-            return { albums: [], activeAlbumId: '' };
+            return { albums: [], activeAlbumId: '', groups };
           }
           // Deleting the active album means promoting another one to live; deleting a
           // parked album just drops it and leaves the active fields untouched.
           if (id === s.activeAlbumId) {
             const target = remaining[0];
             applyAlbumLayout(target.albumTypeId, target.edition, target.trackCC);
-            return { albums: remaining, activeAlbumId: target.id, ...loadSnapshot(target) };
+            return { albums: remaining, activeAlbumId: target.id, groups, ...loadSnapshot(target) };
           }
-          return { albums: remaining };
+          return { albums: remaining, groups };
         }),
 
       setTheme: (theme) => set({ theme }),
@@ -436,6 +521,115 @@ export const useCollection = create<CollectionState>()(
         }),
 
       reorderAlbums: (orderedIds) => set({ albumOrder: orderedIds }),
+
+      createGroup: (name, memberIds) => {
+        const id = newId();
+        const group: AlbumGroup = { id, name: name.trim() || 'Group', memberIds: [...memberIds], swaps: [] };
+        set((s) => ({ groups: [...s.groups, group] }));
+        return id;
+      },
+
+      renameGroup: (id, name) =>
+        set((s) => ({
+          groups: s.groups.map((g) => (g.id === id ? { ...g, name: name.trim() || g.name } : g)),
+        })),
+
+      setGroupMembers: (id, memberIds) =>
+        set((s) => ({
+          groups: s.groups.map((g) => (g.id === id ? { ...g, memberIds: [...memberIds] } : g)),
+        })),
+
+      disbandGroup: (id) => set((s) => ({ groups: s.groups.filter((g) => g.id !== id) })),
+
+      applyInternalMove: (fromId, toId, stickerId) =>
+        set((s) => applyAlbumDeltas(s, { [fromId]: { [stickerId]: -1 }, [toId]: { [stickerId]: 1 } })),
+
+      createCombinedSwap: (groupId, input) => {
+        const id = newId();
+        const swap: Swap = {
+          id,
+          name: input.name.trim() || 'Untitled swap',
+          notes: input.notes?.trim() || undefined,
+          createdAt: Date.now(),
+          status: 'open',
+          theirNeeds: input.theirNeeds,
+          theirSwaps: input.theirSwaps,
+          theirNeedsQty: input.theirNeedsQty,
+          giving: input.giving,
+          receiving: input.receiving,
+          givingQty: input.givingQty,
+          receivingQty: input.receivingQty,
+        };
+        set((s) => ({
+          groups: s.groups.map((g) => (g.id === groupId ? { ...g, swaps: [swap, ...g.swaps] } : g)),
+        }));
+        return id;
+      },
+
+      updateCombinedSwap: (groupId, swapId, patch) =>
+        set((s) => ({
+          groups: patchGroupSwap(s.groups, groupId, swapId, (sw) => ({
+            ...sw,
+            ...(patch.name !== undefined ? { name: patch.name } : {}),
+            ...(patch.notes !== undefined ? { notes: patch.notes.trim() || undefined } : {}),
+            ...(patch.giving ? { giving: patch.giving } : {}),
+            ...(patch.receiving ? { receiving: patch.receiving } : {}),
+            ...(patch.givingQty ? { givingQty: patch.givingQty } : {}),
+            ...(patch.receivingQty ? { receivingQty: patch.receivingQty } : {}),
+            ...(patch.theirNeeds ? { theirNeeds: patch.theirNeeds } : {}),
+            ...(patch.theirSwaps ? { theirSwaps: patch.theirSwaps } : {}),
+            ...(patch.theirNeedsQty ? { theirNeedsQty: patch.theirNeedsQty } : {}),
+            ...(patch.deselectedGiving ? { deselectedGiving: patch.deselectedGiving } : {}),
+            ...(patch.deselectedReceiving ? { deselectedReceiving: patch.deselectedReceiving } : {}),
+          })),
+        })),
+
+      deleteCombinedSwap: (groupId, swapId) =>
+        set((s) => ({
+          groups: s.groups.map((g) =>
+            g.id !== groupId ? g : { ...g, swaps: g.swaps.filter((sw) => sw.id !== swapId) },
+          ),
+        })),
+
+      closeCombinedSwap: (groupId, swapId, settled) =>
+        set((s) => {
+          const group = s.groups.find((g) => g.id === groupId);
+          if (!group || !group.swaps.some((sw) => sw.id === swapId)) return s;
+          const patch = applyAlbumDeltas(s, settled.settledByAlbum);
+          const groups = patchGroupSwap(s.groups, groupId, swapId, (sw) => ({
+            ...sw,
+            status: 'closed',
+            closedAt: Date.now(),
+            giving: settled.givenIds,
+            receiving: settled.receivedIds,
+            givingQty: settled.giveQty,
+            receivingQty: settled.receiveQty,
+            settledByAlbum: settled.settledByAlbum,
+            deselectedGiving: [],
+            deselectedReceiving: [],
+          }));
+          return { ...patch, groups };
+        }),
+
+      rollbackCombinedSwap: (groupId, swapId) =>
+        set((s) => {
+          const group = s.groups.find((g) => g.id === groupId);
+          const target = group?.swaps.find((sw) => sw.id === swapId);
+          if (!group || !target || target.status !== 'closed' || !target.settledByAlbum) return s;
+          const reversed: Record<string, Record<string, number>> = {};
+          for (const [aid, d] of Object.entries(target.settledByAlbum)) {
+            reversed[aid] = {};
+            for (const [id, n] of Object.entries(d)) reversed[aid][id] = -n;
+          }
+          const patch = applyAlbumDeltas(s, reversed);
+          const groups = patchGroupSwap(s.groups, groupId, swapId, (sw) => ({
+            ...sw,
+            status: 'open',
+            closedAt: undefined,
+            settledByAlbum: undefined,
+          }));
+          return { ...patch, groups };
+        }),
 
       addOne: (id) =>
         set((s) => {
@@ -598,18 +792,19 @@ export const useCollection = create<CollectionState>()(
           // e.g. a just-created swap on the active shared album).
           const cloudAlbums = payload.albums.filter((a) => !nonCloudIds.has(a.id));
           const albums = [...kept, ...cloudAlbums];
+          const groups = payload.groups ?? [];
           const activeInCloud = cloudAlbums.find((a) => a.id === s.activeAlbumId);
           if (activeInCloud) {
             applyAlbumLayout(activeInCloud.albumTypeId, activeInCloud.edition, activeInCloud.trackCC);
-            return { albums, ...loadSnapshot(activeInCloud) };
+            return { albums, groups, ...loadSnapshot(activeInCloud) };
           }
           if (!albums.some((a) => a.id === s.activeAlbumId)) {
             const fallback = albums[0];
-            if (!fallback) return { albums };
+            if (!fallback) return { albums, groups };
             applyAlbumLayout(fallback.albumTypeId, fallback.edition, fallback.trackCC);
-            return { albums, activeAlbumId: fallback.id, ...loadSnapshot(fallback) };
+            return { albums, activeAlbumId: fallback.id, groups, ...loadSnapshot(fallback) };
           }
-          return { albums }; // active is a shared/private album — leave top-level alone
+          return { albums, groups }; // active is a shared/private album — leave top-level alone
         }),
 
       applyMergedAlbum: (albumId, snapshot) =>

@@ -231,3 +231,179 @@ describe('reorderAlbums', () => {
     expect(orderAlbums(st.albums, st.albumOrder).map((a) => a.id)).toEqual(['S', 'A']);
   });
 });
+
+describe('group CRUD', () => {
+  beforeEach(() => {
+    useCollection.setState({ groups: [] } as any, false);
+  });
+
+  it('creates a group with trimmed name and members, returning its id', () => {
+    const id = useCollection.getState().createGroup('  Kids  ', ['A', 'S']);
+    const g = useCollection.getState().groups.find((x) => x.id === id)!;
+    expect(g.name).toBe('Kids');
+    expect(g.memberIds).toEqual(['A', 'S']);
+    expect(g.swaps).toEqual([]);
+  });
+
+  it('renames, replaces members, and disbands', () => {
+    const id = useCollection.getState().createGroup('G', ['A', 'S']);
+    useCollection.getState().renameGroup(id, 'Family');
+    useCollection.getState().setGroupMembers(id, ['A', 'S', 'B']);
+    const g = useCollection.getState().groups.find((x) => x.id === id)!;
+    expect(g.name).toBe('Family');
+    expect(g.memberIds).toEqual(['A', 'S', 'B']);
+    useCollection.getState().disbandGroup(id);
+    expect(useCollection.getState().groups.find((x) => x.id === id)).toBeUndefined();
+  });
+});
+
+describe('applyInternalMove', () => {
+  beforeEach(() => {
+    useCollection.setState({
+      counts: { 'MEX-7': 2 }, activeAlbumId: 'A',
+      albums: [snap('A', { counts: { 'MEX-7': 2 } }), snap('B', { counts: { 'MEX-7': 0 } })],
+    } as any, false);
+  });
+
+  it('moves a copy from the active album to a parked album', () => {
+    useCollection.getState().applyInternalMove('A', 'B', 'MEX-7');
+    const st = useCollection.getState();
+    expect(st.counts['MEX-7']).toBe(1);
+    expect(st.albums.find((a) => a.id === 'B')!.counts['MEX-7']).toBe(1);
+  });
+
+  it('moves a copy between two parked albums without touching the active mirror', () => {
+    useCollection.setState({
+      counts: { 'MEX-7': 9 }, activeAlbumId: 'A',
+      albums: [snap('A', { counts: { 'MEX-7': 9 } }), snap('B', { counts: { 'MEX-7': 3 } }), snap('C', { counts: { 'MEX-7': 0 } })],
+    } as any, false);
+    useCollection.getState().applyInternalMove('B', 'C', 'MEX-7');
+    const st = useCollection.getState();
+    expect(st.counts['MEX-7']).toBe(9);
+    expect(st.albums.find((a) => a.id === 'B')!.counts['MEX-7']).toBe(2);
+    expect(st.albums.find((a) => a.id === 'C')!.counts['MEX-7']).toBe(1);
+  });
+});
+
+describe('combined-swap CRUD', () => {
+  let gid: string;
+  beforeEach(() => {
+    useCollection.setState({ groups: [] } as any, false);
+    gid = useCollection.getState().createGroup('Kids', ['A', 'B']);
+  });
+
+  it('creates a combined swap on the group with receivingQty', () => {
+    const sid = useCollection.getState().createCombinedSwap(gid, {
+      name: 'Carlos', theirNeeds: [], theirSwaps: [], giving: ['MEX-9'], receiving: ['MEX-3'],
+      receivingQty: { 'MEX-3': 2 },
+    });
+    const g = useCollection.getState().groups.find((x) => x.id === gid)!;
+    expect(g.swaps[0].id).toBe(sid);
+    expect(g.swaps[0].receiving).toEqual(['MEX-3']);
+    expect(g.swaps[0].receivingQty).toEqual({ 'MEX-3': 2 });
+    expect(g.swaps[0].status).toBe('open');
+  });
+
+  it('updates and deletes a combined swap', () => {
+    const sid = useCollection.getState().createCombinedSwap(gid, {
+      name: 'x', theirNeeds: [], theirSwaps: [], giving: [], receiving: [],
+    });
+    useCollection.getState().updateCombinedSwap(gid, sid, { name: 'Renamed', giving: ['MEX-1'] });
+    let g = useCollection.getState().groups.find((x) => x.id === gid)!;
+    expect(g.swaps[0].name).toBe('Renamed');
+    expect(g.swaps[0].giving).toEqual(['MEX-1']);
+    useCollection.getState().deleteCombinedSwap(gid, sid);
+    g = useCollection.getState().groups.find((x) => x.id === gid)!;
+    expect(g.swaps).toEqual([]);
+  });
+});
+
+describe('closeCombinedSwap / rollbackCombinedSwap', () => {
+  let gid: string;
+  beforeEach(() => {
+    useCollection.setState({
+      counts: { 'MEX-9': 2 }, activeAlbumId: 'A', groups: [],
+      albums: [snap('A', { counts: { 'MEX-9': 2 } }), snap('B', { counts: { 'MEX-3': 0 } })],
+    } as any, false);
+    gid = useCollection.getState().createGroup('Kids', ['A', 'B']);
+  });
+
+  it('applies per-album deltas, marks closed, and stores settledByAlbum', () => {
+    const sid = useCollection.getState().createCombinedSwap(gid, {
+      name: 'c', theirNeeds: [], theirSwaps: [], giving: ['MEX-9'], receiving: ['MEX-3'],
+    });
+    useCollection.getState().closeCombinedSwap(gid, sid, {
+      givenIds: ['MEX-9'], receivedIds: ['MEX-3'],
+      settledByAlbum: { A: { 'MEX-9': -1 }, B: { 'MEX-3': 1 } },
+    });
+    const st = useCollection.getState();
+    expect(st.counts['MEX-9']).toBe(1);
+    expect(st.albums.find((a) => a.id === 'B')!.counts['MEX-3']).toBe(1);
+    const sw = st.groups[0].swaps[0];
+    expect(sw.status).toBe('closed');
+    expect(sw.settledByAlbum).toEqual({ A: { 'MEX-9': -1 }, B: { 'MEX-3': 1 } });
+  });
+
+  it('rollback reverses the exact per-album deltas and reopens', () => {
+    const sid = useCollection.getState().createCombinedSwap(gid, {
+      name: 'c', theirNeeds: [], theirSwaps: [], giving: ['MEX-9'], receiving: ['MEX-3'],
+    });
+    useCollection.getState().closeCombinedSwap(gid, sid, {
+      givenIds: ['MEX-9'], receivedIds: ['MEX-3'],
+      settledByAlbum: { A: { 'MEX-9': -1 }, B: { 'MEX-3': 1 } },
+    });
+    useCollection.getState().rollbackCombinedSwap(gid, sid);
+    const st = useCollection.getState();
+    expect(st.counts['MEX-9']).toBe(2);
+    expect(st.albums.find((a) => a.id === 'B')!.counts['MEX-3']).toBe(0);
+    expect(st.groups[0].swaps[0].status).toBe('open');
+    expect(st.groups[0].swaps[0].settledByAlbum).toBeUndefined();
+  });
+});
+
+describe('deleteAlbum prunes groups', () => {
+  beforeEach(() => {
+    useCollection.setState({
+      activeAlbumId: 'A', counts: {}, groups: [],
+      albums: [snap('A'), snap('B'), snap('C')],
+    } as any, false);
+  });
+
+  it('removes a deleted member and keeps a group with ≥2 members', () => {
+    const gid = useCollection.getState().createGroup('G', ['A', 'B', 'C']);
+    useCollection.getState().deleteAlbum('C');
+    const g = useCollection.getState().groups.find((x) => x.id === gid)!;
+    expect(g.memberIds).toEqual(['A', 'B']);
+  });
+
+  it('auto-disbands a group that drops below 2 members', () => {
+    const gid = useCollection.getState().createGroup('G', ['B', 'C']);
+    useCollection.getState().deleteAlbum('C');
+    expect(useCollection.getState().groups.find((x) => x.id === gid)).toBeUndefined();
+  });
+});
+
+describe('applyMergedCollection adopts groups', () => {
+  beforeEach(() => {
+    useCollection.setState({
+      activeAlbumId: 'A', counts: {}, groups: [],
+      albums: [snap('A', { counts: {} }), snap('S')],
+    } as any, false);
+  });
+
+  it('adopts the merged group set from the payload', () => {
+    const groups = [{ id: 'g1', name: 'Kids', memberIds: ['A', 'S'], swaps: [] }];
+    useCollection.getState().applyMergedCollection(
+      { kind: 'collection', v: 1, albums: [snap('A')], groups } as any, new Set(['S']),
+    );
+    expect(useCollection.getState().groups).toEqual(groups);
+  });
+
+  it('clears groups when the merged payload has none', () => {
+    useCollection.setState({ groups: [{ id: 'g1', name: 'x', memberIds: ['A', 'S'], swaps: [] }] } as any, false);
+    useCollection.getState().applyMergedCollection(
+      { kind: 'collection', v: 1, albums: [snap('A')] } as any, new Set(['S']),
+    );
+    expect(useCollection.getState().groups).toEqual([]);
+  });
+});

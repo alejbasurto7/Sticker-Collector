@@ -16,6 +16,7 @@ import ReloadPrompt from './components/ReloadPrompt';
 import RevocationNotice from './components/RevocationNotice';
 import AlbumSwitcher from './components/AlbumSwitcher';
 import LibrarySheet from './components/LibrarySheet';
+import AlbumGroupsSheet from './components/AlbumGroupsSheet';
 import AlbumDetailView from './components/AlbumDetailView';
 import WhatsNewDialog from './components/WhatsNewDialog';
 import { shouldShowWhatsNew } from './whatsNew/gate';
@@ -29,6 +30,7 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
+  const [groupsOpen, setGroupsOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
@@ -189,8 +191,14 @@ export default function App() {
             setLibraryOpen(false);
             setSettingsOpen(true);
           }}
+          onOpenGroups={() => {
+            setLibraryOpen(false);
+            setGroupsOpen(true);
+          }}
         />
       )}
+
+      {groupsOpen && <AlbumGroupsSheet onClose={() => setGroupsOpen(false)} />}
 
       {detailOpen && <AlbumDetailView onClose={() => setDetailOpen(false)} />}
 

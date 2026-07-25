@@ -1,4 +1,4 @@
-import type { Counts, Swap } from '../types';
+import type { AlbumGroup, Counts, Swap } from '../types';
 import type { AlbumSnapshot } from '../store/collectionStore';
 import { PAYLOAD_V, type CollectionPayload } from './payload';
 
@@ -158,6 +158,46 @@ export function mergeAlbum(
   };
 }
 
+/** 3-way merge of an id set: an add/remove made on one side survives; convergent (sorted). */
+function merge3IdSet(base: string[], local: string[], remote: string[]): string[] {
+  const bs = new Set(base), ls = new Set(local), rs = new Set(remote);
+  const out: string[] = [];
+  for (const id of new Set([...local, ...remote, ...base])) {
+    const inB = bs.has(id), inL = ls.has(id), inR = rs.has(id);
+    const present = inL === inR ? inL : inL === inB ? inR : inL; // one side always equals base
+    if (present) out.push(id);
+  }
+  return out.sort();
+}
+
+/** 3-way merge of one group: name scalar, memberIds set-merge, swaps via mergeSwaps. */
+export function mergeGroup(
+  base: AlbumGroup | undefined, local: AlbumGroup, remote: AlbumGroup,
+): AlbumGroup {
+  return {
+    id: local.id,
+    name: scalar3(base?.name, local.name, remote.name),
+    memberIds: merge3IdSet(base?.memberIds ?? [], local.memberIds, remote.memberIds),
+    swaps: mergeSwaps(base?.swaps ?? [], local.swaps, remote.swaps),
+  };
+}
+
+/** 3-way merge of the group list keyed by id (add/edit/delete like mergeSwaps). */
+export function mergeGroups(
+  base: AlbumGroup[], local: AlbumGroup[], remote: AlbumGroup[],
+): AlbumGroup[] {
+  const byId = (arr: AlbumGroup[]) => new Map(arr.map((g) => [g.id, g]));
+  const b = byId(base), l = byId(local), r = byId(remote);
+  const out: AlbumGroup[] = [];
+  for (const id of new Set([...l.keys(), ...r.keys()])) {
+    const bg = b.get(id), lg = l.get(id), rg = r.get(id);
+    if (lg && rg) out.push(mergeGroup(bg, lg, rg));
+    else if (lg && !(bg && deepEqual(lg, bg))) out.push(lg); // new locally or edited-vs-delete
+    else if (rg && !(bg && deepEqual(rg, bg))) out.push(rg);
+  }
+  return out.sort((x, y) => (x.id < y.id ? -1 : x.id > y.id ? 1 : 0));
+}
+
 /**
  * 3-way merge of the whole-collection row. `managedIds` are the album ids this
  * device holds in Cloud mode. Albums the device does not manage are preserved
@@ -195,10 +235,12 @@ export function mergeCollection(
     out.set(id, rA ? mergeAlbum(b.get(id), lA, rA) : lA);
   }
 
+  const groups = mergeGroups(base.groups ?? [], local.groups ?? [], remote.groups ?? []);
   return {
     kind: 'collection',
     v: PAYLOAD_V,
     albums: [...out.values()].sort((x, y) => (x.id < y.id ? -1 : x.id > y.id ? 1 : 0)),
     ...(tomb.size ? { deletedAlbumIds: [...tomb].sort() } : {}),
+    ...(groups.length ? { groups } : {}),
   };
 }
