@@ -1,4 +1,5 @@
 import type { Counts } from '../types';
+import type { GroupPool } from './groupSwap';
 import { album, stickerById } from '../data/sampleAlbum';
 import { groupByPage } from './group';
 
@@ -48,6 +49,38 @@ export function buildListExport(
   const parts: string[] = ['Figuritas App - List', albumName];
   if (scope !== 'swaps' && needLines.length > 0) parts.push('I need', ...needLines);
   if (scope !== 'needs' && swapLines.length > 0) parts.push('To Swap', ...swapLines);
+  return parts.join('\n');
+}
+
+/**
+ * Build a shareable "Figuritas App - List" from a combined group pool: pool.get →
+ * "I need" (with "(×N)" when more than one copy is wanted), pool.give → "To Swap"
+ * (with "(×N)" for multiple spares). Same format as buildListExport, so it round-
+ * trips through parseExport for the other collector — the family's whole need/spare
+ * picture, not one album's.
+ */
+export function buildGroupListExport(pool: GroupPool, name: string): string {
+  const needLines: string[] = [];
+  const swapLines: string[] = [];
+
+  for (const page of album.pages) {
+    const needNums: string[] = [];
+    const swapNums: string[] = [];
+    for (const stickerId of page.stickerIds) {
+      const sticker = stickerById[stickerId];
+      if (!sticker) continue;
+      const need = pool.get[stickerId] ?? 0;
+      const give = pool.give[stickerId] ?? 0;
+      if (need > 0) needNums.push(need > 1 ? `${sticker.number} (×${need})` : sticker.number);
+      if (give > 0) swapNums.push(give > 1 ? `${sticker.number} (×${give})` : sticker.number);
+    }
+    if (needNums.length > 0) needLines.push(`${page.code} ${page.emoji}: ${needNums.join(', ')}`);
+    if (swapNums.length > 0) swapLines.push(`${page.code} ${page.emoji}: ${swapNums.join(', ')}`);
+  }
+
+  const parts: string[] = ['Figuritas App - List', name];
+  if (needLines.length > 0) parts.push('I need', ...needLines);
+  if (swapLines.length > 0) parts.push('To Swap', ...swapLines);
   return parts.join('\n');
 }
 
