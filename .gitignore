@@ -10,3 +10,6 @@ node_modules/.tmp
 # Local tooling (Claude Code / Superpowers)
 .claude/
 .superpowers/
+
+# Playwright MCP session output (snapshots, screenshots, console logs)
+.playwright-mcp/
