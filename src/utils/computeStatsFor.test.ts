@@ -3,9 +3,11 @@ import { computeStats, computeStatsFor } from './stats';
 import { buildAlbumFor, DEFAULT_EDITION, DEFAULT_TRACK_CC } from '../data/sampleAlbum';
 import { ALBUM_TYPES, ACTIVE_ALBUM_TYPE_ID } from '../data/albumTypes';
 
-// A second, structurally-different collection (authored via the builder) lets us prove
-// computeStatsFor is parameterized by album type, not bound to the active singleton.
-const OTHER_TYPE_ID = Object.keys(ALBUM_TYPES).find((id) => id !== ACTIVE_ALBUM_TYPE_ID)!;
+// A second, structurally-different collection lets us prove computeStatsFor is
+// parameterized by album type, not bound to the active singleton. When the registry
+// has only one type (e.g. after the Adrenalyn album was removed) there is nothing to
+// compare against, so the cross-type test below skips until a second type returns.
+const OTHER_TYPE_ID = Object.keys(ALBUM_TYPES).find((id) => id !== ACTIVE_ALBUM_TYPE_ID);
 const OTHER_VARIANT = OTHER_TYPE_ID ? ALBUM_TYPES[OTHER_TYPE_ID].defaultVariant : DEFAULT_EDITION;
 
 describe('computeStatsFor', () => {
@@ -30,8 +32,7 @@ describe('computeStatsFor', () => {
     ).toBe(computeStats({}).totalStickers);
   });
 
-  it('reflects a different album type’s own totals, not the active type’s', () => {
-    expect(OTHER_TYPE_ID).toBeTruthy(); // a second collection exists to exercise this
+  it.skipIf(!OTHER_TYPE_ID)('reflects a different album type’s own totals, not the active type’s', () => {
     const otherTotal = buildAlbumFor(OTHER_TYPE_ID, OTHER_VARIANT, false).stickers.length;
     const activeTotal = buildAlbumFor(ACTIVE_ALBUM_TYPE_ID, DEFAULT_EDITION, false).stickers.length;
     expect(otherTotal).not.toBe(activeTotal); // the two collections differ in size

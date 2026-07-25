@@ -4,6 +4,11 @@ import { ALBUM_TYPES, ACTIVE_ALBUM_TYPE_ID } from '../data/albumTypes';
 
 const snap = (id: string, over = {}) => ({ id, albumName: id, counts: {}, swaps: [], edition: 'latam' as const, trackCC: true, locked: false, activityDays: [], completedOn: null, unlockedAchievements: {}, ...over });
 
+// The "create an album of another type" test needs a second entry in the registry.
+// While only one album type exists (e.g. after the Adrenalyn album was removed) it
+// skips, and auto-runs again once a second type returns.
+const OTHER_TYPE_ID = Object.keys(ALBUM_TYPES).find((id) => id !== ACTIVE_ALBUM_TYPE_ID);
+
 beforeEach(() => {
   // Seed a known state: active album 'A' plus a shared album 'S'.
   useCollection.setState({
@@ -170,9 +175,8 @@ describe('orderAlbums (pure)', () => {
 describe('createAlbum (collection type + name)', () => {
   beforeEach(resetToSingleAlbum);
 
-  it('creates an album of the given type + default variant + name and makes it active', () => {
-    const otherId = Object.keys(ALBUM_TYPES).find((id) => id !== ACTIVE_ALBUM_TYPE_ID)!;
-    expect(otherId).toBeTruthy(); // a second collection exists to exercise this
+  it.skipIf(!OTHER_TYPE_ID)('creates an album of the given type + default variant + name and makes it active', () => {
+    const otherId = OTHER_TYPE_ID!;
     const variant = ALBUM_TYPES[otherId].defaultVariant;
     useCollection.getState().createAlbum({ albumTypeId: otherId, name: "Leo's" });
     const s = useCollection.getState();
