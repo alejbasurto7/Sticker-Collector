@@ -1,0 +1,615 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Group swap — album indicator mockups</title>
+<style>
+:root{
+  --bg:#0f1115; --bg-elev:#171a21; --bg-elev-2:#1f232c; --border:#2a2f3a;
+  --text:#f2f4f8; --text-dim:#9aa3b2;
+  --green:#0b8a4b; --green-bright:#18b563; --gold:#f5c542; --red:#e0533d; --blue:#3b82f6;
+  --radius:14px; --radius-sm:10px;
+  --t0:#18b563; --t1:#3b82f6; --t2:#f59e0b; --t3:#ef4444; --t4:#a855f7; --t5:#14b8a6;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:#0a0c10; color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  font-size:15px; line-height:1.45;
+}
+a{color:var(--green-bright)}
+.wrap{max-width:1500px; margin:0 auto; padding:28px 20px 80px}
+
+/* ---------- page chrome ---------- */
+header.page{border-bottom:1px solid var(--border); padding-bottom:20px; margin-bottom:24px}
+header.page h1{margin:0 0 6px; font-size:26px; letter-spacing:-.02em}
+header.page p{margin:0; color:var(--text-dim); max-width:78ch}
+.scenario{
+  margin-top:16px; background:var(--bg-elev); border:1px solid var(--border);
+  border-radius:var(--radius); padding:14px 16px;
+}
+.scenario h2{margin:0 0 8px; font-size:12px; letter-spacing:.09em; text-transform:uppercase; color:var(--text-dim)}
+.scenario ul{margin:0; padding-left:18px; color:var(--text-dim); font-size:13.5px}
+.scenario li{margin:3px 0}
+.scenario b{color:var(--text); font-weight:600}
+
+/* ---------- variant tabs ---------- */
+.tabs{display:flex; gap:8px; flex-wrap:wrap; margin:26px 0 6px; position:sticky; top:0; background:#0a0c10; padding:10px 0; z-index:5; border-bottom:1px solid var(--border)}
+.tabs button{
+  font:inherit; font-size:13.5px; font-weight:600; color:var(--text-dim); cursor:pointer;
+  background:var(--bg-elev-2); border:1px solid var(--border); border-radius:999px; padding:8px 16px;
+  transition:background .15s, color .15s, border-color .15s;
+}
+.tabs button:hover{color:var(--text)}
+.tabs button.on{background:var(--green-bright); border-color:var(--green-bright); color:#06210f}
+
+.variant{display:none}
+.variant.on{display:block}
+.variant > h2{font-size:21px; margin:22px 0 4px; letter-spacing:-.01em}
+.variant > .lede{color:var(--text-dim); margin:0 0 18px; max-width:80ch; font-size:14px}
+
+.sub{font-size:11.5px; letter-spacing:.09em; text-transform:uppercase; color:var(--text-dim); margin:26px 0 12px; font-weight:700}
+
+/* ---------- phone frames ---------- */
+.frames{display:flex; gap:20px; flex-wrap:wrap; align-items:flex-start}
+.frame{width:360px; flex:none}
+.frame > .cap{font-size:12px; font-weight:700; color:var(--text-dim); margin-bottom:8px; letter-spacing:.03em}
+.phone{
+  background:var(--bg); border:1px solid var(--border); border-radius:22px;
+  padding:16px 14px 20px; box-shadow:0 18px 44px rgba(0,0,0,.5);
+}
+.phone h3{margin:0 0 2px; font-size:17px}
+.modal-sub{margin:0 0 12px; color:var(--text-dim); font-size:12.5px; line-height:1.4}
+.section-title{
+  font-size:11.5px; letter-spacing:.07em; text-transform:uppercase; color:var(--text-dim);
+  font-weight:800; margin:16px 0 2px;
+}
+
+/* ---------- app primitives (mirrors styles.css) ---------- */
+.chip-group-row{display:flex; align-items:flex-start; gap:8px; margin-top:10px}
+.chip-group-title{font-size:12px; font-weight:800; color:var(--text-dim); white-space:nowrap; flex-shrink:0; width:60px; padding-top:6px}
+.chip-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(64px,1fr)); gap:8px; flex:1}
+.chip{
+  position:relative; border:1px solid var(--border); background:var(--bg-elev-2);
+  border-radius:var(--radius-sm); padding:8px 4px; font-size:12px; font-weight:700;
+  text-align:center; color:var(--text-dim);
+}
+.chip.sel{border-color:var(--green); background:rgba(11,138,75,.2); color:var(--text)}
+.chip-qty{margin-left:3px; font-size:10px; font-weight:800; color:var(--green-bright); vertical-align:super}
+.btn{
+  font:inherit; font-size:14px; font-weight:600; background:var(--bg-elev-2); color:var(--text);
+  border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 14px; cursor:pointer;
+}
+.btn.primary{background:var(--green); border-color:var(--green); color:#fff}
+.btn.full{width:100%}
+.btn-row{display:flex; gap:8px; margin-top:16px}
+select.route-change{
+  background:var(--bg-elev-2); color:var(--text); border:1px solid var(--border);
+  border-radius:var(--radius-sm); padding:3px 6px; font-size:12.5px; font-family:inherit;
+}
+.pill{font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px; background:var(--bg-elev-2); color:var(--text-dim); border:1px solid var(--border)}
+
+/* ---------- THE ALBUM MARK — shared vocabulary ---------- */
+.amark{
+  display:inline-grid; place-items:center; flex:none;
+  width:15px; height:15px; border-radius:5px;
+  font-size:9.5px; font-weight:800; color:#08130c; letter-spacing:0;
+  font-family:inherit; line-height:1;
+}
+.amark.lg{width:20px; height:20px; border-radius:6px; font-size:11.5px}
+.amark.xl{width:26px; height:26px; border-radius:8px; font-size:14px}
+.amark.t0{background:var(--t0)} .amark.t1{background:var(--t1); color:#04122c}
+.amark.t2{background:var(--t2); color:#241300} .amark.t3{background:var(--t3); color:#2a0603}
+.amark.t4{background:var(--t4); color:#1c0630} .amark.t5{background:var(--t5); color:#022220}
+.amark.ghost{background:transparent; border:1px dashed var(--text-dim); color:var(--text-dim)}
+.amark.viewonly{position:relative; opacity:.65; box-shadow:inset 0 0 0 1px rgba(255,255,255,.25)}
+
+/* legend */
+.legend{display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin:8px 0 2px; font-size:12px; color:var(--text-dim)}
+.legend span.item{display:inline-flex; align-items:center; gap:5px}
+
+/* ---------- A: chip badges ---------- */
+.chip.badged{padding-bottom:6px}
+.chip .badge-row{display:flex; gap:3px; justify-content:center; margin-top:5px}
+.chip .badge-row .amark{width:14px; height:14px; font-size:9px; border-radius:4px}
+.chip.amb{border-color:var(--gold); border-style:dashed}
+.needs-call{
+  margin-top:12px; background:rgba(245,197,66,.08); border:1px solid rgba(245,197,66,.35);
+  border-radius:var(--radius-sm); padding:10px 12px;
+}
+.needs-call .nc-title{font-size:12px; font-weight:800; color:var(--gold); margin-bottom:8px; letter-spacing:.02em}
+.needs-call .nc-row{display:flex; align-items:center; gap:8px; font-size:13px; flex-wrap:wrap}
+.needs-call .nc-row + .nc-row{margin-top:8px; border-top:1px solid rgba(245,197,66,.2); padding-top:8px}
+.nc-sticker{font-weight:800; font-size:12.5px; background:var(--bg-elev-2); border:1px solid var(--border); border-radius:8px; padding:4px 8px}
+
+/* ---------- B: album lanes ---------- */
+.lane{border:1px solid var(--border); border-radius:var(--radius-sm); margin-top:10px; overflow:hidden; background:var(--bg-elev)}
+.lane-head{display:flex; align-items:center; gap:8px; padding:8px 10px; background:var(--bg-elev-2); font-size:13px; font-weight:700}
+.lane-head .dir{color:var(--text-dim); font-weight:800; font-size:13px}
+.lane-head .cnt{margin-left:auto; font-size:11px; font-weight:700; color:var(--text-dim); background:var(--bg); border:1px solid var(--border); border-radius:999px; padding:1px 8px}
+.lane-body{padding:6px 10px 10px}
+.lane-body .chip-group-row{margin-top:6px}
+.lane-body .chip-group-title{width:52px; font-size:11px}
+.lane.accent-t0{border-left:3px solid var(--t0)} .lane.accent-t1{border-left:3px solid var(--t1)}
+.lane.accent-t2{border-left:3px solid var(--t2)} .lane.accent-t3{border-left:3px solid var(--t3)}
+.lane.accent-t4{border-left:3px solid var(--t4)}
+.lane.handoff{border-style:dashed; background:transparent}
+.lane .lane-note{font-size:11.5px; color:var(--text-dim); padding:2px 0 0}
+
+/* ---------- C: flow rows ---------- */
+.flow{display:flex; flex-direction:column; gap:6px; margin-top:8px}
+.flow-row{
+  display:flex; align-items:center; gap:8px; font-size:13px;
+  background:var(--bg-elev); border:1px solid var(--border); border-radius:var(--radius-sm);
+  padding:7px 10px; flex-wrap:wrap;
+}
+.flow-row .sid{font-weight:800; font-size:12.5px; min-width:56px; color:var(--text)}
+.flow-row .arrow{color:var(--text-dim); font-weight:800}
+.apill{display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; color:var(--text);
+  background:var(--bg-elev-2); border:1px solid var(--border); border-radius:999px; padding:3px 10px 3px 4px}
+.apill.out{color:var(--text-dim)}
+.flow-row.amb{border-color:rgba(245,197,66,.5); background:rgba(245,197,66,.07)}
+.flow-row.handoff{border-style:dashed}
+.flow-row .tag{font-size:11px; color:var(--gold); font-weight:700; margin-left:auto}
+.flow-row .tag.hand{color:var(--green-bright)}
+.dir-head{display:flex; align-items:center; gap:6px}
+
+/* ---------- D: matrix ---------- */
+table.mx{width:100%; border-collapse:collapse; margin-top:10px; font-size:12.5px}
+table.mx th, table.mx td{border-bottom:1px solid var(--border); padding:7px 4px; text-align:center}
+table.mx th:first-child, table.mx td:first-child{text-align:left; font-weight:800}
+table.mx thead th{font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; padding-bottom:9px}
+table.mx thead th .amark{margin-bottom:3px}
+table.mx .plus{color:var(--green-bright); font-weight:800}
+table.mx .minus{color:var(--red); font-weight:800}
+table.mx .none{color:#4a5160}
+table.mx .amb{color:var(--gold); font-weight:800}
+table.mx td.hand{color:var(--green-bright); font-size:11px}
+.mx-head-col{display:flex; flex-direction:column; align-items:center; gap:2px}
+
+/* ---------- notes ---------- */
+.notes{
+  margin-top:22px; display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:14px;
+}
+.note{background:var(--bg-elev); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px}
+.note h4{margin:0 0 8px; font-size:12px; letter-spacing:.07em; text-transform:uppercase; color:var(--text-dim)}
+.note ul{margin:0; padding-left:17px; font-size:13.5px; color:var(--text-dim)}
+.note li{margin:5px 0}
+.note li b{color:var(--text); font-weight:600}
+.note.good h4{color:var(--green-bright)}
+.note.bad h4{color:var(--red)}
+.note.verdict{border-color:rgba(24,181,99,.4); background:rgba(24,181,99,.06)}
+.note.verdict h4{color:var(--green-bright)}
+
+/* ---------- recommendation ---------- */
+.rec{margin-top:34px; border:1px solid rgba(24,181,99,.4); background:rgba(24,181,99,.06); border-radius:var(--radius); padding:20px 22px}
+.rec h2{margin:0 0 10px; font-size:19px; color:var(--green-bright)}
+.rec p{margin:0 0 10px; color:var(--text-dim); max-width:82ch; font-size:14px}
+.rec strong{color:var(--text)}
+.rec ol{color:var(--text-dim); font-size:14px; padding-left:20px; margin:10px 0 0}
+.rec ol li{margin:6px 0}
+
+@media (max-width:820px){ .frame{width:100%} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <h1>Group swap — “which album does this sticker come from / go to?”</h1>
+  <p>
+    Four ways to surface per-album routing in a combined swap. All four use the same underlying data that
+    <code>computeGroupPool</code> / <code>routeReceived</code> / <code>routeGiven</code> already return — the
+    difference is purely presentational. Colours and chip styling are the app's real tokens.
+  </p>
+
+  <div class="scenario">
+    <h2>The scenario every mockup renders</h2>
+    <ul>
+      <li>Group <b>“Kids' World Cup”</b> — members <b>Leo</b> (green) and <b>Kai</b> (blue), plus <b>Grandpa</b> as a view-only read-only share.</li>
+      <li><b>You give:</b> MEX-9 ×1 (Leo has the spare) · BRA-4 ×1 (Kai has the spare).</li>
+      <li><b>You get:</b> MEX-7 ×2 (both boys missing it → one each) · MEX-3 ×1 (<b>both</b> missing, only one copy → ambiguous, you choose) · CC-5 ×1 (Leo tracks CC, Kai doesn't) · ARG-2 ×1 (only Grandpa needs it → hand-off, never written).</li>
+      <li>Each variant also gets a <b>4-album stress test</b>, since groups may run to four members.</li>
+    </ul>
+  </div>
+</header>
+
+<div class="tabs" id="tabs"></div>
+
+<div id="variants"></div>
+
+<div class="rec">
+  <h2>My recommendation — A for the chip screens, C for the close screen</h2>
+  <p>
+    They're not competing; they solve different jobs. <strong>A (chip badges)</strong> is the only option that
+    leaves the existing chip grid — and its per-page grouping (<code>MEX 🇲🇽</code>, <code>BRA 🇧🇷</code>) — completely
+    intact. On the New-swap and Detail screens the chip grid <em>is</em> the artifact you're scanning, and routing
+    there is preview-only, so a passive mark is exactly the right weight.
+  </p>
+  <p>
+    <strong>C (flow rows)</strong> earns its vertical space only on the close screen, where every copy is a decision
+    that's about to commit, the override control needs somewhere to live, and “one row per physical copy” matches
+    what you're literally doing with your hands. It's also the shape the code already emits — this is
+    <code>.close-routes</code> grown up, not a rewrite.
+  </p>
+  <p>
+    <strong>B (lanes)</strong> is the strongest single answer if you'd rather have one treatment everywhere, and it's
+    the most legible of the four — but it fights the page grouping and duplicates a sticker that goes to two albums.
+    <strong>D (matrix)</strong> is the most information-dense and the only one that shows the whole ledger at a glance;
+    it reads more like a spreadsheet than the rest of the app, and it's the one I'd expect to age worst on a narrow phone.
+  </p>
+  <ol>
+    <li>Both A and C need the same new primitive: a tinted <code>.amark</code> monogram derived from the existing <code>monogram(name)</code> + <code>coverTint(id)</code>, so an album's colour is identical here, in the Library sheet and in the switcher.</li>
+    <li>Colour is never the only signal — the letter carries the meaning, so this survives colour-blindness and greyscale.</li>
+    <li>The give side stays non-interactive everywhere (spec §D: surplus is fungible); only ambiguous <em>receives</em> get a control, and only at close.</li>
+  </ol>
+</div>
+
+</div>
+
+<script>
+/* ============================ data ============================ */
+const A = {
+  leo:{id:'leo', name:'Leo',     t:0},
+  kai:{id:'kai', name:'Kai',     t:1},
+  ana:{id:'ana', name:'Ana',     t:2},
+  nico:{id:'nico',name:'Nico',   t:4},
+  gp:{id:'gp',   name:'Grandpa', t:3, viewOnly:true},
+};
+const M = (a)=>a.name.trim()[0].toUpperCase();
+
+/* Two-album scenario -------------------------------------------------- */
+const S2 = {
+  members:[A.leo, A.kai],
+  viewOnly:[A.gp],
+  give:[
+    {id:'MEX-9', label:'MEX 9', page:'MEX 🇲🇽', qty:1, from:[A.leo]},
+    {id:'BRA-4', label:'BRA 4', page:'BRA 🇧🇷', qty:1, from:[A.kai]},
+  ],
+  get:[
+    {id:'MEX-7', label:'MEX 7', page:'MEX 🇲🇽', qty:2, to:[A.leo, A.kai]},
+    {id:'MEX-3', label:'MEX 3', page:'MEX 🇲🇽', qty:1, to:[A.leo], ambiguous:[A.leo, A.kai]},
+    {id:'CC-5',  label:'CC 5',  page:'CC ⭐',   qty:1, to:[A.leo]},
+    {id:'ARG-2', label:'ARG 2', page:'ARG 🇦🇷', qty:1, to:[], handoff:[A.gp]},
+  ],
+};
+
+/* Four-album stress --------------------------------------------------- */
+const S4 = {
+  members:[A.leo, A.kai, A.ana, A.nico],
+  viewOnly:[],
+  give:[
+    {id:'MEX-9', label:'MEX 9', page:'MEX 🇲🇽', qty:2, from:[A.nico, A.ana]},
+    {id:'BRA-4', label:'BRA 4', page:'BRA 🇧🇷', qty:1, from:[A.kai]},
+  ],
+  get:[
+    {id:'MEX-7', label:'MEX 7', page:'MEX 🇲🇽', qty:3, to:[A.leo, A.kai, A.ana]},
+    {id:'MEX-3', label:'MEX 3', page:'MEX 🇲🇽', qty:1, to:[A.leo], ambiguous:[A.leo, A.kai, A.ana, A.nico]},
+    {id:'BRA-8', label:'BRA 8', page:'BRA 🇧🇷', qty:2, to:[A.kai, A.nico]},
+    {id:'CC-5',  label:'CC 5',  page:'CC ⭐',   qty:1, to:[A.ana]},
+  ],
+};
+
+/* ============================ helpers ============================ */
+const esc = s => String(s).replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const mark = (a, cls='') => `<span class="amark t${a.t} ${a.viewOnly?'viewonly':''} ${cls}" title="${esc(a.name)}">${M(a)}</span>`;
+const ghost = (cls='') => `<span class="amark ghost ${cls}">?</span>`;
+const apill = (a, extra='') => `<span class="apill ${extra}">${mark(a)}${esc(a.name)}</span>`;
+
+const legend = (sc) => {
+  const all = [...sc.members, ...sc.viewOnly];
+  return `<div class="legend">${all.map(a=>
+    `<span class="item">${mark(a)} ${esc(a.name)}${a.viewOnly?' <span class="pill">view-only</span>':''}</span>`
+  ).join('')}</div>`;
+};
+
+/* group a sticker list by page, preserving order */
+const byPage = (items) => {
+  const out = [];
+  for (const it of items) {
+    let g = out.find(g=>g.page===it.page);
+    if (!g) out.push(g={page:it.page, items:[]});
+    g.items.push(it);
+  }
+  return out;
+};
+const shortNum = it => it.label.split(' ')[1];
+const pageCode = p => p.split(' ')[0];
+
+/* ============================ VARIANT A — chip badges ============================ */
+function chipA(it, dir){
+  const marks = dir==='give' ? it.from : it.to;
+  const amb = !!it.ambiguous;
+  const hand = it.handoff || [];
+  const badges = [
+    ...marks.map(a=>mark(a)),
+    ...(amb ? [ghost()] : []),
+    ...hand.map(a=>mark(a)),
+  ].join('');
+  return `<button class="chip sel badged ${amb?'amb':''}" title="${esc(it.label)}">
+    ${shortNum(it)}${it.qty>1?`<span class="chip-qty">×${it.qty}</span>`:''}
+    <span class="badge-row">${badges}</span>
+  </button>`;
+}
+function chipsA(items, dir){
+  return byPage(items).map(g=>`
+    <div class="chip-group-row">
+      <span class="chip-group-title">${esc(g.page)}</span>
+      <div class="chip-grid">${g.items.map(it=>chipA(it,dir)).join('')}</div>
+    </div>`).join('');
+}
+function variantA(sc, surface){
+  const needsCall = sc.get.filter(it=>it.ambiguous);
+  const handoffs  = sc.get.filter(it=>it.handoff);
+  const giveTitle = surface==='close' ? 'You gave' : 'You give';
+  const getTitle  = surface==='close' ? 'You received' : 'You get';
+  const gN = sc.give.reduce((n,i)=>n+i.qty,0), rN = sc.get.reduce((n,i)=>n+i.qty,0);
+  return `
+    ${legend(sc)}
+    <div class="section-title">${giveTitle} (${gN}) <span style="text-transform:none;letter-spacing:0;font-weight:600">· badge = which album it leaves</span></div>
+    ${chipsA(sc.give,'give')}
+    <div class="section-title">${getTitle} (${rN}) <span style="text-transform:none;letter-spacing:0;font-weight:600">· badge = which album it lands in</span></div>
+    ${chipsA(sc.get,'get')}
+    ${surface==='close' && (needsCall.length||handoffs.length) ? `
+      <div class="needs-call">
+        <div class="nc-title">⚠️ Needs your call</div>
+        ${needsCall.map(it=>`
+          <div class="nc-row">
+            <span class="nc-sticker">${esc(it.label)}</span>
+            <span style="color:var(--text-dim)">${it.ambiguous.length} albums need it, 1 copy →</span>
+            <select class="route-change">${it.ambiguous.map((a,i)=>`<option ${i?'':'selected'}>${esc(a.name)}</option>`).join('')}</select>
+          </div>`).join('')}
+        ${handoffs.map(it=>`
+          <div class="nc-row">
+            <span class="nc-sticker">${esc(it.label)}</span>
+            <span style="color:var(--green-bright);font-weight:600">🤝 hand to ${esc(it.handoff[0].name)} — not recorded</span>
+          </div>`).join('')}
+      </div>` : ''}
+    ${surface!=='close' && needsCall.length ? `
+      <p class="modal-sub" style="margin-top:10px">
+        <span class="amark ghost" style="vertical-align:-3px"></span>
+        = more than one album needs it and only one copy is coming — you'll pick at close.
+      </p>` : ''}`;
+}
+
+/* ============================ VARIANT B — album lanes ============================ */
+function laneChips(items){
+  return byPage(items).map(g=>`
+    <div class="chip-group-row">
+      <span class="chip-group-title">${esc(pageCode(g.page))}</span>
+      <div class="chip-grid">${g.items.map(it=>`
+        <button class="chip sel">${shortNum(it)}${it.amb?'<span class="chip-qty">?</span>':''}</button>`).join('')}
+      </div>
+    </div>`).join('');
+}
+function variantB(sc, surface){
+  const lane = (a, dir, items, extra='') => items.length ? `
+    <div class="lane accent-t${a.t} ${extra}">
+      <div class="lane-head">
+        <span class="dir">${dir==='give'?'←':'→'}</span>${mark(a,'lg')}
+        <span>${esc(a.name)}</span>
+        ${a.viewOnly?'<span class="pill">view-only</span>':''}
+        <span class="cnt">${items.reduce((n,i)=>n+(i.copies||1),0)}</span>
+      </div>
+      <div class="lane-body">
+        ${laneChips(items)}
+        ${a.viewOnly?'<div class="lane-note">🤝 hand over physically — never written to their album</div>':''}
+        ${items.some(i=>i.amb) && surface==='close' ? `
+          <div class="lane-note" style="display:flex;align-items:center;gap:8px;margin-top:8px;color:var(--gold)">
+            ? = both need it, 1 copy →
+            <select class="route-change">${sc.members.map((m,i)=>`<option ${i?'':'selected'}>${esc(m.name)}</option>`).join('')}</select>
+          </div>` : ''}
+        ${items.some(i=>i.amb) && surface!=='close' ? `<div class="lane-note" style="color:var(--gold)">? = provisional — another album needs it too; you pick at close</div>`:''}
+      </div>
+    </div>` : '';
+
+  // fan the flat lists out into per-album buckets
+  const giveBy = a => sc.give.filter(it=>it.from.some(x=>x.id===a.id)).map(it=>({...it, copies:it.from.filter(x=>x.id===a.id).length}));
+  const getBy  = a => sc.get.filter(it=>it.to.some(x=>x.id===a.id)).map(it=>({...it, amb:!!it.ambiguous, copies:1}));
+  const handBy = a => sc.get.filter(it=>(it.handoff||[]).some(x=>x.id===a.id)).map(it=>({...it, copies:1}));
+
+  const gN = sc.give.reduce((n,i)=>n+i.qty,0), rN = sc.get.reduce((n,i)=>n+i.qty,0);
+  return `
+    <div class="section-title">${surface==='close'?'You gave':'You give'} (${gN}) <span style="text-transform:none;letter-spacing:0;font-weight:600">· grouped by source album</span></div>
+    ${sc.members.map(a=>lane(a,'give',giveBy(a))).join('')}
+    <div class="section-title">${surface==='close'?'You received':'You get'} (${rN}) <span style="text-transform:none;letter-spacing:0;font-weight:600">· grouped by destination album</span></div>
+    ${sc.members.map(a=>lane(a,'get',getBy(a))).join('')}
+    ${sc.viewOnly.map(a=>lane(a,'get',handBy(a),'handoff')).join('')}`;
+}
+
+/* ============================ VARIANT C — flow rows ============================ */
+function variantC(sc, surface){
+  const rows = [];
+  for (const it of sc.give)
+    for (const a of it.from)
+      rows.push(`<div class="flow-row">
+        <span class="sid">${esc(it.label)}</span>
+        ${apill(a)}<span class="arrow">⟶</span><span class="apill out">out</span>
+      </div>`);
+  const getRows = [];
+  for (const it of sc.get){
+    for (const a of it.to){
+      const amb = it.ambiguous;
+      getRows.push(`<div class="flow-row ${amb?'amb':''}">
+        <span class="sid">${esc(it.label)}</span>
+        <span class="arrow">⟶</span>${apill(a)}
+        ${amb ? (surface==='close'
+          ? `<select class="route-change">${amb.map((m,i)=>`<option ${i?'':'selected'}>${esc(m.name)}</option>`).join('')}</select><span class="tag">1 copy, ${amb.length} need it</span>`
+          : `<span class="tag">${amb.length} need it · you pick at close</span>`) : ''}
+      </div>`);
+    }
+    for (const a of (it.handoff||[])){
+      getRows.push(`<div class="flow-row handoff">
+        <span class="sid">${esc(it.label)}</span>
+        <span class="arrow">⟶</span>${apill(a)}
+        <span class="tag hand">🤝 not recorded</span>
+      </div>`);
+    }
+  }
+  const gN = sc.give.reduce((n,i)=>n+i.qty,0), rN = sc.get.reduce((n,i)=>n+i.qty,0);
+  return `
+    <div class="section-title">${surface==='close'?'You gave':'You give'} (${gN}) <span style="text-transform:none;letter-spacing:0;font-weight:600">· one row per physical copy</span></div>
+    <div class="flow">${rows.join('')}</div>
+    <div class="section-title">${surface==='close'?'You received':'You get'} (${rN})</div>
+    <div class="flow">${getRows.join('')}</div>`;
+}
+
+/* ============================ VARIANT D — matrix ============================ */
+function variantD(sc){
+  const cols = sc.members;
+  const all = [
+    ...sc.give.map(it=>({...it, kind:'give'})),
+    ...sc.get.map(it=>({...it, kind:'get'})),
+  ];
+  const cell = (it,a) => {
+    if (it.kind==='give'){
+      const n = it.from.filter(x=>x.id===a.id).length;
+      return n ? `<span class="minus">−${n}</span>` : '<span class="none">·</span>';
+    }
+    const n = it.to.filter(x=>x.id===a.id).length;
+    if (it.ambiguous && it.ambiguous.some(x=>x.id===a.id)) {
+      return n ? '<span class="amb">+1?</span>' : '<span class="amb">?</span>';
+    }
+    return n ? `<span class="plus">+${n}</span>` : '<span class="none">·</span>';
+  };
+  return `
+    <div class="section-title">Net effect per album</div>
+    <table class="mx">
+      <thead><tr>
+        <th></th>
+        ${cols.map(a=>`<th><span class="mx-head-col">${mark(a,'lg')}${esc(a.name)}</span></th>`).join('')}
+        ${sc.viewOnly.map(a=>`<th><span class="mx-head-col">${mark(a,'lg')}${esc(a.name)}</span></th>`).join('')}
+      </tr></thead>
+      <tbody>
+        ${all.map(it=>`<tr>
+          <td>${esc(it.label)}${it.qty>1?` <span class="chip-qty">×${it.qty}</span>`:''}</td>
+          ${cols.map(a=>`<td>${cell(it,a)}</td>`).join('')}
+          ${sc.viewOnly.map(a=>`<td class="hand">${(it.handoff||[]).some(x=>x.id===a.id)?'🤝':'<span class="none">·</span>'}</td>`).join('')}
+        </tr>`).join('')}
+      </tbody>
+    </table>
+    <p class="modal-sub" style="margin-top:10px">
+      <span class="plus">+</span> lands in · <span class="minus">−</span> leaves ·
+      <span class="amb">?</span> both need it, one copy · 🤝 hand over, not recorded
+    </p>
+    <div style="margin-top:8px"><select class="route-change"><option>MEX 3 → Leo</option><option>MEX 3 → Kai</option></select></div>`;
+}
+
+/* ============================ frames ============================ */
+const RENDER = {A:variantA, B:variantB, C:variantC, D:variantD};
+
+function frame(cap, title, sub, body, footer){
+  return `<div class="frame">
+    <div class="cap">${cap}</div>
+    <div class="phone">
+      <h3>${title}</h3>
+      <p class="modal-sub">${sub}</p>
+      ${body}
+      ${footer}
+    </div>
+  </div>`;
+}
+
+function surfaces(key, sc){
+  const R = RENDER[key];
+  const isD = key==='D';
+  const newBody = isD ? R(sc,'new') : R(sc,'new');
+  return `<div class="frames">
+    ${frame('1 · New combined swap', 'New combined swap', "Matches against the whole group pool. The indicator tells you <em>who</em> each match is actually for before you save.",
+      `<div style="background:var(--bg-elev-2);border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:12px;color:var(--text-dim);margin-bottom:6px">Carlos' list — 14 lines parsed ✓</div>` + newBody,
+      `<div class="btn-row"><button class="btn full">Cancel</button><button class="btn primary full">Save swap</button></div>`)}
+
+    ${frame('2 · Swap detail (open)', 'Carlos', 'Preview only — nothing commits until you mark it swapped.',
+      R(sc,'detail'),
+      `<div class="btn-row"><button class="btn full">Export</button><button class="btn primary full">🤝 Mark as swapped</button></div>`)}
+
+    ${frame('3 · Close / settle', 'Mark “Carlos” as swapped', 'Confirm what was exchanged. This writes counts to each album.',
+      R(sc,'close'),
+      `<div class="btn-row"><button class="btn full">Cancel</button><button class="btn primary full">🤝 Mark as swapped</button></div>`)}
+  </div>`;
+}
+
+/* ============================ notes ============================ */
+const NOTES = {
+A:{
+  title:'A · Badges on the chip',
+  lede:'Each sticker chip keeps its place in the existing page-grouped grid and gains a row of tiny tinted monograms underneath — the albums this copy lands in (or leaves). A dashed “?” means more than one album needs it and only one copy is coming.',
+  good:['<b>Zero structural change.</b> The chip grid and its <code>MEX 🇲🇽 / BRA 🇧🇷</code> page grouping survive untouched — this is a <code>&lt;span&gt;</code> inside the existing button.','<b>A sticker going to two albums is one chip</b> with two badges — no duplication anywhere.','<b>The close screen gets short.</b> Only genuinely ambiguous copies need a row, so “Needs your call” is usually one line or absent entirely.','Scales to 4 members without reflowing: four 14px marks still fit a 64px chip.'],
+  bad:['<b>Small.</b> 14px marks are a glance-level signal, not a reading-level one — fine for “Leo or Kai?”, weaker for “exactly how many copies land where”.','Needs a persistent legend the first few times; the letter helps but two albums starting with the same letter collide (Leo / Lucas both → “L”).','Direction (in vs out) is carried by the section header, not the badge itself.'],
+  verdict:'Best on the two preview surfaces, where routing is information rather than a decision.',
+},
+B:{
+  title:'B · Lanes grouped by album',
+  lede:'Give and get lists are re-bucketed under a header per album — “→ Leo (3)”, “← Kai (1)” — with a coloured left edge. Page grouping nests inside each lane.',
+  good:['<b>Unambiguous with no legend.</b> The album name is spelled out at full size; you never decode a colour.','<b>Reads like a packing list</b> — “these three go in Leo’s album” is exactly the physical act you’re about to perform.','Scales cleanly to any N: more members just means more lanes.','The view-only hand-off becomes its own dashed lane, which is a genuinely clearer place for it than a footnote.'],
+  bad:['<b>Fights the page grouping.</b> You now have two nested groupings (album → page), so <code>MEX</code> can appear under every lane.','<b>Duplicates the shared case.</b> MEX-7 going to both boys appears in two lanes — the one thing the pool math worked hard to net.','Tallest of the four; a 4-album swap pushes the action button well below the fold.'],
+  verdict:'The best single treatment if you want one pattern on every screen — at the cost of the page grouping.',
+},
+C:{
+  title:'C · Directional flow rows',
+  lede:'One row per physical copy: sticker → tinted album pill, with the arrow doing the in/out work. This is today’s plain-text <code>.close-routes</code> block, promoted to a real component.',
+  good:['<b>Literally one row per copy.</b> Two copies of MEX-7 are two rows — nothing to infer from a ×2 badge.','<b>The override control has an obvious home</b>, inline on the row it belongs to, instead of floating in a separate panel.','<b>Direction is explicit</b> in the row itself, so it survives being read out of context.','Closest to the existing implementation — the smallest diff of the four on the close screen.'],
+  bad:['<b>Verbose on the preview screens</b>, where it duplicates information the chip grid already shows.','A 12-copy swap is a 12-row list; no visual compression at all.','Loses the page grouping entirely.'],
+  verdict:'The right answer for the close screen specifically. Too heavy for the other two.',
+},
+D:{
+  title:'D · Per-album ledger matrix',
+  lede:'Rows are stickers, columns are albums, cells are the signed count delta. The whole settlement as one table.',
+  good:['<b>The only view that shows the complete net effect at once</b> — gives and gets in one grid, per album.','<b>Densest by far.</b> A 10-sticker, 4-album swap fits on one screen.','Trivially auditable: the column sums are what actually gets written to each album.'],
+  bad:['<b>Reads as a spreadsheet</b>, not as this app. Nothing else in the product looks like this.','Columns get cramped fast on a 360px phone once you pass three members plus a view-only.','<b>Discards the chip vocabulary</b> the user already knows from every other swap screen.','The override control has no natural cell-level home — it ends up as a detached dropdown.'],
+  verdict:'Strong as an optional “ledger” expander on the close screen; wrong as the primary treatment.',
+},
+};
+
+/* ============================ boot ============================ */
+const keys = ['A','B','C','D'];
+document.getElementById('tabs').innerHTML =
+  keys.map((k,i)=>`<button data-k="${k}" class="${i?'':'on'}">${esc(NOTES[k].title)}</button>`).join('');
+
+document.getElementById('variants').innerHTML = keys.map((k,i)=>`
+  <section class="variant ${i?'':'on'}" data-k="${k}">
+    <h2>${esc(NOTES[k].title)}</h2>
+    <p class="lede">${NOTES[k].lede}</p>
+
+    <div class="sub">Typical case — 2 albums + 1 view-only member</div>
+    ${surfaces(k, S2)}
+
+    <div class="sub">Stress test — 4 albums</div>
+    <div class="frames">
+      <div class="frame">
+        <div class="cap">Swap detail · 4 members</div>
+        <div class="phone">
+          <h3>Carlos</h3>
+          <p class="modal-sub">Preview only — nothing commits until you mark it swapped.</p>
+          ${RENDER[k](S4,'detail')}
+        </div>
+      </div>
+      <div class="frame">
+        <div class="cap">Close · 4 members</div>
+        <div class="phone">
+          <h3>Mark “Carlos” as swapped</h3>
+          <p class="modal-sub">Confirm what was exchanged. This writes counts to each album.</p>
+          ${RENDER[k](S4,'close')}
+          <div class="btn-row"><button class="btn full">Cancel</button><button class="btn primary full">🤝 Mark as swapped</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <div class="note good"><h4>Works because</h4><ul>${NOTES[k].good.map(x=>`<li>${x}</li>`).join('')}</ul></div>
+      <div class="note bad"><h4>Costs</h4><ul>${NOTES[k].bad.map(x=>`<li>${x}</li>`).join('')}</ul></div>
+      <div class="note verdict"><h4>Verdict</h4><ul><li>${NOTES[k].verdict}</li></ul></div>
+    </div>
+  </section>`).join('');
+
+document.getElementById('tabs').addEventListener('click', e=>{
+  const b = e.target.closest('button[data-k]'); if(!b) return;
+  const k = b.dataset.k;
+  document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on', x===b));
+  document.querySelectorAll('.variant').forEach(v=>v.classList.toggle('on', v.dataset.k===k));
+  window.scrollTo({top:0, behavior:'instant'});
+});
+</script>
+</body>
+</html>
