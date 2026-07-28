@@ -6,6 +6,9 @@ import {
   computeGroupCandidates,
   routeReceived,
   routeGiven,
+  routeForDisplay,
+  reservedSparesOf,
+  swapRoutingInput,
   type GroupMember,
 } from './groupSwap';
 import type { ParsedList } from './import';
@@ -138,8 +141,24 @@ describe('routeReceived', () => {
   it('reminds to hand off to a view-only needer without writing it', () => {
     const members = [w('A', { 'MEX-2': 1 }), v('V', { 'MEX-2': 0 })];
     const r = routeReceived(members, { 'MEX-2': 1 });
+    // The single copy goes to V by hand; nothing is credited to A. (Before this fix the
+    // copy was double-counted: written to A AND flagged as a hand-off to V.)
+    expect(r.writes).toEqual({});
+    expect(r.handoffs).toEqual([{ id: 'MEX-2', memberId: 'V', memberName: 'V' }]);
+  });
+
+  it('a second copy beyond the hand-off is parked in a writable album', () => {
+    const members = [w('A', { 'MEX-2': 1 }), v('V', { 'MEX-2': 0 })];
+    const r = routeReceived(members, { 'MEX-2': 2 });
     expect(r.writes).toEqual({ A: { 'MEX-2': 1 } });
     expect(r.handoffs).toEqual([{ id: 'MEX-2', memberId: 'V', memberName: 'V' }]);
+  });
+
+  it('a view-only needer gets no reminder when no copy is left for it', () => {
+    const members = [w('A', { 'MEX-2': 0 }), v('V', { 'MEX-2': 0 })];
+    const r = routeReceived(members, { 'MEX-2': 1 });
+    expect(r.writes).toEqual({ A: { 'MEX-2': 1 } });
+    expect(r.handoffs).toEqual([]);
   });
 });
 
@@ -168,5 +187,146 @@ describe('routeGiven', () => {
     const r = routeGiven(members, { 'MEX-9': 1 });
     expect(r.writes).toEqual({});
     expect(r.short).toEqual({ 'MEX-9': 1 });
+  });
+});
+
+describe('routeForDisplay', () => {
+  const spares = (n: number) => ({ 'MEX-9': n });
+
+  it('give routed to one member yields one mark', () => {
+    const members = [w('A', { 'MEX-9': 2 }), w('B', { 'MEX-9': 1 })];
+    const r = routeForDisplay(members, { 'MEX-9': 1 }, {});
+    expect(r.give['MEX-9'].memberIds).toEqual(['A']);
+  });
+
+  it('two copies from one member is still one mark (qty lives on the chip)', () => {
+    const members = [w('A', { 'MEX-9': 3 }), w('B', { 'MEX-9': 1 })];
+    const r = routeForDisplay(members, { 'MEX-9': 2 }, {});
+    expect(r.give['MEX-9'].memberIds).toEqual(['A']);
+  });
+
+  it('two copies from two members yields two marks in group order', () => {
+    const members = [w('A', { 'MEX-9': 2 }), w('B', { 'MEX-9': 2 })];
+    const r = routeForDisplay(members, { 'MEX-9': 2 }, {});
+    expect(r.give['MEX-9'].memberIds).toEqual(['A', 'B']);
+  });
+
+  it('two needers and two copies: both marked, not ambiguous', () => {
+    const members = [w('A', { 'MEX-7': 0 }), w('B', { 'MEX-7': 0 })];
+    const r = routeForDisplay(members, {}, { 'MEX-7': 2 });
+    expect(r.get['MEX-7'].memberIds).toEqual(['A', 'B']);
+    expect(r.get['MEX-7'].ambiguousAmong).toBeUndefined();
+  });
+
+  it('two needers and one copy: one mark plus ambiguousAmong', () => {
+    const members = [w('A', { 'MEX-3': 0 }), w('B', { 'MEX-3': 0 })];
+    const r = routeForDisplay(members, {}, { 'MEX-3': 1 });
+    expect(r.get['MEX-3'].memberIds).toEqual(['A']);
+    expect(r.get['MEX-3'].ambiguousAmong).toEqual(['A', 'B']);
+  });
+
+  it('a writable needer takes the only copy, leaving nothing to hand over', () => {
+    const members = [w('A', { 'ARG-2': 0 }), v('G', { 'ARG-2': 0 })];
+    const r = routeForDisplay(members, {}, { 'ARG-2': 1 });
+    // Writable needers are filled first (spec §D). With one copy there is nothing
+    // physical left for G, so no hand-off reminder is raised.
+    expect(r.get['ARG-2'].memberIds).toEqual(['A']);
+    expect(r.get['ARG-2'].handoffIds).toBeUndefined();
+  });
+
+  it('a second copy is the one the view-only needer gets by hand', () => {
+    const members = [w('A', { 'ARG-2': 0 }), v('G', { 'ARG-2': 0 })];
+    const r = routeForDisplay(members, {}, { 'ARG-2': 2 });
+    expect(r.get['ARG-2'].memberIds).toEqual(['A']);
+    expect(r.get['ARG-2'].handoffIds).toEqual(['G']);
+  });
+
+  it('a sticker only a view-only member needs has no write target at all', () => {
+    const members = [w('A', { 'ARG-2': 1 }), v('G', { 'ARG-2': 0 })];
+    const r = routeForDisplay(members, {}, { 'ARG-2': 1 });
+    expect(r.get['ARG-2'].memberIds).toEqual([]);
+    expect(r.get['ARG-2'].handoffIds).toEqual(['G']);
+  });
+
+  it('a hand-off consumes its copy, so only a genuine surplus lands in a writable album', () => {
+    const members = [w('A', { 'ARG-2': 1 }), v('G', { 'ARG-2': 0 })];
+    const r = routeForDisplay(members, {}, { 'ARG-2': 2 });
+    expect(r.get['ARG-2'].memberIds).toEqual(['A']);
+    expect(r.get['ARG-2'].handoffIds).toEqual(['G']);
+  });
+
+  it('a member whose layout excludes the sticker never appears', () => {
+    const members = [
+      { ...w('A', { 'CC-5': 0 }), trackCC: true },
+      { ...w('B', { 'CC-5': 0 }), trackCC: false },
+    ];
+    const r = routeForDisplay(members, {}, { 'CC-5': 1 });
+    expect(r.get['CC-5'].memberIds).toEqual(['A']);
+  });
+
+  it('a give the pool cannot source yields no marks and does not throw', () => {
+    const members = [w('A', { 'MEX-9': 1 }), w('B', { 'MEX-9': 1 })];
+    const r = routeForDisplay(members, { 'MEX-9': 1 }, {});
+    expect(r.give['MEX-9'].memberIds).toEqual([]);
+  });
+
+  it("respects a spare reserved by that album's own solo swap", () => {
+    const members = [w('A', { 'MEX-9': 2 }), w('B', { 'MEX-9': 3 })];
+    const r = routeForDisplay(members, { 'MEX-9': 1 }, {}, { A: spares(1) });
+    expect(r.give['MEX-9'].memberIds).toEqual(['B']);
+  });
+
+  it('is per-sticker independent: dropping one id leaves the others identical', () => {
+    const members = [w('A', { 'MEX-9': 2, 'BRA-4': 2 }), w('B', { 'MEX-9': 1, 'BRA-4': 1 })];
+    const both = routeForDisplay(members, { 'MEX-9': 1, 'BRA-4': 1 }, {});
+    const one = routeForDisplay(members, { 'BRA-4': 1 }, {});
+    expect(one.give['BRA-4']).toEqual(both.give['BRA-4']);
+  });
+
+  it('orders marks by group member order, not by writes insertion order', () => {
+    const members = [w('B', { 'MEX-7': 0 }), w('A', { 'MEX-7': 0 })];
+    const r = routeForDisplay(members, {}, { 'MEX-7': 2 });
+    expect(r.get['MEX-7'].memberIds).toEqual(['B', 'A']);
+  });
+});
+
+describe('swapRoutingInput', () => {
+  // theirNeeds / theirSwaps are required on Swap — omitting them fails typecheck.
+  const base = {
+    id: 's1', name: 'Carlos', status: 'open' as const, createdAt: 0,
+    theirNeeds: [], theirSwaps: [],
+    giving: [] as string[], receiving: [] as string[],
+  };
+
+  it('reads promised give quantities and receiving quantities', () => {
+    const swap = { ...base, giving: ['MEX-9'], givingQty: { 'MEX-9': 2 },
+      receiving: ['MEX-7'], receivingQty: { 'MEX-7': 2 } };
+    expect(swapRoutingInput(swap)).toEqual({
+      giving: { 'MEX-9': 2 },
+      receiving: { 'MEX-7': 2 },
+    });
+  });
+
+  it('defaults a missing receivingQty to one copy', () => {
+    const swap = { ...base, giving: [], receiving: ['MEX-7'] };
+    expect(swapRoutingInput(swap).receiving).toEqual({ 'MEX-7': 1 });
+  });
+
+  it('uses the promised set, ignoring deselection', () => {
+    const swap = { ...base, giving: ['MEX-9'], receiving: ['MEX-7'],
+      deselectedReceiving: ['MEX-7'] };
+    expect(Object.keys(swapRoutingInput(swap).receiving)).toEqual(['MEX-7']);
+  });
+});
+
+describe('reservedSparesOf', () => {
+  it("maps each member to its own open swaps' committed gives", () => {
+    const swap = {
+      id: 's1', name: 'x', status: 'open' as const, createdAt: 0,
+      theirNeeds: [], theirSwaps: [],
+      giving: ['MEX-9'], receiving: [] as string[],
+    };
+    expect(reservedSparesOf([{ id: 'A', swaps: [swap] }, { id: 'B', swaps: [] }]))
+      .toEqual({ A: { 'MEX-9': 1 }, B: {} });
   });
 });

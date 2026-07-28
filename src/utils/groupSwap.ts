@@ -1,6 +1,7 @@
-import type { Counts, Edition } from '../types';
+import type { Counts, Edition, Swap } from '../types';
 import type { ParsedList } from './import';
 import type { Reservations } from './swap';
+import { computeReservations, giveQtyOf } from './swap';
 import { activeType, buildAlbumFromType } from '../data/albumTypes';
 
 /** A group member reduced to what pool math needs — no store/singleton dependency. */
@@ -162,22 +163,33 @@ export function routeReceived(
     if (qty <= 0) continue;
     const includers = members.filter((m) => idSets.get(m.id)!.has(id));
     const writableNeeders = includers.filter((m) => m.writable && (m.counts[id] ?? 0) === 0);
+    const viewNeeders = includers.filter((m) => !m.writable && (m.counts[id] ?? 0) === 0);
+
+    // Writable needers first — a view-only need never consumes a writable album's target.
     const assign = Math.min(writableNeeders.length, qty);
     for (let k = 0; k < assign; k++) addWrite(writes, writableNeeders[k].id, id, 1);
-    const extra = qty - assign;
-    if (extra > 0) {
-      const target = includers.find((m) => m.writable);
-      if (target) addWrite(writes, target.id, id, extra);
+    let remaining = qty - assign;
+
+    // Each view-only needer takes one PHYSICAL copy. It is never written to counts, but it
+    // is still consumed — so it cannot also be parked in a writable album as a spare.
+    const handedOff = Math.min(viewNeeders.length, remaining);
+    for (let k = 0; k < handedOff; k++) {
+      handoffs.push({ id, memberId: viewNeeders[k].id, memberName: viewNeeders[k].name });
     }
+    remaining -= handedOff;
+
+    // Only a genuine surplus — beyond every needer, writable or view-only — becomes a spare.
+    if (remaining > 0) {
+      const target = includers.find((m) => m.writable);
+      if (target) addWrite(writes, target.id, id, remaining);
+    }
+
     if (writableNeeders.length > qty && writableNeeders.length > 1) {
       ambiguous.push({
         id,
         chosenIds: writableNeeders.slice(0, qty).map((m) => m.id),
         options: writableNeeders.map((m) => ({ id: m.id, name: m.name })),
       });
-    }
-    for (const vm of includers.filter((m) => !m.writable && (m.counts[id] ?? 0) === 0)) {
-      handoffs.push({ id, memberId: vm.id, memberName: vm.name });
     }
   }
   return { writes, ambiguous, handoffs };
@@ -219,4 +231,85 @@ export function routeGiven(
     if (remaining > 0) short[id] = remaining;
   }
   return { writes, short };
+}
+
+/** Where one sticker's copies come from / go to, for display only. Never persisted. */
+export interface ChipRouting {
+  /** Distinct member ids this sticker leaves from (give) or lands in (get), in group order. */
+  memberIds: string[];
+  /** Set when more writable albums need it than copies are coming — user picks at close. */
+  ambiguousAmong?: string[];
+  /** View-only members missing it: a physical hand-off, never written to counts. */
+  handoffIds?: string[];
+}
+
+export interface DisplayRouting {
+  give: Record<string, ChipRouting>;
+  get: Record<string, ChipRouting>;
+}
+
+/**
+ * Flatten routeGiven / routeReceived into per-sticker display data. Adds no routing
+ * logic of its own so the badges can never disagree with settlement.
+ *
+ * One mark per DISTINCT member: quantity is already carried by the chip's ×N badge, so
+ * an album supplying both copies gets one mark, not two.
+ */
+export function routeForDisplay(
+  members: GroupMember[],
+  giving: Record<string, number>,
+  receiving: Record<string, number>,
+  reservedSpares: Record<string, Record<string, number>> = {},
+): DisplayRouting {
+  const order = new Map(members.map((m, i) => [m.id, i]));
+  // writes is keyed by album id in insertion order; re-sort so marks follow group order.
+  const inOrder = (ids: string[]) => [...ids].sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
+
+  const given = routeGiven(members, giving, reservedSpares);
+  const received = routeReceived(members, receiving);
+
+  const give: Record<string, ChipRouting> = {};
+  for (const id of Object.keys(giving)) {
+    give[id] = {
+      memberIds: inOrder(Object.keys(given.writes).filter((aid) => (given.writes[aid][id] ?? 0) < 0)),
+    };
+  }
+
+  const get: Record<string, ChipRouting> = {};
+  for (const id of Object.keys(receiving)) {
+    const amb = received.ambiguous.find((a) => a.id === id);
+    const handoffIds = received.handoffs.filter((h) => h.id === id).map((h) => h.memberId);
+    get[id] = {
+      memberIds: inOrder(Object.keys(received.writes).filter((aid) => (received.writes[aid][id] ?? 0) > 0)),
+      ...(amb ? { ambiguousAmong: inOrder(amb.options.map((o) => o.id)) } : {}),
+      ...(handoffIds.length ? { handoffIds: inOrder(handoffIds) } : {}),
+    };
+  }
+
+  return { give, get };
+}
+
+/** Each member's own solo-swap give reservations, so the per-album give floor holds. */
+export function reservedSparesOf(
+  members: { id: string; swaps: Swap[] }[],
+): Record<string, Record<string, number>> {
+  return Object.fromEntries(
+    members.map((m) => [m.id, Object.fromEntries(computeReservations(m.swaps).committedGive)]),
+  );
+}
+
+/**
+ * The promised copies on a swap, as routeForDisplay wants them. Deliberately the
+ * PROMISED set, not the checked set: routing is per-sticker independent, so this keeps
+ * an unchecked chip's marks from blanking out and jumping back when it is re-checked.
+ */
+export function swapRoutingInput(swap: Swap): {
+  giving: Record<string, number>;
+  receiving: Record<string, number>;
+} {
+  const giving: Record<string, number> = {};
+  for (const id of swap.giving) giving[id] = giveQtyOf(swap, id);
+  const receiving: Record<string, number> = {};
+  for (const id of swap.receiving) receiving[id] = Math.max(1, swap.receivingQty?.[id] ?? 1);
+  return { giving, receiving };
 }
