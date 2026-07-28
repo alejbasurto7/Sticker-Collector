@@ -84,9 +84,18 @@ describe('routeForDisplay', () => {
     expect(r.get['MEX-3'].ambiguousAmong).toEqual(['A', 'B']);
   });
 
-  it('a view-only needer becomes a handoff, never a write target', () => {
+  it('a writable needer takes the only copy, leaving nothing to hand over', () => {
     const members = [w('A', { 'ARG-2': 0 }), v('G', { 'ARG-2': 0 })];
     const r = routeForDisplay(members, {}, { 'ARG-2': 1 });
+    // Writable needers are filled first (spec §D). With one copy there is nothing
+    // physical left for G, so no hand-off reminder is raised.
+    expect(r.get['ARG-2'].memberIds).toEqual(['A']);
+    expect(r.get['ARG-2'].handoffIds).toBeUndefined();
+  });
+
+  it('a second copy is the one the view-only needer gets by hand', () => {
+    const members = [w('A', { 'ARG-2': 0 }), v('G', { 'ARG-2': 0 })];
+    const r = routeForDisplay(members, {}, { 'ARG-2': 2 });
     expect(r.get['ARG-2'].memberIds).toEqual(['A']);
     expect(r.get['ARG-2'].handoffIds).toEqual(['G']);
   });
@@ -378,7 +387,10 @@ change — it reads `writes` and `handoffs`, whose shapes are unchanged.
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `npm test -- src/utils/groupSwap.test.ts`
-Expected: PASS, including all pre-existing tests in the file except the one corrected in Step 3b.
+Expected: PASS. Two tests change meaning under Step 3b's rule and are given in corrected form
+above — the `routeReceived` one named in Step 3b, and the `routeForDisplay` "writable needer takes
+the only copy" one in Step 1. No other pre-existing test should need touching; if one does, stop
+and report rather than adjusting it.
 
 - [ ] **Step 5: Commit**
 
