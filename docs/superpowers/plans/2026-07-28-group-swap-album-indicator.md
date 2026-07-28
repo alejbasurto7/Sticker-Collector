@@ -26,6 +26,8 @@
 
 1. **§D contrast — one ink, not per-tint inks.** The spec anticipated darkening the ink for individual failing tints. Measured against `#06210f` (the `.album-cover` ink): green 6.35, blue 4.63, amber 7.94, red 4.53, purple **4.31 FAIL**, teal 6.85. Only purple fails, and blue passes — the opposite of what the spec guessed. Pure `#000` passes all six (min 5.31, purple). So `.amark` uses `color: #000` — a single rule with no per-tint exception to maintain, imperceptibly different from `#06210f` at 9.5px. Task 2 makes this an enforced unit test rather than a review-time eyeball.
 2. **§C "one optional prop" — honoured, but the prop carries resolved albums.** `ChipRouting` holds member *ids*; the chip needs names. Rather than adding a second lookup prop, a pure `chipBadges()` mapper resolves ids to `{id, name, viewOnly}` first, so `StickerChips` still takes exactly one new prop.
+4. **`useGroupBadges` hook added (pre-flight amendment, user-approved).** The first draft had Tasks 4, 5 and 6 each build `markAlbums` and wrap `routeForDisplay` in `chipBadges` — the same ~10 lines three times. Task 3 now owns that as a single hook and Tasks 4–6 each make one call. The hook memoises on a **content key** rather than argument identity, because callers rebuild `giving`/`receiving` every render while the computation rebuilds every member's album layout (`buildAlbumFromType`) — recomputing that per keystroke in the new-swap dialog would be a real cost.
+
 3. **§G component-level test is NOT included.** The repo runs vitest node-only with no jsdom and no `@testing-library/react` (vitest.config.ts states this is deliberate: "Node environment is enough: tests only touch pure functions"). Adding a component-test stack for one assertion is disproportionate to the change. Instead the "renders identically without badges" guarantee is enforced structurally — `badges` is optional and every new render path sits behind `badge &&` — and verified by manual smoke row 9. **Flag for the user:** if you would rather add jsdom + RTL, that is a separate task before Task 3.
 
 ---
@@ -496,12 +498,13 @@ Turns routing into render-ready badges, and teaches `StickerChips` to draw them.
 - Create: `src/utils/chipBadges.ts`
 - Create: `src/utils/chipBadges.test.ts`
 - Create: `src/components/GroupLegend.tsx`
+- Create: `src/components/useGroupBadges.ts`
 - Modify: `src/components/StickerChips.tsx`
 - Modify: `src/styles.css`
 
 **Interfaces:**
-- Consumes: `ChipRouting`, `DisplayRouting` (Task 1); `AlbumMark` (Task 2); existing `labelFor` from `src/utils/group.ts`.
-- Produces: `AlbumMarkInfo`, `ChipBadge`, `chipBadges(routing, members, direction)`, `describeBadge(badge, qty)`; `<GroupLegend members={...} />`; `StickerChips` prop `badges?: Map<string, ChipBadge>`.
+- Consumes: `ChipRouting`, `DisplayRouting`, `routeForDisplay`, `reservedSparesOf` (Task 1); `AlbumMark` (Task 2); existing `labelFor` from `src/utils/group.ts`; existing `GroupSwapCtx` from `src/sync/groupMembers.ts`.
+- Produces: `AlbumMarkInfo`, `ChipBadge`, `chipBadges(routing, members, direction)`, `describeBadge(badge, qty)`; `<GroupLegend members={...} />`; `useGroupBadges(groupCtx, giving, receiving, routeOverride?)`; `StickerChips` prop `badges?: Map<string, ChipBadge>`. **Tasks 4, 5 and 6 each consume `useGroupBadges` and must not re-implement its body.**
 
 - [ ] **Step 1: Write the failing mapper tests**
 
@@ -696,6 +699,72 @@ export default function GroupLegend({ members }: Props) {
 }
 ```
 
+- [ ] **Step 5b: Add the shared badge hook**
+
+This is the single place the three surfaces get their badges from. Tasks 4–6 call it; none of them
+rebuilds its body.
+
+Create `src/components/useGroupBadges.ts`:
+
+```ts
+import { useMemo } from 'react';
+import type { GroupSwapCtx } from '../sync/groupMembers';
+import { routeForDisplay, reservedSparesOf } from '../utils/groupSwap';
+import { chipBadges, type AlbumMarkInfo, type ChipBadge } from '../utils/chipBadges';
+
+export interface GroupBadges {
+  /** Members as AlbumMark needs them — also what GroupLegend renders. */
+  members: AlbumMarkInfo[];
+  give: Map<string, ChipBadge>;
+  get: Map<string, ChipBadge>;
+}
+
+/**
+ * Per-sticker album routing for a combined swap's chips. Returns null outside group
+ * mode, so a solo swap passes `undefined` badges and renders exactly as it always has.
+ *
+ * Memoised on a CONTENT key rather than argument identity: callers build `giving` /
+ * `receiving` fresh on every render, while the computation rebuilds each member's album
+ * layout via buildAlbumFromType — far too expensive to redo on every keystroke in the
+ * new-swap dialog. The records are small, so stringifying them is the cheap side.
+ */
+export function useGroupBadges(
+  groupCtx: GroupSwapCtx | undefined,
+  giving: Record<string, number>,
+  receiving: Record<string, number>,
+  routeOverride?: Record<string, string>,
+): GroupBadges | null {
+  const key = JSON.stringify([giving, receiving, routeOverride ?? null]);
+  return useMemo(() => {
+    if (!groupCtx) return null;
+    const members: AlbumMarkInfo[] = groupCtx.members.map((m) => ({
+      id: m.id,
+      name: m.name,
+      viewOnly: !m.writable,
+    }));
+    const routing = routeForDisplay(
+      groupCtx.members,
+      giving,
+      receiving,
+      reservedSparesOf(groupCtx.members),
+    );
+    // Reflect an ambiguous-copy override (close screen only) on the chip itself.
+    for (const [id, chosen] of Object.entries(routeOverride ?? {})) {
+      if (routing.get[id]) routing.get[id] = { ...routing.get[id], memberIds: [chosen] };
+    }
+    return {
+      members,
+      give: chipBadges(routing.give, members, 'give'),
+      get: chipBadges(routing.get, members, 'get'),
+    };
+    // `key` is the content hash of giving/receiving/routeOverride — see the doc comment.
+  }, [groupCtx, key]);
+}
+```
+
+No unit test: this is a React hook and the suite is node-only with no renderer. Every piece of
+logic it composes (`routeForDisplay`, `chipBadges`, `reservedSparesOf`) is already unit-tested.
+
 - [ ] **Step 6: Teach StickerChips to draw badges**
 
 Rewrite `src/components/StickerChips.tsx` as:
@@ -837,7 +906,7 @@ Expected: build succeeds; all tests pass (solo-swap call sites still compile bec
 - [ ] **Step 9: Commit**
 
 ```bash
-git add src/utils/chipBadges.ts src/utils/chipBadges.test.ts src/components/GroupLegend.tsx src/components/StickerChips.tsx src/styles.css
+git add src/utils/chipBadges.ts src/utils/chipBadges.test.ts src/components/GroupLegend.tsx src/components/useGroupBadges.ts src/components/StickerChips.tsx src/styles.css
 git commit -m "feat(group-swap): render album routing marks on sticker chips"
 ```
 
@@ -851,49 +920,39 @@ The first surface where the user sees routing. Preview only — no controls.
 - Modify: `src/components/SwapDetail.tsx`
 
 **Interfaces:**
-- Consumes: `routeForDisplay`, `reservedSparesOf`, `swapRoutingInput` (Task 1); `chipBadges` (Task 3); `GroupLegend` (Task 3); existing `groupCtx.members` (`ResolvedGroupMember[]`, which already carries `id`, `name`, `writable`, `swaps`).
+- Consumes: `swapRoutingInput` (Task 1); `useGroupBadges` and `GroupLegend` (Task 3); existing `groupCtx.members` (`ResolvedGroupMember[]`, which already carries `id`, `name`, `writable`, `swaps`).
 - Produces: nothing consumed by later tasks.
+- **Do not re-implement the badge derivation.** `useGroupBadges` owns it; this task is a call plus two props.
 
 - [ ] **Step 1: Add the imports**
 
 In `src/components/SwapDetail.tsx`, extend the existing imports:
 
 ```tsx
-import { computeConflicts, giveQtyOf } from '../utils/swap';
-import { routeForDisplay, reservedSparesOf, swapRoutingInput } from '../utils/groupSwap';
-import { chipBadges, type AlbumMarkInfo } from '../utils/chipBadges';
+import { swapRoutingInput } from '../utils/groupSwap';
+import { useGroupBadges } from './useGroupBadges';
 import GroupLegend from './GroupLegend';
 ```
 
 - [ ] **Step 2: Derive the badges**
 
-Insert after the existing `recvConflicts` / `conflictCount` block (just before `const giving = new Set(...)`, currently around line 99):
+Insert after the existing `recvConflicts` / `conflictCount` block (just before `const giving = new Set(...)`, currently around line 99). The hook is called unconditionally and returns `null` outside group mode, so it never becomes a conditional hook call:
 
 ```tsx
   // Group mode: which album each promised copy leaves from / lands in. Derived live
   // from current counts every render — preview only, nothing persisted.
-  const markAlbums: AlbumMarkInfo[] = useMemo(
-    () => (groupCtx?.members ?? []).map((m) => ({ id: m.id, name: m.name, viewOnly: !m.writable })),
-    [groupCtx],
-  );
-
-  const badges = useMemo(() => {
-    if (!groupCtx) return null;
-    const { giving: g, receiving: r } = swapRoutingInput(swap);
-    const routing = routeForDisplay(groupCtx.members, g, r, reservedSparesOf(groupCtx.members));
-    return {
-      give: chipBadges(routing.give, markAlbums, 'give'),
-      get: chipBadges(routing.get, markAlbums, 'get'),
-    };
-  }, [groupCtx, swap, markAlbums]);
+  const routingInput = swapRoutingInput(swap);
+  const badges = useGroupBadges(groupCtx, routingInput.giving, routingInput.receiving);
 ```
+
+Then use `badges?.members` wherever the legend needs its member list.
 
 - [ ] **Step 3: Render the legend and pass the badges**
 
 Replace the two `StickerChips` blocks (currently lines 202–220) with:
 
 ```tsx
-        {groupCtx && <GroupLegend members={markAlbums} />}
+        {badges && <GroupLegend members={badges.members} />}
 
         <div className="section-title">You give ({giveCopies})</div>
         <StickerChips
@@ -949,56 +1008,52 @@ Shows who each match is for, before the swap is saved.
 - Modify: `src/components/NewSwapDialog.tsx`
 
 **Interfaces:**
-- Consumes: `routeForDisplay`, `reservedSparesOf` (Task 1); `chipBadges` (Task 3); `GroupLegend` (Task 3); the existing `candidates` object from `computeGroupCandidates`, whose `giveQty` / `getQty` are already `Record<string, number>` — exactly `routeForDisplay`'s input shape.
+- Consumes: `useGroupBadges` and `GroupLegend` (Task 3); the existing `candidates` object from `computeGroupCandidates`, whose `giveQty` / `getQty` are already `Record<string, number>` — exactly the hook's input shape.
 - Produces: nothing consumed by later tasks.
+- **Do not re-implement the badge derivation.** `useGroupBadges` owns it; this task is a call plus two props.
 
 - [ ] **Step 1: Add the imports**
 
 In `src/components/NewSwapDialog.tsx`, extend the existing imports:
 
 ```tsx
-import { routeForDisplay, reservedSparesOf } from '../utils/groupSwap';
-import { chipBadges, type AlbumMarkInfo } from '../utils/chipBadges';
+import { useGroupBadges } from './useGroupBadges';
 import GroupLegend from './GroupLegend';
+import type { GroupCandidates } from '../utils/groupSwap';
 ```
 
 (`computeGroupCandidates` is already imported; keep it.)
 
 - [ ] **Step 2: Derive the badges from the candidates**
 
-Insert immediately after the `candidates` `useMemo` (currently around line 102):
+Add this module-level constant near the top of the file (outside the component), so the empty case
+keeps a stable identity:
 
 ```tsx
-  const markAlbums: AlbumMarkInfo[] = useMemo(
-    () => (groupCtx?.members ?? []).map((m) => ({ id: m.id, name: m.name, viewOnly: !m.writable })),
-    [groupCtx],
-  );
-
-  // Routing is per-sticker independent, so these marks stay put as candidates are
-  // toggled on and off — they describe every offered sticker, not just the checked ones.
-  const badges = useMemo(() => {
-    if (!groupCtx || !candidates) return null;
-    const routing = routeForDisplay(
-      groupCtx.members,
-      candidates.giveQty,
-      candidates.getQty,
-      reservedSparesOf(groupCtx.members),
-    );
-    return {
-      give: chipBadges(routing.give, markAlbums, 'give'),
-      get: chipBadges(routing.get, markAlbums, 'get'),
-    };
-  }, [groupCtx, candidates, markAlbums]);
+const NO_QTY: Record<string, number> = {};
 ```
 
-**Note on types:** `candidates` is a union of `GroupCandidates` and the solo `Candidates`; only the group branch has `getQty`. The `!groupCtx` guard narrows it at runtime. If TypeScript cannot narrow the union here, cast at the call site with `candidates as GroupCandidates` and import that type from `../utils/groupSwap` — do not widen the shared type.
+Then insert immediately after the `candidates` `useMemo` (currently around line 102):
+
+```tsx
+  // Routing is per-sticker independent, so these marks stay put as candidates are
+  // toggled on and off — they describe every offered sticker, not just the checked ones.
+  const groupCandidates = groupCtx ? (candidates as GroupCandidates | null) : null;
+  const badges = useGroupBadges(
+    groupCtx,
+    groupCandidates?.giveQty ?? NO_QTY,
+    groupCandidates?.getQty ?? NO_QTY,
+  );
+```
+
+**Note on types:** `candidates` is a union of `GroupCandidates` and the solo `Candidates`; only the group branch has `getQty`. The `groupCtx ? … : null` guard makes the cast safe — the group branch is the only one that produces a `GroupCandidates`. Do not widen the shared type to make the cast unnecessary.
 
 - [ ] **Step 3: Render the legend and pass the badges**
 
 Add the legend directly above the `You can give` section title (currently line 215), inside the `{candidates && (<>` fragment:
 
 ```tsx
-            {groupCtx && <GroupLegend members={markAlbums} />}
+            {badges && <GroupLegend members={badges.members} />}
 ```
 
 Then add `badges={badges?.give}` to the first `StickerChips` (the `youGive` one) and `badges={badges?.get}` to the second (`youGet`), leaving every other prop untouched.
@@ -1036,43 +1091,27 @@ Badges replace the grey route text; a focused panel keeps only what still needs 
 In `src/components/SwapClose.tsx`, extend the existing imports:
 
 ```tsx
-import { useMemo, useState } from 'react';
-import { routeForDisplay, reservedSparesOf, swapRoutingInput, routeReceived, routeGiven } from '../utils/groupSwap';
-import { chipBadges, type AlbumMarkInfo } from '../utils/chipBadges';
+import { swapRoutingInput } from '../utils/groupSwap';
+import { useGroupBadges } from './useGroupBadges';
 import GroupLegend from './GroupLegend';
 ```
 
-(`routeReceived` / `routeGiven` are already imported — keep them; they drive settlement.)
+(`routeReceived` / `routeGiven` are already imported — keep them; they drive settlement, which this task does not touch.)
 
 - [ ] **Step 2: Derive the display badges, honouring the override**
 
-Insert after the existing `nameOf` helper (currently around line 58):
+Insert after the existing `nameOf` helper (currently around line 58). The hook's fourth argument
+carries the override, so the chip's mark follows the user's choice:
 
 ```tsx
-  const markAlbums: AlbumMarkInfo[] = useMemo(
-    () => members.map((m) => ({ id: m.id, name: m.name, viewOnly: !m.writable })),
-    [members],
-  );
-
   /**
    * Badges describe the PROMISED set, while receiveRouting/giveRouting above settle the
    * CHECKED set. Routing is per-sticker independent, so the two agree on every checked
    * chip — and using the promised set stops an unchecked chip's marks from blanking out
    * and jumping back when it is re-checked.
    */
-  const badges = useMemo(() => {
-    if (!groupCtx) return null;
-    const { giving: g, receiving: r } = swapRoutingInput(swap);
-    const routing = routeForDisplay(members, g, r, reservedSparesOf(members));
-    // Reflect the user's ambiguous-copy override on the chip itself.
-    for (const [id, chosen] of Object.entries(routeOverride)) {
-      if (routing.get[id]) routing.get[id] = { ...routing.get[id], memberIds: [chosen] };
-    }
-    return {
-      give: chipBadges(routing.give, markAlbums, 'give'),
-      get: chipBadges(routing.get, markAlbums, 'get'),
-    };
-  }, [groupCtx, members, swap, routeOverride, markAlbums]);
+  const routingInput = swapRoutingInput(swap);
+  const badges = useGroupBadges(groupCtx, routingInput.giving, routingInput.receiving, routeOverride);
 ```
 
 - [ ] **Step 3: Replace the route text with badges and the decision panel**
@@ -1080,7 +1119,7 @@ Insert after the existing `nameOf` helper (currently around line 58):
 Replace everything from `<div className="section-title">You gave ...` through the closing of the received `.close-routes` block (currently lines 128–187) with:
 
 ```tsx
-        {groupCtx && <GroupLegend members={markAlbums} />}
+        {badges && <GroupLegend members={badges.members} />}
 
         <div className="section-title">You gave ({givenCopies})</div>
         <StickerChips
@@ -1263,6 +1302,7 @@ If a smoke step failed, fix it, re-run Step 1, and commit with a `fix(group-swap
 | §B per-surface inputs, `reservedSparesOf`, `swapRoutingInput` | Task 1 (helpers), Tasks 4–6 (use) |
 | §C `StickerChips` one optional prop | Task 3 (deviation 2: prop carries resolved albums) |
 | §C `GroupLegend` on all three surfaces | Task 3 (component), Tasks 4–6 (render) |
+| §C shared badge derivation (`useGroupBadges`) | Task 3 (deviation 4: added pre-flight to keep Tasks 4–6 duplication-free) |
 | §C new swap / detail / close behaviour table | Tasks 5 / 4 / 6 |
 | §C "Needs your call" panel, `.close-routes` removed | Task 6 |
 | §C give side non-interactive | Global constraint; verified in Task 7 |
