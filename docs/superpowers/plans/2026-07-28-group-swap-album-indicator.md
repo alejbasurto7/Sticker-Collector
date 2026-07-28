@@ -98,6 +98,13 @@ describe('routeForDisplay', () => {
     expect(r.get['ARG-2'].handoffIds).toEqual(['G']);
   });
 
+  it('a hand-off consumes its copy, so only a genuine surplus lands in a writable album', () => {
+    const members = [w('A', { 'ARG-2': 1 }), v('G', { 'ARG-2': 0 })];
+    const r = routeForDisplay(members, {}, { 'ARG-2': 2 });
+    expect(r.get['ARG-2'].memberIds).toEqual(['A']);
+    expect(r.get['ARG-2'].handoffIds).toEqual(['G']);
+  });
+
   it('a member whose layout excludes the sticker never appears', () => {
     const members = [
       { ...w('A', { 'CC-5': 0 }), trackCC: true },
@@ -290,16 +297,102 @@ export function swapRoutingInput(swap: Swap): {
 }
 ```
 
+- [ ] **Step 3b: Fix the view-only double-credit bug in `routeReceived`**
+
+**Added mid-execution on the user's ruling.** Building the display layer exposed a real defect in
+`routeReceived`: a copy acquired for a **view-only** member is *also* written to the first writable
+album. One physical copy gets credited twice — it lands in Leo's counts **and** you are told to hand
+it to Grandpa. The existing test at `groupSwap.test.ts` (`reminds to hand off to a view-only needer
+without writing it`) locked the bug in: it asserts `writes` is `{ A: { 'MEX-2': 1 } }` while its own
+name says the copy is not written.
+
+The rule (spec §D): writable needers are filled first, **then each view-only needer consumes one
+physical copy as a hand-off**, and only what remains after both is parked in a writable album as a
+spare.
+
+In `src/utils/groupSwap.ts`, replace the body of the `for (const [id, qty] of Object.entries(received))`
+loop in `routeReceived` — everything from `const assign = ...` through the existing `for (const vm of ...)`
+hand-off loop — with:
+
+```ts
+    const viewNeeders = includers.filter((m) => !m.writable && (m.counts[id] ?? 0) === 0);
+
+    // Writable needers first — a view-only need never consumes a writable album's target.
+    const assign = Math.min(writableNeeders.length, qty);
+    for (let k = 0; k < assign; k++) addWrite(writes, writableNeeders[k].id, id, 1);
+    let remaining = qty - assign;
+
+    // Each view-only needer takes one PHYSICAL copy. It is never written to counts, but it
+    // is still consumed — so it cannot also be parked in a writable album as a spare.
+    const handedOff = Math.min(viewNeeders.length, remaining);
+    for (let k = 0; k < handedOff; k++) {
+      handoffs.push({ id, memberId: viewNeeders[k].id, memberName: viewNeeders[k].name });
+    }
+    remaining -= handedOff;
+
+    // Only a genuine surplus — beyond every needer, writable or view-only — becomes a spare.
+    if (remaining > 0) {
+      const target = includers.find((m) => m.writable);
+      if (target) addWrite(writes, target.id, id, remaining);
+    }
+
+    if (writableNeeders.length > qty && writableNeeders.length > 1) {
+      ambiguous.push({
+        id,
+        chosenIds: writableNeeders.slice(0, qty).map((m) => m.id),
+        options: writableNeeders.map((m) => ({ id: m.id, name: m.name })),
+      });
+    }
+```
+
+Then update the one existing test this corrects, in `src/utils/groupSwap.test.ts`:
+
+```ts
+  it('reminds to hand off to a view-only needer without writing it', () => {
+    const members = [w('A', { 'MEX-2': 1 }), v('V', { 'MEX-2': 0 })];
+    const r = routeReceived(members, { 'MEX-2': 1 });
+    // The single copy goes to V by hand; nothing is credited to A. (Before this fix the
+    // copy was double-counted: written to A AND flagged as a hand-off to V.)
+    expect(r.writes).toEqual({});
+    expect(r.handoffs).toEqual([{ id: 'MEX-2', memberId: 'V', memberName: 'V' }]);
+  });
+
+  it('a second copy beyond the hand-off is parked in a writable album', () => {
+    const members = [w('A', { 'MEX-2': 1 }), v('V', { 'MEX-2': 0 })];
+    const r = routeReceived(members, { 'MEX-2': 2 });
+    expect(r.writes).toEqual({ A: { 'MEX-2': 1 } });
+    expect(r.handoffs).toEqual([{ id: 'MEX-2', memberId: 'V', memberName: 'V' }]);
+  });
+
+  it('a view-only needer gets no reminder when no copy is left for it', () => {
+    const members = [w('A', { 'MEX-2': 0 }), v('V', { 'MEX-2': 0 })];
+    const r = routeReceived(members, { 'MEX-2': 1 });
+    expect(r.writes).toEqual({ A: { 'MEX-2': 1 } });
+    expect(r.handoffs).toEqual([]);
+  });
+```
+
+`SwapClose` is the only production consumer of `routeReceived` (verified by grep) and needs no
+change — it reads `writes` and `handoffs`, whose shapes are unchanged.
+
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `npm test -- src/utils/groupSwap.test.ts`
-Expected: PASS, including all pre-existing tests in the file.
+Expected: PASS, including all pre-existing tests in the file except the one corrected in Step 3b.
 
 - [ ] **Step 5: Commit**
 
+One commit for both changes — they are the same edit to the same file and the fix is what makes the
+display layer truthful:
+
 ```bash
 git add src/utils/groupSwap.ts src/utils/groupSwap.test.ts
-git commit -m "feat(group-swap): derive per-sticker album routing for display"
+git commit -m "feat(group-swap): derive per-sticker album routing for display
+
+Adds routeForDisplay/reservedSparesOf/swapRoutingInput, and fixes a defect
+the display layer exposed: routeReceived also wrote a copy destined for a
+view-only member into the first writable album, crediting one physical copy
+twice. Hand-offs now consume their copy; only a genuine surplus is parked."
 ```
 
 ---
