@@ -9,7 +9,9 @@ import {
   routeForDisplay,
   reservedSparesOf,
   swapRoutingInput,
+  applyRouteOverride,
   type GroupMember,
+  type ChipRouting,
 } from './groupSwap';
 import type { ParsedList } from './import';
 import type { Reservations } from './swap';
@@ -287,6 +289,40 @@ describe('routeForDisplay', () => {
     const members = [w('B', { 'MEX-7': 0 }), w('A', { 'MEX-7': 0 })];
     const r = routeForDisplay(members, {}, { 'MEX-7': 2 });
     expect(r.get['MEX-7'].memberIds).toEqual(['B', 'A']);
+  });
+});
+
+describe('applyRouteOverride', () => {
+  const routing = (): Record<string, ChipRouting> => ({
+    'MEX-3': { memberIds: ['A'], ambiguousAmong: ['A', 'B'] },
+    'MEX-7': { memberIds: ['A', 'B'] },
+  });
+
+  it('retargets the copy and clears the ambiguity marker', () => {
+    const out = applyRouteOverride(routing(), { 'MEX-3': 'B' });
+    expect(out['MEX-3'].memberIds).toEqual(['B']);
+    expect(out['MEX-3'].ambiguousAmong).toBeUndefined();
+  });
+
+  it('leaves stickers without an override untouched', () => {
+    const out = applyRouteOverride(routing(), { 'MEX-3': 'B' });
+    expect(out['MEX-7']).toEqual({ memberIds: ['A', 'B'] });
+  });
+
+  it('keeps the marker when no choice was made (the app default stands)', () => {
+    const out = applyRouteOverride(routing(), {});
+    expect(out['MEX-3'].ambiguousAmong).toEqual(['A', 'B']);
+  });
+
+  it('ignores an override for a sticker that is not being received', () => {
+    const out = applyRouteOverride(routing(), { 'BRA-4': 'A' });
+    expect(out['BRA-4']).toBeUndefined();
+  });
+
+  it('does not mutate its input', () => {
+    const before = routing();
+    applyRouteOverride(before, { 'MEX-3': 'B' });
+    expect(before['MEX-3']).toEqual({ memberIds: ['A'], ambiguousAmong: ['A', 'B'] });
   });
 });
 

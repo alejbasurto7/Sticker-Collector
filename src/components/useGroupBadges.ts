@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { GroupSwapCtx } from '../sync/groupMembers';
-import { routeForDisplay, reservedSparesOf } from '../utils/groupSwap';
+import { routeForDisplay, reservedSparesOf, applyRouteOverride } from '../utils/groupSwap';
 import { chipBadges, type AlbumMarkInfo, type ChipBadge } from '../utils/chipBadges';
 
 export interface GroupBadges {
@@ -18,6 +18,11 @@ export interface GroupBadges {
  * `receiving` fresh on every render, while the computation rebuilds each member's album
  * layout via buildAlbumFromType — far too expensive to redo on every keystroke in the
  * new-swap dialog. The records are small, so stringifying them is the cheap side.
+ *
+ * NOTE: `groupCtx` is a dep by REFERENCE. Callers must pass it straight through (as
+ * SwapsView does, rebuilding the literal each render) and must not memoise it with
+ * incomplete deps — a member's counts changing must produce a new `groupCtx`, or the
+ * badges will go stale.
  */
 export function useGroupBadges(
   groupCtx: GroupSwapCtx | undefined,
@@ -40,13 +45,11 @@ export function useGroupBadges(
       reservedSparesOf(groupCtx.members),
     );
     // Reflect an ambiguous-copy override (close screen only) on the chip itself.
-    for (const [id, chosen] of Object.entries(routeOverride ?? {})) {
-      if (routing.get[id]) routing.get[id] = { ...routing.get[id], memberIds: [chosen] };
-    }
+    const get = applyRouteOverride(routing.get, routeOverride);
     return {
       members,
       give: chipBadges(routing.give, members, 'give'),
-      get: chipBadges(routing.get, members, 'get'),
+      get: chipBadges(get, members, 'get'),
     };
     // `key` is the content hash of giving/receiving/routeOverride — see the doc comment.
   }, [groupCtx, key]);

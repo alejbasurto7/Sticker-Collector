@@ -289,6 +289,25 @@ export function routeForDisplay(
   return { give, get };
 }
 
+/**
+ * Apply the user's ambiguous-copy choices to a routing map. An explicit choice RESOLVES
+ * the ambiguity, so the `?` marker is cleared along with the retarget — leaving it set
+ * would keep telling the user to decide something they just decided. Accepting the app's
+ * default leaves no override entry, and correctly keeps the marker.
+ */
+export function applyRouteOverride(
+  get: Record<string, ChipRouting>,
+  override: Record<string, string> = {},
+): Record<string, ChipRouting> {
+  const out = { ...get };
+  for (const [id, chosen] of Object.entries(override)) {
+    if (!out[id]) continue;
+    const { ambiguousAmong: _resolved, ...rest } = out[id];
+    out[id] = { ...rest, memberIds: [chosen] };
+  }
+  return out;
+}
+
 /** Each member's own solo-swap give reservations, so the per-album give floor holds. */
 export function reservedSparesOf(
   members: { id: string; swaps: Swap[] }[],
