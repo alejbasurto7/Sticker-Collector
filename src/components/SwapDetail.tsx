@@ -7,6 +7,9 @@ import { isDesktop } from '../utils/device';
 import { buildSwapExport } from '../utils/listExport';
 import { copyToClipboard } from '../utils/share';
 import type { GroupSwapCtx } from '../sync/groupMembers';
+import { swapRoutingInput } from '../utils/groupSwap';
+import { useGroupBadges } from './useGroupBadges';
+import GroupLegend from './GroupLegend';
 import StickerChips from './StickerChips';
 import SwapClose from './SwapClose';
 import NewSwapDialog from './NewSwapDialog';
@@ -97,6 +100,11 @@ export default function SwapDetail({ swap, onClose, groupCtx }: Props) {
   }, [swap.receiving, conflicts]);
 
   const conflictCount = giveConflicts.size + recvConflicts.size;
+
+  // Group mode: which album each promised copy leaves from / lands in. Derived live
+  // from current counts every render — preview only, nothing persisted.
+  const routingInput = swapRoutingInput(swap);
+  const badges = useGroupBadges(groupCtx, routingInput.giving, routingInput.receiving);
 
   const giving = new Set(swap.giving.filter((id) => !deselectedGiving.has(id)));
   const receiving = new Set(swap.receiving.filter((id) => !deselectedReceiving.has(id)));
@@ -199,12 +207,15 @@ export default function SwapDetail({ swap, onClose, groupCtx }: Props) {
           </>
         )}
 
+        {badges && <GroupLegend members={badges.members} />}
+
         <div className="section-title">You give ({giveCopies})</div>
         <StickerChips
           ids={swap.giving}
           selected={giving}
           conflicts={giveConflicts}
           quantities={giveQty}
+          badges={badges?.give}
           onToggle={toggleGiving}
           readOnly={!isOpen || readOnly}
         />
@@ -215,9 +226,17 @@ export default function SwapDetail({ swap, onClose, groupCtx }: Props) {
           selected={receiving}
           conflicts={recvConflicts}
           quantities={groupCtx ? receiveQty : undefined}
+          badges={badges?.get}
           onToggle={toggleReceiving}
           readOnly={!isOpen || readOnly}
         />
+
+        {groupCtx && isOpen && (
+          <p className="modal-sub" style={{ margin: '10px 0 0' }}>
+            <span className="amark ghost" style={{ verticalAlign: '-3px' }}>?</span>{' '}
+            = more than one album needs it and only one copy is coming — you'll pick at close.
+          </p>
+        )}
 
         <button
           className={`btn full ${justCopied ? 'success' : ''}`}
