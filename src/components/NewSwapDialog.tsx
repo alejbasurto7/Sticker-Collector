@@ -8,6 +8,9 @@ import { tapVerb } from '../utils/device';
 import type { Swap } from '../types';
 import type { GroupSwapCtx } from '../sync/groupMembers';
 import StickerChips from './StickerChips';
+import { useGroupBadges } from './useGroupBadges';
+import GroupLegend from './GroupLegend';
+import type { GroupCandidates } from '../utils/groupSwap';
 
 interface Props {
   onClose: () => void;
@@ -38,6 +41,8 @@ const sumCopies = (ids: Iterable<string>, qty: Map<string, number>) => {
   for (const id of ids) n += qty.get(id) ?? 1;
   return n;
 };
+
+const NO_QTY: Record<string, number> = {};
 
 export default function NewSwapDialog({ onClose, initialText, editSwap, groupCtx }: Props) {
   const counts = useCollection((s) => s.counts);
@@ -100,6 +105,15 @@ export default function NewSwapDialog({ onClose, initialText, editSwap, groupCtx
       ? computeGroupCandidates(groupCtx.members, parsed, reservations)
       : computeCandidates(counts, parsed, reservations);
   }, [parsed, counts, reservations, groupCtx]);
+
+  // Routing is per-sticker independent, so these marks stay put as candidates are
+  // toggled on and off — they describe every offered sticker, not just the checked ones.
+  const groupCandidates = groupCtx ? (candidates as GroupCandidates | null) : null;
+  const badges = useGroupBadges(
+    groupCtx,
+    groupCandidates?.giveQty ?? NO_QTY,
+    groupCandidates?.getQty ?? NO_QTY,
+  );
 
   const findMatches = () => {
     const p = parseExport(text);
@@ -212,6 +226,7 @@ export default function NewSwapDialog({ onClose, initialText, editSwap, groupCtx
 
         {candidates && (
           <>
+            {badges && <GroupLegend members={badges.members} />}
             <div className="section-title">
               You can give ({sumCopies(give, giveQty)}/{sumCopies(candidates.youGive, giveQty)})
             </div>
@@ -221,6 +236,7 @@ export default function NewSwapDialog({ onClose, initialText, editSwap, groupCtx
               onToggle={(id) => toggle(give, setGive, id)}
               conflicts={giveConflicts}
               quantities={giveQty}
+              badges={badges?.give}
             />
             {candidates.giveReserved.size > 0 && (
               <p className="reserved-note">
@@ -242,6 +258,7 @@ export default function NewSwapDialog({ onClose, initialText, editSwap, groupCtx
               onToggle={(id) => toggle(get, setGet, id)}
               conflicts={getConflicts}
               quantities={groupCtx ? getQty : undefined}
+              badges={badges?.get}
             />
             {candidates.getReserved.size > 0 && (
               <p className="reserved-note">
