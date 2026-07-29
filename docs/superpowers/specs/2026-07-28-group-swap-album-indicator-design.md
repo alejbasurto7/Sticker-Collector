@@ -192,7 +192,7 @@ album a spare leaves from is never the user's decision.
 | Sticker outside a member's layout (`CC-5`, one album has `trackCC` off) | That member never appears in `memberIds` — falls out of `memberStickerIds`, no special-casing |
 | One album supplies both given copies | One mark; `×2` on the chip carries the quantity |
 | Received copy only a **view-only** member needs | `memberIds` empty, `handoffIds` length 1; chip shows the view-only mark and, at close, the 🤝 reminder. Never written |
-| Ambiguous receive after override | The chosen album's mark replaces the default; `ambiguousAmong` still drives the `?` and the panel row |
+| Ambiguous receive after override | An explicit choice **resolves** the ambiguity: the chosen album's mark replaces the default and the `?` marker clears. Accepting the app's default records no override and correctly keeps the `?` — a default is a guess, not a decision. The "Needs your call" row itself is driven by `receiveRouting`, not the badge, so it remains until settlement. A stale override (counts changed under an open dialog) is ignored by both badge and settlement |
 | `routeGiven.short` (pool can't source a promised copy) | `memberIds` empty → chip renders with no marks, no throw |
 | Two members with the same initial (Leo / Lucas → "L") | Accepted. Tints differ (derived from album id), and the legend plus `title` disambiguate. A two-letter monogram would diverge from the Library sheet, so it is deliberately not introduced |
 | Group drops below 2 resolvable members | No group lens at all (existing gating in `SwapsView`) — this feature is unreachable, nothing to handle |

@@ -301,7 +301,10 @@ export function applyRouteOverride(
 ): Record<string, ChipRouting> {
   const out = { ...get };
   for (const [id, chosen] of Object.entries(override)) {
-    if (!out[id]) continue;
+    // Ignore a stale choice: counts can change under an open close dialog (background sync),
+    // and settlement only honours an override that is still ambiguous with `chosen` among its
+    // options. Applying it here regardless would make the badge disagree with what gets written.
+    if (!out[id]?.ambiguousAmong?.includes(chosen)) continue;
     const { ambiguousAmong: _resolved, ...rest } = out[id];
     out[id] = { ...rest, memberIds: [chosen] };
   }

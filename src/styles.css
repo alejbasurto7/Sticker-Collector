@@ -1503,6 +1503,7 @@ textarea.notes-input {
 }
 .chip .badge-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 3px;
   justify-content: center;
   margin-top: 5px;

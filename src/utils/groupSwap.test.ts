@@ -324,6 +324,16 @@ describe('applyRouteOverride', () => {
     applyRouteOverride(before, { 'MEX-3': 'B' });
     expect(before['MEX-3']).toEqual({ memberIds: ['A'], ambiguousAmong: ['A', 'B'] });
   });
+
+  it('ignores a stale override once the sticker is no longer ambiguous', () => {
+    const get = { 'MEX-3': { memberIds: ['A'] } };
+    expect(applyRouteOverride(get, { 'MEX-3': 'B' })['MEX-3'].memberIds).toEqual(['A']);
+  });
+
+  it('ignores an override naming an album that is no longer an option', () => {
+    const get = { 'MEX-3': { memberIds: ['A'], ambiguousAmong: ['A', 'B'] } };
+    expect(applyRouteOverride(get, { 'MEX-3': 'C' })['MEX-3'].memberIds).toEqual(['A']);
+  });
 });
 
 describe('swapRoutingInput', () => {

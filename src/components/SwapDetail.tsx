@@ -103,8 +103,12 @@ export default function SwapDetail({ swap, onClose, groupCtx }: Props) {
 
   // Group mode: which album each promised copy leaves from / lands in. Derived live
   // from current counts every render — preview only, nothing persisted.
+  // Marks describe routing derived from CURRENT counts, which is only meaningful while the
+  // swap is still open. A concluded swap has already been settled, so recomputing would
+  // describe the post-settlement world and contradict what was actually written
+  // (swap.settledByAlbum holds that truth). Show no marks rather than wrong ones.
   const routingInput = swapRoutingInput(swap);
-  const badges = useGroupBadges(groupCtx, routingInput.giving, routingInput.receiving);
+  const badges = useGroupBadges(isOpen ? groupCtx : undefined, routingInput.giving, routingInput.receiving);
 
   const giving = new Set(swap.giving.filter((id) => !deselectedGiving.has(id)));
   const receiving = new Set(swap.receiving.filter((id) => !deselectedReceiving.has(id)));
@@ -231,10 +235,11 @@ export default function SwapDetail({ swap, onClose, groupCtx }: Props) {
           readOnly={!isOpen || readOnly}
         />
 
-        {groupCtx && isOpen && (
+        {badges && [...badges.get.values()].some((b) => b.ambiguous) && (
           <p className="modal-sub" style={{ margin: '10px 0 0' }}>
             <span className="amark ghost" style={{ verticalAlign: '-3px' }}>?</span>{' '}
-            = more than one album needs it and only one copy is coming — you'll pick at close.
+            = more albums need this than there are copies coming. Where there is a single copy
+            to place, you choose at close.
           </p>
         )}
 
