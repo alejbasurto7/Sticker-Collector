@@ -1497,6 +1497,37 @@ textarea.notes-input {
   color: var(--green);
   vertical-align: super;
 }
+/* A chip carrying album-routing marks (combined swaps only). */
+.chip.badged {
+  padding-bottom: 6px;
+}
+.chip .badge-row {
+  display: flex;
+  gap: 3px;
+  justify-content: center;
+  margin-top: 5px;
+}
+/* More albums need this than copies are coming — resolved on the close screen. */
+.chip.amb {
+  border-color: var(--gold);
+  border-style: dashed;
+}
+
+/* Which mark means which album, shown above the give list in group mode. */
+.group-legend {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 8px 0 2px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.group-legend .legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
 .chip-group-row {
   display: flex;
   align-items: flex-start;
