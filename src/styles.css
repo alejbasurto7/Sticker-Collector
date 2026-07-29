@@ -2753,30 +2753,52 @@ textarea.notes-input {
   flex: none;
 }
 
-/* Per-copy routing preview under the combined close screen. */
-.close-routes {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin: 8px 0 4px;
+/* Combined-swap close: the only routing that still needs a human decision —
+   an ambiguous single copy, or a view-only member's hand-off. Everything
+   unambiguous is already stated by the chips' album marks. */
+.needs-call {
+  margin-top: 12px;
+  background: rgba(245, 197, 66, 0.08);
+  border: 1px solid rgba(245, 197, 66, 0.35);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
 }
-.close-route {
+.needs-call .nc-title {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--gold);
+  margin-bottom: 8px;
+}
+.needs-call .nc-row {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
   gap: 8px;
   font-size: 13px;
-  color: var(--text-dim);
+  flex-wrap: wrap;
 }
-.close-route .route-change {
+.needs-call .nc-row + .nc-row {
+  margin-top: 8px;
+  border-top: 1px solid rgba(245, 197, 66, 0.2);
+  padding-top: 8px;
+}
+.needs-call .nc-sticker {
+  font-weight: 800;
+  font-size: 12.5px;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+.needs-call .route-change {
   background: var(--bg-elev-2);
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 3px 6px;
   font-size: 13px;
+  font-family: inherit;
 }
-.close-handoff {
-  color: var(--green);
+.needs-call .nc-handoff {
+  color: var(--green-bright);
   font-weight: 600;
 }

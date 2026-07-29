@@ -2,10 +2,12 @@ import { useState } from 'react';
 import type { Swap } from '../types';
 import { useCollection } from '../store/collectionStore';
 import { activeGiving, activeReceiving, giveQtyOf, computeReservations } from '../utils/swap';
-import { routeReceived, routeGiven } from '../utils/groupSwap';
+import { routeReceived, routeGiven, swapRoutingInput } from '../utils/groupSwap';
 import { labelFor } from '../utils/group';
 import type { GroupSwapCtx } from '../sync/groupMembers';
 import StickerChips from './StickerChips';
+import { useGroupBadges } from './useGroupBadges';
+import GroupLegend from './GroupLegend';
 
 interface Props {
   swap: Swap;
@@ -55,18 +57,14 @@ export default function SwapClose({ swap, onClose, groupCtx }: Props) {
   }
   const giveRouting = groupCtx ? routeGiven(members, givenRecord, reservedSpares) : null;
 
-  const nameOf = (albumId: string) => members.find((m) => m.id === albumId)?.name ?? albumId;
-
-  /** Where each received sticker is written (with an ambiguous single-copy override applied). */
-  const receiveTargets = (id: string): string[] => {
-    const amb = receiveRouting?.ambiguous.find((a) => a.id === id);
-    if (amb && amb.chosenIds.length === 1) return [routeOverride[id] ?? amb.chosenIds[0]];
-    const targets: string[] = [];
-    for (const [aid, m] of Object.entries(receiveRouting?.writes ?? {})) {
-      if ((m[id] ?? 0) > 0) targets.push(aid);
-    }
-    return targets;
-  };
+  /**
+   * Badges describe the PROMISED set, while receiveRouting/giveRouting above settle the
+   * CHECKED set. Routing is per-sticker independent, so the two agree on every checked
+   * chip — and using the promised set stops an unchecked chip's marks from blanking out
+   * and jumping back when it is re-checked.
+   */
+  const routingInput = swapRoutingInput(swap);
+  const badges = useGroupBadges(groupCtx, routingInput.giving, routingInput.receiving, routeOverride);
 
   const confirm = () => {
     // Carry the per-sticker copy counts so settlement removes every given copy.
@@ -115,6 +113,12 @@ export default function SwapClose({ swap, onClose, groupCtx }: Props) {
     onClose();
   };
 
+  // Only checked stickers are settled, so only they can still need a decision.
+  const needsCall = (receiveRouting?.ambiguous ?? []).filter(
+    (a) => a.chosenIds.length === 1 && received.has(a.id),
+  );
+  const handoffRows = (receiveRouting?.handoffs ?? []).filter((h) => received.has(h.id));
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -125,64 +129,52 @@ export default function SwapClose({ swap, onClose, groupCtx }: Props) {
             : 'Confirm what was actually exchanged. Given stickers will be removed from your duplicates; received stickers will be added to your collection.'}
         </p>
 
+        {badges && <GroupLegend members={badges.members} />}
+
         <div className="section-title">You gave ({givenCopies})</div>
         <StickerChips
           ids={swap.giving}
           selected={given}
           quantities={giveQty}
+          badges={badges?.give}
           onToggle={(id) => toggle(given, setGiven, id)}
         />
-        {groupCtx && giveRouting && [...given].length > 0 && (
-          <div className="close-routes">
-            {[...given].map((id) => {
-              const from = Object.keys(giveRouting.writes).filter((aid) => (giveRouting.writes[aid][id] ?? 0) < 0);
-              if (from.length === 0) return null;
-              return (
-                <div className="close-route" key={id}>
-                  {labelFor(id)} — from {from.map(nameOf).join(', ')}
-                </div>
-              );
-            })}
-          </div>
-        )}
 
         <div className="section-title">You received ({groupCtx ? receivedCopies : received.size})</div>
         <StickerChips
           ids={swap.receiving}
           selected={received}
           quantities={groupCtx ? receiveQty : undefined}
+          badges={badges?.get}
           onToggle={(id) => toggle(received, setReceived, id)}
         />
-        {groupCtx && receiveRouting && (
-          <div className="close-routes">
-            {[...received].map((id) => {
-              const amb = receiveRouting.ambiguous.find((a) => a.id === id);
-              const targets = receiveTargets(id);
-              const handoffs = receiveRouting.handoffs.filter((h) => h.id === id);
-              return (
-                <div className="close-route" key={id}>
-                  <span>
-                    {labelFor(id)} → {targets.map(nameOf).join(', ') || '—'}
-                  </span>
-                  {amb && amb.chosenIds.length === 1 && (
-                    <select
-                      className="route-change"
-                      value={routeOverride[id] ?? amb.chosenIds[0]}
-                      onChange={(e) => setRouteOverride((prev) => ({ ...prev, [id]: e.target.value }))}
-                    >
-                      {amb.options.map((o) => (
-                        <option key={o.id} value={o.id}>{o.name}</option>
-                      ))}
-                    </select>
-                  )}
-                  {handoffs.map((h) => (
-                    <span className="close-handoff" key={h.memberId}>
-                      🤝 give to {h.memberName} — not recorded
-                    </span>
+
+        {groupCtx && receiveRouting && (needsCall.length > 0 || handoffRows.length > 0) && (
+          <div className="needs-call">
+            <div className="nc-title">⚠️ Needs your call</div>
+            {needsCall.map((amb) => (
+              <div className="nc-row" key={amb.id}>
+                <span className="nc-sticker">{labelFor(amb.id)}</span>
+                <span style={{ color: 'var(--text-dim)' }}>
+                  {amb.options.length} albums need it, {receiveQty.get(amb.id) ?? 1} copy →
+                </span>
+                <select
+                  className="route-change"
+                  value={routeOverride[amb.id] ?? amb.chosenIds[0]}
+                  onChange={(e) => setRouteOverride((prev) => ({ ...prev, [amb.id]: e.target.value }))}
+                >
+                  {amb.options.map((o) => (
+                    <option key={o.id} value={o.id}>{o.name}</option>
                   ))}
-                </div>
-              );
-            })}
+                </select>
+              </div>
+            ))}
+            {handoffRows.map((h) => (
+              <div className="nc-row" key={`${h.id}-${h.memberId}`}>
+                <span className="nc-sticker">{labelFor(h.id)}</span>
+                <span className="nc-handoff">🤝 hand to {h.memberName} — not recorded</span>
+              </div>
+            ))}
           </div>
         )}
 
