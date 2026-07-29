@@ -594,7 +594,8 @@ export const useCollection = create<CollectionState>()(
       closeCombinedSwap: (groupId, swapId, settled) =>
         set((s) => {
           const group = s.groups.find((g) => g.id === groupId);
-          if (!group || !group.swaps.some((sw) => sw.id === swapId)) return s;
+          const target = group?.swaps.find((sw) => sw.id === swapId);
+          if (!group || !target || target.status !== 'open') return s;
           const patch = applyAlbumDeltas(s, settled.settledByAlbum);
           const groups = patchGroupSwap(s.groups, groupId, swapId, (sw) => ({
             ...sw,

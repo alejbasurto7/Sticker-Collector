@@ -10,6 +10,7 @@ import {
   reservedSparesOf,
   swapRoutingInput,
   applyRouteOverride,
+  overrideIsLive,
   type GroupMember,
   type ChipRouting,
 } from './groupSwap';
@@ -333,6 +334,22 @@ describe('applyRouteOverride', () => {
   it('ignores an override naming an album that is no longer an option', () => {
     const get = { 'MEX-3': { memberIds: ['A'], ambiguousAmong: ['A', 'B'] } };
     expect(applyRouteOverride(get, { 'MEX-3': 'C' })['MEX-3'].memberIds).toEqual(['A']);
+  });
+});
+
+describe('overrideIsLive', () => {
+  const options = [{ id: 'A' }, { id: 'B' }];
+  it('accepts a choice still among the options', () => {
+    expect(overrideIsLive(options, 'B')).toBe(true);
+  });
+  it('rejects a choice no longer among the options', () => {
+    expect(overrideIsLive(options, 'C')).toBe(false);
+  });
+  it('rejects an absent choice', () => {
+    expect(overrideIsLive(options, undefined)).toBe(false);
+  });
+  it('rejects any choice when nothing is on offer', () => {
+    expect(overrideIsLive([], 'A')).toBe(false);
   });
 });
 

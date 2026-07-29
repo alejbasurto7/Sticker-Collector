@@ -311,6 +311,17 @@ export function applyRouteOverride(
   return out;
 }
 
+/**
+ * Is a stored ambiguous-copy choice still valid? Counts can change under an open close
+ * dialog (background sync), which can drop the chosen album out of contention — it may have
+ * received the sticker, become read-only, or resolved out entirely. Honouring a stale choice
+ * writes the copy to the wrong album AND starves the one that still needs it, so both the
+ * badge and settlement must ignore it and fall back to the default.
+ */
+export function overrideIsLive(options: { id: string }[], chosen: string | undefined): boolean {
+  return !!chosen && options.some((o) => o.id === chosen);
+}
+
 /** Each member's own solo-swap give reservations, so the per-album give floor holds. */
 export function reservedSparesOf(
   members: { id: string; swaps: Swap[] }[],

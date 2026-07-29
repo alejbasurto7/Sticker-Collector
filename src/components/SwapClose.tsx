@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { Swap } from '../types';
 import { useCollection } from '../store/collectionStore';
 import { activeGiving, activeReceiving, giveQtyOf, computeReservations } from '../utils/swap';
-import { routeReceived, routeGiven, swapRoutingInput } from '../utils/groupSwap';
+import { routeReceived, routeGiven, swapRoutingInput, overrideIsLive } from '../utils/groupSwap';
 import { labelFor } from '../utils/group';
 import type { GroupSwapCtx } from '../sync/groupMembers';
 import StickerChips from './StickerChips';
@@ -87,10 +87,11 @@ export default function SwapClose({ swap, onClose, groupCtx }: Props) {
       for (const amb of receiveRouting.ambiguous) {
         if (amb.chosenIds.length !== 1) continue;
         const chosen = routeOverride[amb.id];
-        if (chosen && chosen !== amb.chosenIds[0]) {
-          add(amb.chosenIds[0], amb.id, -1);
-          add(chosen, amb.id, 1);
-        }
+        // A stale pick (the chosen album changed under us mid-dialog) falls back to the
+        // default, matching what the chip's mark already shows via applyRouteOverride.
+        if (!overrideIsLive(amb.options, chosen) || chosen === amb.chosenIds[0]) continue;
+        add(amb.chosenIds[0], amb.id, -1);
+        add(chosen!, amb.id, 1);
       }
       // Given copies (negative).
       for (const [aid, m] of Object.entries(giveRouting.writes)) {
@@ -118,6 +119,10 @@ export default function SwapClose({ swap, onClose, groupCtx }: Props) {
     (a) => a.chosenIds.length === 1 && received.has(a.id),
   );
   const handoffRows = (receiveRouting?.handoffs ?? []).filter((h) => received.has(h.id));
+  // Stickers the give pool couldn't source a spare for (e.g. the only spare is reserved by
+  // that album's own solo swap) — surface this instead of silently telling the user a
+  // sticker left an album that never actually gave it up.
+  const shortRows = Object.keys(giveRouting?.short ?? {}).filter((id) => given.has(id));
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -149,7 +154,7 @@ export default function SwapClose({ swap, onClose, groupCtx }: Props) {
           onToggle={(id) => toggle(received, setReceived, id)}
         />
 
-        {groupCtx && receiveRouting && (needsCall.length > 0 || handoffRows.length > 0) && (
+        {groupCtx && receiveRouting && (needsCall.length > 0 || handoffRows.length > 0 || shortRows.length > 0) && (
           <div className="needs-call">
             <div className="nc-title">⚠️ Needs your call</div>
             {needsCall.map((amb) => (
@@ -160,7 +165,7 @@ export default function SwapClose({ swap, onClose, groupCtx }: Props) {
                 </span>
                 <select
                   className="route-change"
-                  value={routeOverride[amb.id] ?? amb.chosenIds[0]}
+                  value={overrideIsLive(amb.options, routeOverride[amb.id]) ? routeOverride[amb.id] : amb.chosenIds[0]}
                   onChange={(e) => setRouteOverride((prev) => ({ ...prev, [amb.id]: e.target.value }))}
                 >
                   {amb.options.map((o) => (
@@ -173,6 +178,14 @@ export default function SwapClose({ swap, onClose, groupCtx }: Props) {
               <div className="nc-row" key={`${h.id}-${h.memberId}`}>
                 <span className="nc-sticker">{labelFor(h.id)}</span>
                 <span className="nc-handoff">🤝 hand to {h.memberName} — not recorded</span>
+              </div>
+            ))}
+            {shortRows.map((id) => (
+              <div className="nc-row" key={`short-${id}`}>
+                <span className="nc-sticker">{labelFor(id)}</span>
+                <span style={{ color: 'var(--text-dim)' }}>
+                  no album has a free spare — this one won't be removed from any album
+                </span>
               </div>
             ))}
           </div>
