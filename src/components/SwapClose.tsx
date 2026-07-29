@@ -180,14 +180,20 @@ export default function SwapClose({ swap, onClose, groupCtx }: Props) {
                 <span className="nc-handoff">🤝 hand to {h.memberName} — not recorded</span>
               </div>
             ))}
-            {shortRows.map((id) => (
-              <div className="nc-row" key={`short-${id}`}>
-                <span className="nc-sticker">{labelFor(id)}</span>
-                <span style={{ color: 'var(--text-dim)' }}>
-                  no album has a free spare — this one won't be removed from any album
-                </span>
-              </div>
-            ))}
+            {shortRows.map((id) => {
+              const missing = giveRouting?.short?.[id] ?? 0;
+              const promised = giveQty.get(id) ?? 1;
+              return (
+                <div className="nc-row" key={`short-${id}`}>
+                  <span className="nc-sticker">{labelFor(id)}</span>
+                  <span style={{ color: 'var(--text-dim)' }}>
+                    {missing >= promised
+                      ? 'no album has a free spare — nothing will be removed'
+                      : `only ${promised - missing} of ${promised} copies can be removed — no album has a free spare for the rest`}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         )}
 
