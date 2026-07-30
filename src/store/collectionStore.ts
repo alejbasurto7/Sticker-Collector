@@ -355,14 +355,32 @@ function todayKey(ts = Date.now()): string {
 type ActivityFields = Pick<AlbumSnapshot, 'firstStickerAt' | 'activityDays' | 'completedOn'>;
 
 /**
+ * Freeze the day an album became complete, once every unique sticker is owned. Returns
+ * `prev` untouched when it is already stamped: the date is the first completion, and
+ * losing a copy later must not re-open or re-date it.
+ *
+ * `layout` is the album being measured — completion is only meaningful against that
+ * album's own type/edition/CC sticker set. The active album passes the live `album`
+ * singleton; any other album passes its own built layout, so a shorter live layout can't
+ * stamp it complete (or a longer one hide that it is).
+ *
+ * Split out of `withActivity` because the two jobs are not always owed together: an
+ * internal move between group albums is not *collecting* (see `applyInternalMove`), so it
+ * owes the stamp but no activity day.
+ */
+function completionStamp(
+  prev: string | null,
+  nextCounts: Counts | undefined,
+  layout: Album,
+): string | null {
+  if (prev || !nextCounts || layout.stickers.length === 0) return prev;
+  return ownedUnique(nextCounts, layout) === layout.stickers.length ? todayKey() : prev;
+}
+
+/**
  * Stamp the first-sticker time, log today as an active collecting day, and—once
  * every unique sticker is owned—freeze the album completion date. Pass the
- * resulting counts so completion can be detected.
- *
- * `layout` is the album being credited — completion is only meaningful against that
- * album's own type/edition/CC sticker set. The active album passes the live `album`
- * singleton; a parked album in a combined settlement passes its own built layout, so a
- * shorter live layout can't stamp it complete (or a longer one hide that it is).
+ * resulting counts so completion can be detected, and `layout` per `completionStamp`.
  */
 function withActivity(
   s: ActivityFields,
@@ -370,14 +388,10 @@ function withActivity(
   layout: Album,
 ): ActivityFields {
   const today = todayKey();
-  let completedOn = s.completedOn;
-  if (!completedOn && nextCounts && layout.stickers.length > 0 && ownedUnique(nextCounts, layout) === layout.stickers.length) {
-    completedOn = today;
-  }
   return {
     firstStickerAt: s.firstStickerAt ?? Date.now(),
     activityDays: s.activityDays.includes(today) ? s.activityDays : [...s.activityDays, today].sort(),
-    completedOn,
+    completedOn: completionStamp(s.completedOn, nextCounts, layout),
   };
 }
 
@@ -625,7 +639,31 @@ export const useCollection = create<CollectionState>()(
           // it, double-tapping Apply before the pool memo recomputes empties the source.
           const committed = computeReservations(source.swaps).committedGive.get(stickerId) ?? 0;
           if ((source.counts[stickerId] ?? 0) - 1 < 1 + committed) return s;
-          return applyAlbumDeltas(s, { [fromId]: { [stickerId]: -1 }, [toId]: { [stickerId]: 1 } }).patch;
+          const { patch } = applyAlbumDeltas(s, { [fromId]: { [stickerId]: -1 }, [toId]: { [stickerId]: 1 } });
+          // An internal move is not *collecting* — no new sticker entered the household —
+          // so it logs no activity day and starts no streak clock. The completion stamp is
+          // still owed: the copy may have been the receiving album's last missing sticker,
+          // and "days collecting" freezes on `completedOn`, so without it that counter runs
+          // past the day the album was actually finished. Measured against the receiving
+          // album's OWN layout, the way `closeCombinedSwap` measures each album it credits.
+          // The source can never lose completion: the `1 + committed` floor above leaves it
+          // a copy of its own.
+          if (toId === s.activeAlbumId) {
+            return { ...patch, completedOn: completionStamp(s.completedOn, patch.counts, album) };
+          }
+          // Skipped when toId is active: `patch.albums` also carries the active album's
+          // parked copy, whose counts are stale by design (see `applyAlbumDeltas`).
+          const albums = patch.albums?.map((a) =>
+            a.id !== toId
+              ? a
+              : {
+                  ...a,
+                  completedOn: completionStamp(
+                    a.completedOn, a.counts, buildAlbumFor(a.albumTypeId, a.edition, a.trackCC),
+                  ),
+                },
+          );
+          return { ...patch, ...(albums ? { albums } : {}) };
         }),
 
       createCombinedSwap: (groupId, input) => {

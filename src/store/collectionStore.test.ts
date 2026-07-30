@@ -325,6 +325,75 @@ describe('applyInternalMove', () => {
   });
 });
 
+describe('an internal move stamps completion — and nothing else', () => {
+  // An internal move is not *collecting*: no new sticker entered the household, so it must
+  // not log an activity day or start the streak clock. But the receiving album really is
+  // finished, and "days collecting" freezes on `completedOn`, so the stamp is owed. Each
+  // album is measured against its OWN layout — here the two track opt-in sections
+  // differently, so their sticker sets differ.
+  const both = new Set(['A', 'B']);
+
+  /** Every sticker of a layout owned, minus `hold` — the copy the move will deliver. */
+  const fullExcept = (trackCC: boolean, hold: string) => {
+    const layout = buildAlbumFor(ACTIVE_ALBUM_TYPE_ID, 'latam', trackCC);
+    const counts = Object.fromEntries(layout.stickers.map((s) => [s.id, 1]));
+    delete counts[hold];
+    return counts;
+  };
+  const anyStickerOf = (trackCC: boolean) =>
+    buildAlbumFor(ACTIVE_ALBUM_TYPE_ID, 'latam', trackCC).stickers.at(-1)!.id;
+
+  afterEach(() => {
+    applyAlbumLayout(ACTIVE_ALBUM_TYPE_ID, DEFAULT_EDITION, DEFAULT_TRACK_CC);
+  });
+
+  /** Active album 'A' plus parked 'B', each with its own opt-in tracking. */
+  const seed = (activeTrackCC: boolean, active: Record<string, unknown>, parked: Record<string, unknown>) => {
+    useCollection.setState({
+      counts: {}, activeAlbumId: 'A', trackCC: activeTrackCC, edition: 'latam',
+      activityDays: [], firstStickerAt: undefined, completedOn: null, swaps: [],
+      albums: [snap('A', { trackCC: activeTrackCC, ...active }), snap('B', parked)],
+      ...active, // the active album's counts live at the top level
+    } as any, false);
+    // The live layout mirrors the ACTIVE album, exactly as the app keeps it.
+    applyAlbumLayout(ACTIVE_ALBUM_TYPE_ID, 'latam', activeTrackCC);
+  };
+
+  it('stamps the receiving parked album complete when the move finishes it', () => {
+    const last = anyStickerOf(false);
+    // B tracks no opt-in section; the active album does, so its layout is the larger one.
+    seed(true, { counts: { [last]: 2 } }, { trackCC: false, counts: fullExcept(false, last) });
+    useCollection.getState().applyInternalMove('A', 'B', last, both);
+    expect(useCollection.getState().albums.find((a) => a.id === 'B')!.completedOn).not.toBeNull();
+  });
+
+  it("stamps the receiving ACTIVE album complete when the move finishes it", () => {
+    const last = anyStickerOf(false);
+    seed(false, { counts: fullExcept(false, last) }, { trackCC: false, counts: { [last]: 2 } });
+    useCollection.getState().applyInternalMove('B', 'A', last, both);
+    expect(useCollection.getState().completedOn).not.toBeNull();
+  });
+
+  it("does not stamp the receiving album complete on the OTHER album's shorter layout", () => {
+    const last = anyStickerOf(false);
+    // Now B is the one tracking the opt-in section: owning every sticker of the ACTIVE
+    // album's shorter layout still leaves B's own album unfinished.
+    seed(false, { counts: { [last]: 2 } }, { trackCC: true, counts: fullExcept(false, last) });
+    useCollection.getState().applyInternalMove('A', 'B', last, both);
+    expect(useCollection.getState().albums.find((a) => a.id === 'B')!.completedOn).toBeNull();
+  });
+
+  it('logs no collecting day and starts no streak clock — nothing was collected', () => {
+    const last = anyStickerOf(false);
+    seed(false, { counts: fullExcept(false, last) }, { trackCC: false, counts: { [last]: 2 } });
+    useCollection.getState().applyInternalMove('B', 'A', last, both);
+    const st = useCollection.getState();
+    expect(st.activityDays).toEqual([]);
+    expect(st.firstStickerAt).toBeUndefined();
+    expect(st.albums.find((a) => a.id === 'B')!.activityDays).toEqual([]);
+  });
+});
+
 describe('combined-swap CRUD', () => {
   let gid: string;
   beforeEach(() => {
