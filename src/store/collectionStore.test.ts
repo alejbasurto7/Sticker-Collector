@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { useCollection, orderAlbums, liveAlbums } from './collectionStore';
 import { ALBUM_TYPES, ACTIVE_ALBUM_TYPE_ID } from '../data/albumTypes';
+import { applyAlbumLayout, buildAlbumFor, DEFAULT_EDITION, DEFAULT_TRACK_CC } from '../data/sampleAlbum';
 
 const snap = (id: string, over = {}) => ({ id, albumName: id, counts: {}, swaps: [], edition: 'latam' as const, trackCC: true, locked: false, activityDays: [], completedOn: null, unlockedAchievements: {}, ...over });
 
@@ -445,6 +446,35 @@ describe('closeCombinedSwap / rollbackCombinedSwap', () => {
     expect(useCollection.getState().activityDays).toEqual([]);
   });
 
+  it('credits a parked album that received a copy with its own collecting day', () => {
+    // Activity used to be written only to the top-level fields — the ACTIVE album's — so a
+    // received copy routed into a parked album grew nobody's streak.
+    const sid = useCollection.getState().createCombinedSwap(gid, {
+      name: 'c', theirNeeds: [], theirSwaps: [], giving: ['MEX-9'], receiving: ['MEX-3'],
+    });
+    useCollection.getState().closeCombinedSwap(gid, sid, {
+      givenIds: ['MEX-9'], receivedIds: ['MEX-3'],
+      settledByAlbum: { A: { 'MEX-9': -1 }, B: { 'MEX-3': 1 } },
+    });
+    const st = useCollection.getState();
+    const b = st.albums.find((a) => a.id === 'B')!;
+    expect(b.activityDays).toHaveLength(1);
+    expect(b.firstStickerAt).toBeTypeOf('number');
+    expect(st.activityDays).toEqual([]); // active album only gave — not a collecting day
+  });
+
+  it('does not credit a parked album that only gave', () => {
+    const sid = useCollection.getState().createCombinedSwap(gid, {
+      name: 'c', theirNeeds: [], theirSwaps: [], giving: ['MEX-3'], receiving: [],
+    });
+    useCollection.setState({ albums: [snap('A', { counts: { 'MEX-9': 2 } }), snap('B', { counts: { 'MEX-3': 2 } })] } as any, false);
+    useCollection.getState().closeCombinedSwap(gid, sid, {
+      givenIds: ['MEX-3'], receivedIds: [],
+      settledByAlbum: { B: { 'MEX-3': -1 } },
+    });
+    expect(useCollection.getState().albums.find((a) => a.id === 'B')!.activityDays).toEqual([]);
+  });
+
   it('rollback reverses the exact per-album deltas and reopens', () => {
     const sid = useCollection.getState().createCombinedSwap(gid, {
       name: 'c', theirNeeds: [], theirSwaps: [], giving: ['MEX-9'], receiving: ['MEX-3'],
@@ -545,5 +575,65 @@ describe('liveAlbums', () => {
   it('invents no album while the collection is empty (album-less first run)', () => {
     useCollection.setState({ activeAlbumId: '', albums: [] } as any, false);
     expect(liveAlbums(useCollection.getState())).toEqual([]);
+  });
+});
+
+describe('combined settlement stamps completion against the RIGHT album', () => {
+  // The reason this was deferred: completion has to be measured against the album that
+  // gained the copy — its own type/edition/CC layout — not against whatever layout the
+  // active album happens to have live. Here the two albums track opt-in sections
+  // differently, so the two layouts hold different sticker sets.
+  let gid: string;
+
+  /** Every sticker of a layout owned, minus `hold` — the copy the swap will deliver. */
+  const fullExcept = (trackCC: boolean, hold: string) => {
+    const layout = buildAlbumFor(ACTIVE_ALBUM_TYPE_ID, 'latam', trackCC);
+    const counts = Object.fromEntries(layout.stickers.map((s) => [s.id, 1]));
+    delete counts[hold];
+    return counts;
+  };
+  const anyStickerOf = (trackCC: boolean) =>
+    buildAlbumFor(ACTIVE_ALBUM_TYPE_ID, 'latam', trackCC).stickers.at(-1)!.id;
+
+  afterEach(() => {
+    applyAlbumLayout(ACTIVE_ALBUM_TYPE_ID, DEFAULT_EDITION, DEFAULT_TRACK_CC);
+  });
+
+  const seed = (activeTrackCC: boolean, parked: Record<string, unknown>) => {
+    useCollection.setState({
+      counts: {}, activeAlbumId: 'A', groups: [], trackCC: activeTrackCC, edition: 'latam',
+      activityDays: [], firstStickerAt: undefined, completedOn: null,
+      albums: [snap('A', { trackCC: activeTrackCC }), snap('B', parked)],
+    } as any, false);
+    // The live layout mirrors the ACTIVE album — the one the old code measured against.
+    applyAlbumLayout(ACTIVE_ALBUM_TYPE_ID, 'latam', activeTrackCC);
+    gid = useCollection.getState().createGroup('Kids', ['A', 'B']);
+  };
+
+  it("stamps a parked album complete when its OWN layout is finished", () => {
+    const last = anyStickerOf(false);
+    // B tracks no opt-in section; the active album does, so its layout is the larger one.
+    seed(true, { trackCC: false, counts: fullExcept(false, last) });
+    const sid = useCollection.getState().createCombinedSwap(gid, {
+      name: 'c', theirNeeds: [], theirSwaps: [], giving: [], receiving: [last],
+    });
+    useCollection.getState().closeCombinedSwap(gid, sid, {
+      givenIds: [], receivedIds: [last], settledByAlbum: { B: { [last]: 1 } },
+    });
+    expect(useCollection.getState().albums.find((a) => a.id === 'B')!.completedOn).not.toBeNull();
+  });
+
+  it("does not stamp a parked album complete on the active album's shorter layout", () => {
+    const last = anyStickerOf(false);
+    // Now B is the one tracking the opt-in section: finishing every sticker of the ACTIVE
+    // album's shorter layout still leaves B's own album unfinished.
+    seed(false, { trackCC: true, counts: fullExcept(false, last) });
+    const sid = useCollection.getState().createCombinedSwap(gid, {
+      name: 'c', theirNeeds: [], theirSwaps: [], giving: [], receiving: [last],
+    });
+    useCollection.getState().closeCombinedSwap(gid, sid, {
+      givenIds: [], receivedIds: [last], settledByAlbum: { B: { [last]: 1 } },
+    });
+    expect(useCollection.getState().albums.find((a) => a.id === 'B')!.completedOn).toBeNull();
   });
 });

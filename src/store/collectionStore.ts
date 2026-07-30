@@ -1,9 +1,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { AlbumGroup, Counts, Edition, Swap } from '../types';
+import type { Album, AlbumGroup, Counts, Edition, Swap } from '../types';
 import type { CollectionPayload } from '../sync/payload';
 import { reconstructActive } from '../sync/serialize';
-import { album, applyAlbumLayout, DEFAULT_EDITION, DEFAULT_TRACK_CC } from '../data/sampleAlbum';
+import { album, applyAlbumLayout, buildAlbumFor, DEFAULT_EDITION, DEFAULT_TRACK_CC } from '../data/sampleAlbum';
 import { ACTIVE_ALBUM_TYPE_ID, typeById } from '../data/albumTypes';
 import { computeReservations, settleSwapCounts, reverseSettlement } from '../utils/swap';
 
@@ -340,8 +340,8 @@ function nextAlbumName(existing: string[]): string {
   }
 }
 
-const ownedUnique = (counts: Counts) =>
-  album.stickers.reduce((acc, s) => acc + ((counts[s.id] ?? 0) >= 1 ? 1 : 0), 0);
+const ownedUnique = (counts: Counts, layout: Album) =>
+  layout.stickers.reduce((acc, s) => acc + ((counts[s.id] ?? 0) >= 1 ? 1 : 0), 0);
 
 /** Local calendar day as YYYY-MM-DD, used to group collecting activity. */
 function todayKey(ts = Date.now()): string {
@@ -351,18 +351,27 @@ function todayKey(ts = Date.now()): string {
   return `${d.getFullYear()}-${m}-${day}`;
 }
 
+/** An album's own activity log — the fields `withActivity` reads and rewrites. */
+type ActivityFields = Pick<AlbumSnapshot, 'firstStickerAt' | 'activityDays' | 'completedOn'>;
+
 /**
  * Stamp the first-sticker time, log today as an active collecting day, and—once
  * every unique sticker is owned—freeze the album completion date. Pass the
  * resulting counts so completion can be detected.
+ *
+ * `layout` is the album being credited — completion is only meaningful against that
+ * album's own type/edition/CC sticker set. The active album passes the live `album`
+ * singleton; a parked album in a combined settlement passes its own built layout, so a
+ * shorter live layout can't stamp it complete (or a longer one hide that it is).
  */
 function withActivity(
-  s: CollectionState,
-  nextCounts?: Counts,
-): Pick<CollectionState, 'firstStickerAt' | 'activityDays' | 'completedOn'> {
+  s: ActivityFields,
+  nextCounts: Counts | undefined,
+  layout: Album,
+): ActivityFields {
   const today = todayKey();
   let completedOn = s.completedOn;
-  if (!completedOn && nextCounts && album.stickers.length > 0 && ownedUnique(nextCounts) === album.stickers.length) {
+  if (!completedOn && nextCounts && layout.stickers.length > 0 && ownedUnique(nextCounts, layout) === layout.stickers.length) {
     completedOn = today;
   }
   return {
@@ -685,16 +694,23 @@ export const useCollection = create<CollectionState>()(
             deselectedGiving: [],
             deselectedReceiving: [],
           }));
-          // Receiving stickers counts as a collecting day, exactly as on the solo path —
-          // but only when copies actually landed in the ACTIVE album, since the activity
-          // fields at the top level are that album's. A parked album that gained a copy is
-          // not credited: its own layout (type/edition/CC) is not the one `withActivity`
-          // measures completion against, so crediting it here could freeze the wrong date.
-          const activeGained = Object.values(applied[s.activeAlbumId] ?? {}).some((n) => n > 0);
+          // Receiving stickers counts as a collecting day, exactly as on the solo path, for
+          // EVERY album that gained a copy — a combined swap routes copies into parked
+          // albums too, and each keeps its own streak and completion date. Each is measured
+          // against its own layout: the active album against the live `album` singleton, a
+          // parked one against what its type/edition/CC builds, so a completion stamp can
+          // never land on an album that isn't actually finished.
+          const gained = (id: string) => Object.values(applied[id] ?? {}).some((n) => n > 0);
+          const albums = patch.albums?.map((a) =>
+            a.id !== s.activeAlbumId && gained(a.id)
+              ? { ...a, ...withActivity(a, a.counts, buildAlbumFor(a.albumTypeId, a.edition, a.trackCC)) }
+              : a,
+          );
           return {
             ...patch,
+            ...(albums ? { albums } : {}),
             groups,
-            ...(activeGained ? withActivity(s, patch.counts ?? s.counts) : {}),
+            ...(gained(s.activeAlbumId) ? withActivity(s, patch.counts ?? s.counts, album) : {}),
           };
         }),
 
@@ -721,7 +737,7 @@ export const useCollection = create<CollectionState>()(
       addOne: (id) =>
         set((s) => {
           const counts = { ...s.counts, [id]: clampCount((s.counts[id] ?? 0) + 1) };
-          return { counts, ...withActivity(s, counts) };
+          return { counts, ...withActivity(s, counts, album) };
         }),
 
       removeOne: (id) =>
@@ -732,7 +748,7 @@ export const useCollection = create<CollectionState>()(
           const next = clampCount(n);
           const increased = next > (s.counts[id] ?? 0);
           const counts = { ...s.counts, [id]: next };
-          return { counts, ...(increased ? withActivity(s, counts) : {}) };
+          return { counts, ...(increased ? withActivity(s, counts, album) : {}) };
         }),
 
       importCounts: (map, mode) =>
@@ -751,7 +767,7 @@ export const useCollection = create<CollectionState>()(
                 })();
           // Bump the import marker so the achievement banner can recognise this
           // batch as an import and summarise it rather than firing one per unlock.
-          return { counts, importSeq: s.importSeq + 1, ...(added ? withActivity(s, counts) : {}) };
+          return { counts, importSeq: s.importSeq + 1, ...(added ? withActivity(s, counts, album) : {}) };
         }),
 
       // Clears the collection and its live time counters for a fresh start; earned
@@ -826,7 +842,7 @@ export const useCollection = create<CollectionState>()(
               : sw,
           );
           // Receiving new stickers counts as a collecting day.
-          return { counts, swaps, ...(settled.receivedIds.length ? withActivity(s, counts) : {}) };
+          return { counts, swaps, ...(settled.receivedIds.length ? withActivity(s, counts, album) : {}) };
         }),
 
       rollbackSwap: (id) =>
