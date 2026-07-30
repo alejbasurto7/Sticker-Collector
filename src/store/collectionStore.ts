@@ -151,8 +151,15 @@ interface CollectionState {
   renameGroup: (id: string, name: string) => void;
   setGroupMembers: (id: string, memberIds: string[]) => void;
   disbandGroup: (id: string) => void;
-  /** Record a physical internal move of one copy of `stickerId` from one album to another. */
-  applyInternalMove: (fromId: string, toId: string, stickerId: string) => void;
+  /**
+   * Record a physical internal move of one copy of `stickerId` from one album to another.
+   * `writableIds` is the group's writable member ids (the caller resolves writability from
+   * sync metadata, which this store deliberately does not see) — a move touching anything
+   * outside that set is refused.
+   */
+  applyInternalMove: (
+    fromId: string, toId: string, stickerId: string, writableIds: Set<string>,
+  ) => void;
 
   // Combined (group) swaps
   createCombinedSwap: (
@@ -342,34 +349,66 @@ function withActivity(
   };
 }
 
+/** What `applyAlbumDeltas` changed: the store patch, plus the deltas it really wrote. */
+interface AppliedDeltas {
+  patch: { counts?: Counts; albums?: AlbumSnapshot[] };
+  /** albumId -> stickerId -> the delta that actually landed. Never contains a zero. */
+  applied: Record<string, Record<string, number>>;
+}
+
 /**
  * Apply per-album count deltas (albumId -> stickerId -> ±n) across the active album
  * (top-level `counts`) and any parked `albums`, clamped ≥ 0. The active album's counts
  * live only at the top level (its parked snapshot is refreshed on switch), so its delta
- * is applied there and skipped in the `albums` map. Returns just the fields that changed.
+ * is applied there and skipped in the `albums` map.
+ *
+ * Reports back the deltas it ACTUALLY wrote, which can differ from the ones asked for:
+ * the ≥0 clamp swallows part (or all) of a decrement, and an album this device does not
+ * have is skipped entirely. Callers that persist a settlement must store the applied
+ * deltas — storing the intended ones makes rollback reverse more than ever happened and
+ * invent copies the user never had. Mirrors `settleSwapCounts` on the solo path, which
+ * likewise records a delta only when the count really moved.
  */
 function applyAlbumDeltas(
   s: CollectionState,
   deltas: Record<string, Record<string, number>>,
-): { counts?: Counts; albums?: AlbumSnapshot[] } {
+): AppliedDeltas {
   const patch: { counts?: Counts; albums?: AlbumSnapshot[] } = {};
+  const applied: Record<string, Record<string, number>> = {};
+
+  /** Clamp one album's deltas onto its counts, recording only the changes that stuck. */
+  const write = (albumId: string, before: Counts, d: Record<string, number>): Counts => {
+    const counts = { ...before };
+    for (const [id, n] of Object.entries(d)) {
+      const was = counts[id] ?? 0;
+      const now = clampCount(was + n);
+      counts[id] = now;
+      if (now !== was) (applied[albumId] ??= {})[id] = now - was;
+    }
+    return counts;
+  };
+
   const activeDelta = deltas[s.activeAlbumId];
-  if (activeDelta) {
-    const counts = { ...s.counts };
-    for (const [id, d] of Object.entries(activeDelta)) counts[id] = clampCount((counts[id] ?? 0) + d);
-    patch.counts = counts;
-  }
+  if (activeDelta) patch.counts = write(s.activeAlbumId, s.counts, activeDelta);
+
   const touchesParked = s.albums.some((a) => a.id !== s.activeAlbumId && deltas[a.id]);
   if (touchesParked) {
     patch.albums = s.albums.map((a) => {
       const d = a.id === s.activeAlbumId ? undefined : deltas[a.id];
-      if (!d) return a;
-      const counts = { ...a.counts };
-      for (const [id, n] of Object.entries(d)) counts[id] = clampCount((counts[id] ?? 0) + n);
-      return { ...a, counts };
+      return d ? { ...a, counts: write(a.id, a.counts, d) } : a;
     });
   }
-  return patch;
+  return { patch, applied };
+}
+
+/**
+ * The live counts + swaps of any album by id. The active album's parked snapshot is only
+ * refreshed on switch, so its authoritative copy is the top level; every other album reads
+ * from `albums`. Undefined when this device has no such album.
+ */
+function albumFields(s: CollectionState, albumId: string): { counts: Counts; swaps: Swap[] } | undefined {
+  if (albumId === s.activeAlbumId) return { counts: s.counts, swaps: s.swaps };
+  return s.albums.find((a) => a.id === albumId);
 }
 
 /** Map over a group's swaps by id, replacing the matched swap with `fn(swap)`. */
@@ -541,8 +580,21 @@ export const useCollection = create<CollectionState>()(
 
       disbandGroup: (id) => set((s) => ({ groups: s.groups.filter((g) => g.id !== id) })),
 
-      applyInternalMove: (fromId, toId, stickerId) =>
-        set((s) => applyAlbumDeltas(s, { [fromId]: { [stickerId]: -1 }, [toId]: { [stickerId]: 1 } })),
+      applyInternalMove: (fromId, toId, stickerId, writableIds) =>
+        set((s) => {
+          // Both ends must still be writable: a share can be downgraded to read-only by a
+          // background sync while the moves panel is on screen.
+          if (fromId === toId || !writableIds.has(fromId) || !writableIds.has(toId)) return s;
+          const source = albumFields(s, fromId);
+          const target = albumFields(s, toId);
+          if (!source || !target) return s;
+          // Same `1 + committed` floor the give path uses: the source keeps one copy for
+          // itself plus every copy its own open swaps have already promised away. Without
+          // it, double-tapping Apply before the pool memo recomputes empties the source.
+          const committed = computeReservations(source.swaps).committedGive.get(stickerId) ?? 0;
+          if ((source.counts[stickerId] ?? 0) - 1 < 1 + committed) return s;
+          return applyAlbumDeltas(s, { [fromId]: { [stickerId]: -1 }, [toId]: { [stickerId]: 1 } }).patch;
+        }),
 
       createCombinedSwap: (groupId, input) => {
         const id = newId();
@@ -596,7 +648,7 @@ export const useCollection = create<CollectionState>()(
           const group = s.groups.find((g) => g.id === groupId);
           const target = group?.swaps.find((sw) => sw.id === swapId);
           if (!group || !target || target.status !== 'open') return s;
-          const patch = applyAlbumDeltas(s, settled.settledByAlbum);
+          const { patch, applied } = applyAlbumDeltas(s, settled.settledByAlbum);
           const groups = patchGroupSwap(s.groups, groupId, swapId, (sw) => ({
             ...sw,
             status: 'closed',
@@ -605,11 +657,22 @@ export const useCollection = create<CollectionState>()(
             receiving: settled.receivedIds,
             givingQty: settled.giveQty,
             receivingQty: settled.receiveQty,
-            settledByAlbum: settled.settledByAlbum,
+            // What was really written, so rollbackCombinedSwap reverses exactly that.
+            settledByAlbum: applied,
             deselectedGiving: [],
             deselectedReceiving: [],
           }));
-          return { ...patch, groups };
+          // Receiving stickers counts as a collecting day, exactly as on the solo path —
+          // but only when copies actually landed in the ACTIVE album, since the activity
+          // fields at the top level are that album's. A parked album that gained a copy is
+          // not credited: its own layout (type/edition/CC) is not the one `withActivity`
+          // measures completion against, so crediting it here could freeze the wrong date.
+          const activeGained = Object.values(applied[s.activeAlbumId] ?? {}).some((n) => n > 0);
+          return {
+            ...patch,
+            groups,
+            ...(activeGained ? withActivity(s, patch.counts ?? s.counts) : {}),
+          };
         }),
 
       rollbackCombinedSwap: (groupId, swapId) =>
@@ -622,7 +685,7 @@ export const useCollection = create<CollectionState>()(
             reversed[aid] = {};
             for (const [id, n] of Object.entries(d)) reversed[aid][id] = -n;
           }
-          const patch = applyAlbumDeltas(s, reversed);
+          const { patch } = applyAlbumDeltas(s, reversed);
           const groups = patchGroupSwap(s.groups, groupId, swapId, (sw) => ({
             ...sw,
             status: 'open',

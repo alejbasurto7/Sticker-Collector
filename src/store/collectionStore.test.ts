@@ -262,15 +262,16 @@ describe('group CRUD', () => {
 });
 
 describe('applyInternalMove', () => {
+  const both = new Set(['A', 'B']);
   beforeEach(() => {
     useCollection.setState({
-      counts: { 'MEX-7': 2 }, activeAlbumId: 'A',
+      counts: { 'MEX-7': 2 }, swaps: [], activeAlbumId: 'A',
       albums: [snap('A', { counts: { 'MEX-7': 2 } }), snap('B', { counts: { 'MEX-7': 0 } })],
     } as any, false);
   });
 
   it('moves a copy from the active album to a parked album', () => {
-    useCollection.getState().applyInternalMove('A', 'B', 'MEX-7');
+    useCollection.getState().applyInternalMove('A', 'B', 'MEX-7', both);
     const st = useCollection.getState();
     expect(st.counts['MEX-7']).toBe(1);
     expect(st.albums.find((a) => a.id === 'B')!.counts['MEX-7']).toBe(1);
@@ -281,11 +282,45 @@ describe('applyInternalMove', () => {
       counts: { 'MEX-7': 9 }, activeAlbumId: 'A',
       albums: [snap('A', { counts: { 'MEX-7': 9 } }), snap('B', { counts: { 'MEX-7': 3 } }), snap('C', { counts: { 'MEX-7': 0 } })],
     } as any, false);
-    useCollection.getState().applyInternalMove('B', 'C', 'MEX-7');
+    useCollection.getState().applyInternalMove('B', 'C', 'MEX-7', new Set(['B', 'C']));
     const st = useCollection.getState();
     expect(st.counts['MEX-7']).toBe(9);
     expect(st.albums.find((a) => a.id === 'B')!.counts['MEX-7']).toBe(2);
     expect(st.albums.find((a) => a.id === 'C')!.counts['MEX-7']).toBe(1);
+  });
+
+  it('refuses to move the source album\'s last copy', () => {
+    // The bite: double-tapping Apply before the pool memo recomputes. The first tap takes
+    // A from 2 to 1; the second must be a no-op rather than emptying A.
+    useCollection.getState().applyInternalMove('A', 'B', 'MEX-7', both);
+    useCollection.getState().applyInternalMove('A', 'B', 'MEX-7', both);
+    const st = useCollection.getState();
+    expect(st.counts['MEX-7']).toBe(1);
+    expect(st.albums.find((a) => a.id === 'B')!.counts['MEX-7']).toBe(1);
+  });
+
+  it("refuses to move a spare reserved by the source album's own open swap", () => {
+    const reserved = {
+      id: 'sw1', name: 'x', createdAt: 1, status: 'open' as const,
+      theirNeeds: [], theirSwaps: [], giving: ['MEX-7'], receiving: [],
+    };
+    useCollection.setState({ swaps: [reserved] } as any, false); // 'A' is active
+    useCollection.getState().applyInternalMove('A', 'B', 'MEX-7', both);
+    const st = useCollection.getState();
+    expect(st.counts['MEX-7']).toBe(2);
+    expect(st.albums.find((a) => a.id === 'B')!.counts['MEX-7'] ?? 0).toBe(0);
+  });
+
+  it('refuses a target that is not writable', () => {
+    useCollection.getState().applyInternalMove('A', 'B', 'MEX-7', new Set(['A']));
+    const st = useCollection.getState();
+    expect(st.counts['MEX-7']).toBe(2);
+    expect(st.albums.find((a) => a.id === 'B')!.counts['MEX-7'] ?? 0).toBe(0);
+  });
+
+  it('refuses a source that is not writable', () => {
+    useCollection.getState().applyInternalMove('A', 'B', 'MEX-7', new Set(['B']));
+    expect(useCollection.getState().counts['MEX-7']).toBe(2);
   });
 });
 
@@ -327,6 +362,7 @@ describe('closeCombinedSwap / rollbackCombinedSwap', () => {
   beforeEach(() => {
     useCollection.setState({
       counts: { 'MEX-9': 2 }, activeAlbumId: 'A', groups: [],
+      activityDays: [], firstStickerAt: undefined, completedOn: null,
       albums: [snap('A', { counts: { 'MEX-9': 2 } }), snap('B', { counts: { 'MEX-3': 0 } })],
     } as any, false);
     gid = useCollection.getState().createGroup('Kids', ['A', 'B']);
@@ -346,6 +382,67 @@ describe('closeCombinedSwap / rollbackCombinedSwap', () => {
     const sw = st.groups[0].swaps[0];
     expect(sw.status).toBe('closed');
     expect(sw.settledByAlbum).toEqual({ A: { 'MEX-9': -1 }, B: { 'MEX-3': 1 } });
+  });
+
+  it('records the delta clamping actually applied, not the one that was intended', () => {
+    // 'B' holds no MEX-3, so the -1 clamps to nothing. Storing the intended -1 would make
+    // rollback invent a copy the user never had.
+    const sid = useCollection.getState().createCombinedSwap(gid, {
+      name: 'c', theirNeeds: [], theirSwaps: [], giving: ['MEX-3'], receiving: [],
+    });
+    useCollection.getState().closeCombinedSwap(gid, sid, {
+      givenIds: ['MEX-3'], receivedIds: [],
+      settledByAlbum: { B: { 'MEX-3': -1 } },
+    });
+    expect(useCollection.getState().groups[0].swaps[0].settledByAlbum).toEqual({});
+  });
+
+  it('rollback of a clamped give does not invent a copy', () => {
+    const sid = useCollection.getState().createCombinedSwap(gid, {
+      name: 'c', theirNeeds: [], theirSwaps: [], giving: ['MEX-3'], receiving: [],
+    });
+    useCollection.getState().closeCombinedSwap(gid, sid, {
+      givenIds: ['MEX-3'], receivedIds: [],
+      settledByAlbum: { B: { 'MEX-3': -1 } },
+    });
+    useCollection.getState().rollbackCombinedSwap(gid, sid);
+    expect(useCollection.getState().albums.find((a) => a.id === 'B')!.counts['MEX-3'] ?? 0).toBe(0);
+  });
+
+  it('drops deltas aimed at an album this device does not have', () => {
+    const sid = useCollection.getState().createCombinedSwap(gid, {
+      name: 'c', theirNeeds: [], theirSwaps: [], giving: [], receiving: ['MEX-3'],
+    });
+    useCollection.getState().closeCombinedSwap(gid, sid, {
+      givenIds: [], receivedIds: ['MEX-3'],
+      settledByAlbum: { GONE: { 'MEX-3': 1 }, B: { 'MEX-3': 1 } },
+    });
+    expect(useCollection.getState().groups[0].swaps[0].settledByAlbum).toEqual({ B: { 'MEX-3': 1 } });
+  });
+
+  it('counts as a collecting day when the active album receives a copy', () => {
+    const sid = useCollection.getState().createCombinedSwap(gid, {
+      name: 'c', theirNeeds: [], theirSwaps: [], giving: [], receiving: ['MEX-3'],
+    });
+    useCollection.getState().closeCombinedSwap(gid, sid, {
+      givenIds: [], receivedIds: ['MEX-3'],
+      settledByAlbum: { A: { 'MEX-3': 1 } },
+    });
+    const st = useCollection.getState();
+    expect(st.activityDays).toHaveLength(1);
+    expect(st.firstStickerAt).toBeTypeOf('number');
+  });
+
+  it('does not count as a collecting day when the active album only gives', () => {
+    const sid = useCollection.getState().createCombinedSwap(gid, {
+      name: 'c', theirNeeds: [], theirSwaps: [], giving: ['MEX-9'], receiving: ['MEX-3'],
+    });
+    // The received copy lands in parked 'B'; 'A' only hands one over.
+    useCollection.getState().closeCombinedSwap(gid, sid, {
+      givenIds: ['MEX-9'], receivedIds: ['MEX-3'],
+      settledByAlbum: { A: { 'MEX-9': -1 }, B: { 'MEX-3': 1 } },
+    });
+    expect(useCollection.getState().activityDays).toEqual([]);
   });
 
   it('rollback reverses the exact per-album deltas and reopens', () => {

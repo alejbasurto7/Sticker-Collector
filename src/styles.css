@@ -1869,6 +1869,15 @@ textarea.notes-input {
   opacity: 0.65;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
 }
+/* A view-only member no copy reaches: hollowed out, so "waiting" reads differently
+   from "getting one by hand" at a glance. Keeps the monogram — who is waiting matters. */
+.amark.waiting {
+  background: transparent;
+  border: 1px dashed var(--text-dim);
+  color: var(--text-dim);
+  box-shadow: none;
+  opacity: 1;
+}
 /* "More albums need this than copies are coming" — resolved at close. */
 .amark.ghost {
   background: transparent;
@@ -2801,5 +2810,11 @@ textarea.notes-input {
 }
 .needs-call .nc-handoff {
   color: var(--green-bright);
+  font-weight: 600;
+}
+/* A view-only member no copy reaches: dimmer than a hand-off, because there is nothing
+   to hand over — it is a note for next time, not an action for now. */
+.needs-call .nc-waiting {
+  color: var(--text-dim);
   font-weight: 600;
 }

@@ -16,6 +16,8 @@ export interface ChipBadge {
   ambiguous: boolean;
   /** View-only members needing it: handed over physically, never written. */
   handoffs: AlbumMarkInfo[];
+  /** View-only members needing it that no copy reaches — still waiting after this swap. */
+  waiting: AlbumMarkInfo[];
 }
 
 /**
@@ -38,6 +40,7 @@ export function chipBadges(
       marks: resolve(r.memberIds),
       ambiguous: !!r.ambiguousAmong?.length,
       handoffs: resolve(r.handoffIds),
+      waiting: resolve(r.waitingIds),
     });
   }
   return out;
@@ -51,6 +54,7 @@ export function describeBadge(badge: ChipBadge, qty: number): string {
   const copies = `${qty} cop${qty === 1 ? 'y' : 'ies'}`;
   const names = badge.marks.map((m) => m.name);
   const handNames = badge.handoffs.map((m) => m.name);
+  const waitNames = badge.waiting.map((m) => m.name);
 
   let core: string;
   if (names.length) {
@@ -60,6 +64,10 @@ export function describeBadge(badge: ChipBadge, qty: number): string {
     core = `for ${list(handNames)} — hand over, not recorded`;
   } else {
     core = 'not routed to an album';
+  }
+  // Named, not just counted: "one other" tells the user nothing about who to chase next.
+  if (waitNames.length) {
+    core += ` — ${list(waitNames)} still need${waitNames.length === 1 ? 's' : ''} one`;
   }
 
   return `${copies}, ${core}${badge.ambiguous ? ' — another album needs it too, you choose at close' : ''}`;

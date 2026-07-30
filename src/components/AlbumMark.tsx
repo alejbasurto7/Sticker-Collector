@@ -5,6 +5,8 @@ interface Props {
   name: string;
   /** Read-only joined member: a sticker "landing" here is a hand-off, never written. */
   viewOnly?: boolean;
+  /** This member needs the sticker but no copy reaches them — drawn hollow. */
+  waiting?: boolean;
   /** 'md' is the legend row; 'sm' (default) sits on a chip. */
   size?: 'sm' | 'md';
 }
@@ -13,12 +15,18 @@ interface Props {
  * An album's identity mark — the same tint and monogram as its AlbumCard cover.
  * Decorative-with-a-name: not focusable, so a chip stays one tab stop.
  */
-export default function AlbumMark({ id, name, viewOnly, size = 'sm' }: Props) {
+export default function AlbumMark({ id, name, viewOnly, waiting, size = 'sm' }: Props) {
   const cls = ['amark', `tint-${coverTint(id)}`];
   if (size === 'md') cls.push('amark-md');
   if (viewOnly) cls.push('viewonly');
+  if (waiting) cls.push('waiting');
+  const title = waiting
+    ? `${name} — still needs this one`
+    : viewOnly
+      ? `${name} — view-only`
+      : name;
   return (
-    <span className={cls.join(' ')} title={viewOnly ? `${name} — view-only` : name}>
+    <span className={cls.join(' ')} title={title}>
       {monogram(name)}
     </span>
   );

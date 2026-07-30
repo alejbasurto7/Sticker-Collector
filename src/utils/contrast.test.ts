@@ -20,6 +20,18 @@ describe('contrastRatio', () => {
   it('is order-independent', () => {
     expect(contrastRatio('#000000', '#a855f7')).toBeCloseTo(contrastRatio('#a855f7', '#000000'), 5);
   });
+
+  it('reads 3-digit shorthand hex the same as its expanded form', () => {
+    expect(contrastRatio('#fff', '#000')).toBeCloseTo(21, 1);
+    expect(contrastRatio('#18b563', '#1b6')).toBeCloseTo(contrastRatio('#18b563', '#11bb66'), 5);
+  });
+
+  it('throws on a colour it cannot parse rather than returning NaN', () => {
+    // NaN silently satisfies nothing (`NaN >= 4.5` is false), so a bad colour would look
+    // like a contrast failure instead of the input error it is.
+    expect(() => contrastRatio('#ff', '#000000')).toThrow();
+    expect(() => contrastRatio('rebeccapurple', '#000000')).toThrow();
+  });
 });
 
 describe('album mark legibility (spec §D)', () => {

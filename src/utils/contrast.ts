@@ -5,10 +5,16 @@ function channelToLinear(srgb8: number): number {
   return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
 }
 
-/** Relative luminance of a `#rrggbb` colour, per WCAG 2.1. */
+/**
+ * Relative luminance of a `#rgb` or `#rrggbb` colour, per WCAG 2.1. Throws on anything
+ * else: an unparsed colour used to come back as NaN, and every comparison against NaN is
+ * false — so a bad input would read as a contrast failure rather than the mistake it is.
+ */
 export function relativeLuminance(hex: string): number {
-  const h = hex.replace('#', '');
-  const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const h = hex.replace('#', '').trim();
+  const full = h.length === 3 ? [...h].map((c) => c + c).join('') : h;
+  if (!/^[0-9a-f]{6}$/i.test(full)) throw new Error(`Not a hex colour: ${hex}`);
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16));
   return (
     0.2126 * channelToLinear(r) + 0.7152 * channelToLinear(g) + 0.0722 * channelToLinear(b)
   );

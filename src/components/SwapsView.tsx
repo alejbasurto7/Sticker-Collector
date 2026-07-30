@@ -32,6 +32,12 @@ export default function SwapsView() {
   const group = groupForAlbum(groups, activeAlbumId);
   const gm = useGroupMembers(group?.id);
   const pool = useMemo(() => (gm ? computeGroupPool(gm.members) : null), [gm]);
+  // Writability comes from sync metadata, which the collection store never sees — so the
+  // internal-move guard needs it passed in.
+  const writableIds = useMemo(
+    () => new Set((gm?.members ?? []).filter((m) => m.writable).map((m) => m.id)),
+    [gm],
+  );
   // The lens is offered only from a writable member of a group with ≥2 resolvable members.
   const canLens = !readOnly && !!gm && gm.members.length >= 2;
   const showGroup = canLens && lens === 'group';
@@ -109,7 +115,7 @@ export default function SwapsView() {
         <InternalMovesPanel
           moves={pool.internalMoves}
           members={gm.members}
-          onApply={(m) => applyInternalMove(m.fromId, m.toId, m.id)}
+          onApply={(m) => applyInternalMove(m.fromId, m.toId, m.id, writableIds)}
         />
       )}
 

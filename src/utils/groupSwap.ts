@@ -138,6 +138,13 @@ export interface ReceiveRouting {
   ambiguous: { id: string; chosenIds: string[]; options: { id: string; name: string }[] }[];
   /** view-only members missing a received sticker — physical hand-off reminders, never written. */
   handoffs: { id: string; memberId: string; memberName: string }[];
+  /**
+   * View-only members who need a received sticker but whom no copy reaches — every copy
+   * went to a writable album or an earlier hand-off. Nothing can be done for them in this
+   * swap, but they are still waiting, and listing only the lucky ones reads as "everyone
+   * is covered". The view-only counterpart of `ambiguous`: informational, never written.
+   */
+  waiting: { id: string; memberId: string; memberName: string }[];
 }
 
 function addWrite(
@@ -158,6 +165,7 @@ export function routeReceived(
   const writes: Record<string, Record<string, number>> = {};
   const ambiguous: ReceiveRouting['ambiguous'] = [];
   const handoffs: ReceiveRouting['handoffs'] = [];
+  const waiting: ReceiveRouting['waiting'] = [];
 
   for (const [id, qty] of Object.entries(received)) {
     if (qty <= 0) continue;
@@ -176,6 +184,11 @@ export function routeReceived(
     for (let k = 0; k < handedOff; k++) {
       handoffs.push({ id, memberId: viewNeeders[k].id, memberName: viewNeeders[k].name });
     }
+    // Everyone past that point goes without. Nothing to write and nothing to hand over —
+    // but they are named, so the UI never implies the whole group is covered.
+    for (let k = handedOff; k < viewNeeders.length; k++) {
+      waiting.push({ id, memberId: viewNeeders[k].id, memberName: viewNeeders[k].name });
+    }
     remaining -= handedOff;
 
     // Only a genuine surplus — beyond every needer, writable or view-only — becomes a spare.
@@ -192,7 +205,26 @@ export function routeReceived(
       });
     }
   }
-  return { writes, ambiguous, handoffs };
+  return { writes, ambiguous, handoffs, waiting };
+}
+
+/**
+ * Roll `routeReceived().waiting` up per member, restricted to the stickers actually being
+ * settled. One line per person beats one per sticker: a view-only member missing half the
+ * album would otherwise bury the close dialog in rows nobody can act on.
+ */
+export function summariseWaiting(
+  waiting: ReceiveRouting['waiting'],
+  settledIds: Set<string>,
+): { memberId: string; memberName: string; ids: string[] }[] {
+  const byMember = new Map<string, { memberId: string; memberName: string; ids: string[] }>();
+  for (const w of waiting) {
+    if (!settledIds.has(w.id)) continue;
+    const entry = byMember.get(w.memberId) ?? { memberId: w.memberId, memberName: w.memberName, ids: [] };
+    entry.ids.push(w.id);
+    byMember.set(w.memberId, entry);
+  }
+  return [...byMember.values()];
 }
 
 export interface GiveRouting {
@@ -241,6 +273,8 @@ export interface ChipRouting {
   ambiguousAmong?: string[];
   /** View-only members missing it: a physical hand-off, never written to counts. */
   handoffIds?: string[];
+  /** View-only members missing it that no copy reaches — still waiting after this swap. */
+  waitingIds?: string[];
 }
 
 export interface DisplayRouting {
@@ -279,10 +313,12 @@ export function routeForDisplay(
   for (const id of Object.keys(receiving)) {
     const amb = received.ambiguous.find((a) => a.id === id);
     const handoffIds = received.handoffs.filter((h) => h.id === id).map((h) => h.memberId);
+    const waitingIds = received.waiting.filter((h) => h.id === id).map((h) => h.memberId);
     get[id] = {
       memberIds: inOrder(Object.keys(received.writes).filter((aid) => (received.writes[aid][id] ?? 0) > 0)),
       ...(amb ? { ambiguousAmong: inOrder(amb.options.map((o) => o.id)) } : {}),
       ...(handoffIds.length ? { handoffIds: inOrder(handoffIds) } : {}),
+      ...(waitingIds.length ? { waitingIds: inOrder(waitingIds) } : {}),
     };
   }
 
@@ -320,6 +356,55 @@ export function applyRouteOverride(
  */
 export function overrideIsLive(options: { id: string }[], chosen: string | undefined): boolean {
   return !!chosen && options.some((o) => o.id === chosen);
+}
+
+/**
+ * Fold a settled combined swap's two routings into the single per-album delta map the
+ * store applies (albumId -> stickerId -> ±copies): received copies add, given copies
+ * subtract, and a contested single copy goes wherever the user pointed it.
+ *
+ * Extracted from SwapClose so the wiring between the routing helpers is testable in the
+ * repo's node-only Vitest setup — it is the one step in combined settlement that decides
+ * what gets WRITTEN, and it was previously reachable only through the component.
+ *
+ * Entries that net to zero are dropped, so the map only ever describes real movement.
+ */
+export function buildSettledByAlbum(
+  received: ReceiveRouting,
+  given: GiveRouting,
+  routeOverride: Record<string, string> = {},
+): Record<string, Record<string, number>> {
+  const out: Record<string, Record<string, number>> = {};
+  const add = (albumId: string, id: string, n: number) => {
+    (out[albumId] ??= {})[id] = (out[albumId][id] ?? 0) + n;
+  };
+
+  for (const [albumId, m] of Object.entries(received.writes)) {
+    for (const [id, n] of Object.entries(m)) add(albumId, id, n);
+  }
+
+  // Only a SINGLE contested copy is the user's to redirect: with more copies than one, every
+  // chosen album is getting one anyway, so there is nothing to move.
+  for (const amb of received.ambiguous) {
+    if (amb.chosenIds.length !== 1) continue;
+    const chosen = routeOverride[amb.id];
+    // A stale pick (the chosen album dropped out of contention mid-dialog) falls back to the
+    // default — matching what the chip's mark already shows via applyRouteOverride.
+    if (!overrideIsLive(amb.options, chosen) || chosen === amb.chosenIds[0]) continue;
+    add(amb.chosenIds[0], amb.id, -1);
+    add(chosen!, amb.id, 1);
+  }
+
+  for (const [albumId, m] of Object.entries(given.writes)) {
+    for (const [id, n] of Object.entries(m)) add(albumId, id, n);
+  }
+
+  const settled: Record<string, Record<string, number>> = {};
+  for (const [albumId, m] of Object.entries(out)) {
+    const moved = Object.entries(m).filter(([, n]) => n !== 0);
+    if (moved.length) settled[albumId] = Object.fromEntries(moved);
+  }
+  return settled;
 }
 
 /** Each member's own solo-swap give reservations, so the per-album give floor holds. */

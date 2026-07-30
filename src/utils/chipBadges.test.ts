@@ -6,6 +6,7 @@ const MEMBERS: AlbumMarkInfo[] = [
   { id: 'A', name: 'Leo' },
   { id: 'B', name: 'Kai' },
   { id: 'G', name: 'Grandpa', viewOnly: true },
+  { id: 'H', name: 'Nan', viewOnly: true },
 ];
 
 const routing = (over: Partial<ChipRouting>): Record<string, ChipRouting> => ({
@@ -31,6 +32,13 @@ describe('chipBadges', () => {
     expect(b.handoffs.map((x) => x.name)).toEqual(['Grandpa']);
   });
 
+  it('resolves waiting members separately from the ones getting a copy', () => {
+    const m = chipBadges(routing({ handoffIds: ['G'], waitingIds: ['H'] }), MEMBERS, 'get');
+    const b = m.get('MEX-7')!;
+    expect(b.handoffs.map((x) => x.name)).toEqual(['Grandpa']);
+    expect(b.waiting.map((x) => x.name)).toEqual(['Nan']);
+  });
+
   it('drops ids with no matching member instead of rendering a blank mark', () => {
     const m = chipBadges(routing({ memberIds: ['A', 'GONE'] }), MEMBERS, 'give');
     expect(m.get('MEX-7')!.marks.map((x) => x.id)).toEqual(['A']);
@@ -45,7 +53,10 @@ describe('chipBadges', () => {
 describe('describeBadge', () => {
   const badge = (over: Partial<ReturnType<typeof mk>> = {}) => ({ ...mk(), ...over });
   function mk() {
-    return { direction: 'get' as const, marks: [] as AlbumMarkInfo[], ambiguous: false, handoffs: [] as AlbumMarkInfo[] };
+    return {
+      direction: 'get' as const, marks: [] as AlbumMarkInfo[], ambiguous: false,
+      handoffs: [] as AlbumMarkInfo[], waiting: [] as AlbumMarkInfo[],
+    };
   }
 
   it('names a single destination', () => {
@@ -69,6 +80,24 @@ describe('describeBadge', () => {
   it('describes a hand-off-only sticker', () => {
     expect(describeBadge(badge({ handoffs: [MEMBERS[2]] }), 1)).toBe(
       '1 copy, for Grandpa — hand over, not recorded',
+    );
+  });
+
+  it('names the view-only members no copy reaches', () => {
+    expect(describeBadge(badge({ marks: [MEMBERS[0]], waiting: [MEMBERS[3]] }), 1)).toBe(
+      '1 copy, to Leo — Nan still needs one',
+    );
+  });
+
+  it('agrees the verb when two members are waiting', () => {
+    expect(describeBadge(badge({ marks: [MEMBERS[0]], waiting: [MEMBERS[2], MEMBERS[3]] }), 1)).toBe(
+      '1 copy, to Leo — Grandpa and Nan still need one',
+    );
+  });
+
+  it('names everyone still waiting alongside the one being handed a copy', () => {
+    expect(describeBadge(badge({ handoffs: [MEMBERS[2]], waiting: [MEMBERS[3]] }), 1)).toBe(
+      '1 copy, for Grandpa — hand over, not recorded — Nan still needs one',
     );
   });
 });

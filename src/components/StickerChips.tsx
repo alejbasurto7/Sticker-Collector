@@ -71,6 +71,9 @@ export default function StickerChips({
                       {badge.handoffs.map((m) => (
                         <AlbumMark key={`h-${m.id}`} {...m} viewOnly />
                       ))}
+                      {badge.waiting.map((m) => (
+                        <AlbumMark key={`w-${m.id}`} {...m} viewOnly waiting />
+                      ))}
                       {badge.ambiguous && <span className="amark ghost">?</span>}
                     </span>
                   )}

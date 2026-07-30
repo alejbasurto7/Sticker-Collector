@@ -11,8 +11,12 @@ import {
   swapRoutingInput,
   applyRouteOverride,
   overrideIsLive,
+  buildSettledByAlbum,
+  summariseWaiting,
   type GroupMember,
   type ChipRouting,
+  type ReceiveRouting,
+  type GiveRouting,
 } from './groupSwap';
 import type { ParsedList } from './import';
 import type { Reservations } from './swap';
@@ -157,11 +161,31 @@ describe('routeReceived', () => {
     expect(r.handoffs).toEqual([{ id: 'MEX-2', memberId: 'V', memberName: 'V' }]);
   });
 
-  it('a view-only needer gets no reminder when no copy is left for it', () => {
+  it('a view-only needer gets no hand-off when no copy is left for it', () => {
     const members = [w('A', { 'MEX-2': 0 }), v('V', { 'MEX-2': 0 })];
     const r = routeReceived(members, { 'MEX-2': 1 });
     expect(r.writes).toEqual({ A: { 'MEX-2': 1 } });
     expect(r.handoffs).toEqual([]);
+  });
+
+  it('a view-only needer starved by a writable needer is listed as still waiting', () => {
+    const members = [w('A', { 'MEX-2': 0 }), v('V', { 'MEX-2': 0 })];
+    const r = routeReceived(members, { 'MEX-2': 1 });
+    expect(r.waiting).toEqual([{ id: 'MEX-2', memberId: 'V', memberName: 'V' }]);
+  });
+
+  it('lists every view-only needer past the first when copies run out', () => {
+    const members = [w('A', { 'MEX-2': 1 }), v('V', { 'MEX-2': 0 }), v('W', { 'MEX-2': 0 })];
+    const r = routeReceived(members, { 'MEX-2': 1 });
+    expect(r.handoffs).toEqual([{ id: 'MEX-2', memberId: 'V', memberName: 'V' }]);
+    expect(r.waiting).toEqual([{ id: 'MEX-2', memberId: 'W', memberName: 'W' }]);
+  });
+
+  it('nobody is waiting when every view-only needer gets a copy', () => {
+    const members = [w('A', { 'MEX-2': 1 }), v('V', { 'MEX-2': 0 }), v('W', { 'MEX-2': 0 })];
+    const r = routeReceived(members, { 'MEX-2': 2 });
+    expect(r.handoffs).toHaveLength(2);
+    expect(r.waiting).toEqual([]);
   });
 });
 
@@ -258,6 +282,20 @@ describe('routeForDisplay', () => {
     expect(r.get['ARG-2'].handoffIds).toEqual(['G']);
   });
 
+  it('exposes the view-only members no copy reached as waitingIds', () => {
+    const members = [w('A', { 'ARG-2': 0 }), v('G', { 'ARG-2': 0 }), v('H', { 'ARG-2': 0 })];
+    const r = routeForDisplay(members, {}, { 'ARG-2': 2 });
+    expect(r.get['ARG-2'].memberIds).toEqual(['A']);
+    expect(r.get['ARG-2'].handoffIds).toEqual(['G']);
+    expect(r.get['ARG-2'].waitingIds).toEqual(['H']);
+  });
+
+  it('leaves waitingIds unset when every view-only needer is served', () => {
+    const members = [w('A', { 'ARG-2': 1 }), v('G', { 'ARG-2': 0 })];
+    const r = routeForDisplay(members, {}, { 'ARG-2': 1 });
+    expect(r.get['ARG-2'].waitingIds).toBeUndefined();
+  });
+
   it('a member whose layout excludes the sticker never appears', () => {
     const members = [
       { ...w('A', { 'CC-5': 0 }), trackCC: true },
@@ -334,6 +372,113 @@ describe('applyRouteOverride', () => {
   it('ignores an override naming an album that is no longer an option', () => {
     const get = { 'MEX-3': { memberIds: ['A'], ambiguousAmong: ['A', 'B'] } };
     expect(applyRouteOverride(get, { 'MEX-3': 'C' })['MEX-3'].memberIds).toEqual(['A']);
+  });
+});
+
+describe('summariseWaiting', () => {
+  const waiting = [
+    { id: 'MEX-2', memberId: 'V', memberName: 'Nan' },
+    { id: 'MEX-3', memberId: 'V', memberName: 'Nan' },
+    { id: 'MEX-2', memberId: 'W', memberName: 'Pa' },
+  ];
+
+  it('collapses one member\'s stickers into a single entry, in encounter order', () => {
+    expect(summariseWaiting(waiting, new Set(['MEX-2', 'MEX-3']))).toEqual([
+      { memberId: 'V', memberName: 'Nan', ids: ['MEX-2', 'MEX-3'] },
+      { memberId: 'W', memberName: 'Pa', ids: ['MEX-2'] },
+    ]);
+  });
+
+  it('counts only the stickers actually being settled', () => {
+    // An unchecked chip is not part of this settlement, so nobody is waiting on it here.
+    expect(summariseWaiting(waiting, new Set(['MEX-3']))).toEqual([
+      { memberId: 'V', memberName: 'Nan', ids: ['MEX-3'] },
+    ]);
+  });
+
+  it('is empty when nothing is being settled', () => {
+    expect(summariseWaiting(waiting, new Set())).toEqual([]);
+  });
+});
+
+describe('buildSettledByAlbum', () => {
+  const received = (over: Partial<ReceiveRouting> = {}): ReceiveRouting =>
+    ({ writes: {}, ambiguous: [], handoffs: [], ...over });
+  const given = (over: Partial<GiveRouting> = {}): GiveRouting =>
+    ({ writes: {}, short: {}, ...over });
+
+  it('merges the received (positive) and given (negative) writes', () => {
+    const out = buildSettledByAlbum(
+      received({ writes: { B: { 'MEX-3': 1 } } }),
+      given({ writes: { A: { 'MEX-9': -1 } } }),
+    );
+    expect(out).toEqual({ A: { 'MEX-9': -1 }, B: { 'MEX-3': 1 } });
+  });
+
+  it('nets a give and a receive of the same sticker in the same album', () => {
+    const out = buildSettledByAlbum(
+      received({ writes: { A: { 'MEX-9': 1 } } }),
+      given({ writes: { A: { 'MEX-9': -1 } } }),
+    );
+    expect(out).toEqual({}); // nets to zero — nothing to write, nothing to roll back
+  });
+
+  it('moves an ambiguous single copy to the album the user chose', () => {
+    const out = buildSettledByAlbum(
+      received({
+        writes: { A: { 'MEX-3': 1 } },
+        ambiguous: [{ id: 'MEX-3', chosenIds: ['A'], options: [{ id: 'A', name: 'A' }, { id: 'B', name: 'B' }] }],
+      }),
+      given(),
+      { 'MEX-3': 'B' },
+    );
+    expect(out).toEqual({ B: { 'MEX-3': 1 } });
+  });
+
+  it('ignores a stale override naming an album that is no longer an option', () => {
+    // Counts can change under an open close dialog (background sync). Honouring the stale
+    // pick would write the copy to an album that no longer needs it AND starve the one
+    // that does — and would disagree with the badge, which applyRouteOverride already drops.
+    const out = buildSettledByAlbum(
+      received({
+        writes: { A: { 'MEX-3': 1 } },
+        ambiguous: [{ id: 'MEX-3', chosenIds: ['A'], options: [{ id: 'A', name: 'A' }, { id: 'B', name: 'B' }] }],
+      }),
+      given(),
+      { 'MEX-3': 'C' },
+    );
+    expect(out).toEqual({ A: { 'MEX-3': 1 } });
+  });
+
+  it('leaves the default in place when the override just names it', () => {
+    const out = buildSettledByAlbum(
+      received({
+        writes: { A: { 'MEX-3': 1 } },
+        ambiguous: [{ id: 'MEX-3', chosenIds: ['A'], options: [{ id: 'A', name: 'A' }, { id: 'B', name: 'B' }] }],
+      }),
+      given(),
+      { 'MEX-3': 'A' },
+    );
+    expect(out).toEqual({ A: { 'MEX-3': 1 } });
+  });
+
+  it('never reroutes a multi-copy split — only a single contested copy is the user\'s call', () => {
+    const out = buildSettledByAlbum(
+      received({
+        writes: { A: { 'MEX-3': 1 }, B: { 'MEX-3': 1 } },
+        ambiguous: [{
+          id: 'MEX-3', chosenIds: ['A', 'B'],
+          options: [{ id: 'A', name: 'A' }, { id: 'B', name: 'B' }, { id: 'C', name: 'C' }],
+        }],
+      }),
+      given(),
+      { 'MEX-3': 'C' },
+    );
+    expect(out).toEqual({ A: { 'MEX-3': 1 }, B: { 'MEX-3': 1 } });
+  });
+
+  it('writes nothing at all for an empty settlement', () => {
+    expect(buildSettledByAlbum(received(), given())).toEqual({});
   });
 });
 

@@ -2,7 +2,10 @@ import { useState } from 'react';
 import type { Swap } from '../types';
 import { useCollection } from '../store/collectionStore';
 import { activeGiving, activeReceiving, giveQtyOf, computeReservations } from '../utils/swap';
-import { routeReceived, routeGiven, swapRoutingInput, overrideIsLive } from '../utils/groupSwap';
+import {
+  routeReceived, routeGiven, swapRoutingInput, overrideIsLive, buildSettledByAlbum,
+  summariseWaiting,
+} from '../utils/groupSwap';
 import { labelFor } from '../utils/group';
 import type { GroupSwapCtx } from '../sync/groupMembers';
 import StickerChips from './StickerChips';
@@ -75,34 +78,12 @@ export default function SwapClose({ swap, onClose, groupCtx }: Props) {
     }
 
     if (groupCtx && receiveRouting && giveRouting) {
-      const settledByAlbum: Record<string, Record<string, number>> = {};
-      const add = (aid: string, id: string, n: number) => {
-        (settledByAlbum[aid] ??= {})[id] = (settledByAlbum[aid][id] ?? 0) + n;
-      };
-      // Received copies (positive), honouring the default routing.
-      for (const [aid, m] of Object.entries(receiveRouting.writes)) {
-        for (const [id, n] of Object.entries(m)) add(aid, id, n);
-      }
-      // Apply single-copy ambiguous overrides: move the copy from the default to the chosen album.
-      for (const amb of receiveRouting.ambiguous) {
-        if (amb.chosenIds.length !== 1) continue;
-        const chosen = routeOverride[amb.id];
-        // A stale pick (the chosen album changed under us mid-dialog) falls back to the
-        // default, matching what the chip's mark already shows via applyRouteOverride.
-        if (!overrideIsLive(amb.options, chosen) || chosen === amb.chosenIds[0]) continue;
-        add(amb.chosenIds[0], amb.id, -1);
-        add(chosen!, amb.id, 1);
-      }
-      // Given copies (negative).
-      for (const [aid, m] of Object.entries(giveRouting.writes)) {
-        for (const [id, n] of Object.entries(m)) add(aid, id, n);
-      }
       closeCombinedSwap(groupCtx.groupId, swap.id, {
         givenIds: [...given],
         receivedIds: [...received],
         giveQty: settledGiveQty,
         receiveQty: receivedRecord,
-        settledByAlbum,
+        settledByAlbum: buildSettledByAlbum(receiveRouting, giveRouting, routeOverride),
       });
     } else {
       closeSwap(swap.id, {
@@ -119,6 +100,9 @@ export default function SwapClose({ swap, onClose, groupCtx }: Props) {
     (a) => a.chosenIds.length === 1 && received.has(a.id),
   );
   const handoffRows = (receiveRouting?.handoffs ?? []).filter((h) => received.has(h.id));
+  // View-only members no copy reaches. Nothing to do about it here, but naming them beats
+  // listing only the lucky one and letting the rest disappear.
+  const waitingRows = summariseWaiting(receiveRouting?.waiting ?? [], received);
   // Stickers the give pool couldn't source a spare for (e.g. the only spare is reserved by
   // that album's own solo swap) — surface this instead of silently telling the user a
   // sticker left an album that never actually gave it up.
@@ -154,7 +138,8 @@ export default function SwapClose({ swap, onClose, groupCtx }: Props) {
           onToggle={(id) => toggle(received, setReceived, id)}
         />
 
-        {groupCtx && receiveRouting && (needsCall.length > 0 || handoffRows.length > 0 || shortRows.length > 0) && (
+        {groupCtx && receiveRouting &&
+          (needsCall.length > 0 || handoffRows.length > 0 || waitingRows.length > 0 || shortRows.length > 0) && (
           <div className="needs-call">
             <div className="nc-title">⚠️ Needs your call</div>
             {needsCall.map((amb) => (
@@ -178,6 +163,17 @@ export default function SwapClose({ swap, onClose, groupCtx }: Props) {
               <div className="nc-row" key={`${h.id}-${h.memberId}`}>
                 <span className="nc-sticker">{labelFor(h.id)}</span>
                 <span className="nc-handoff">🤝 hand to {h.memberName} — not recorded</span>
+              </div>
+            ))}
+            {waitingRows.map((wr) => (
+              <div className="nc-row" key={`wait-${wr.memberId}`}>
+                <span className="nc-sticker">
+                  {wr.ids.length === 1 ? labelFor(wr.ids[0]) : `${wr.ids.length} stickers`}
+                </span>
+                <span className="nc-waiting">
+                  ⏳ {wr.memberName} still needs {wr.ids.length === 1 ? 'this one' : 'these'} — no
+                  {wr.ids.length === 1 ? ' copy' : ' copies'} left this time
+                </span>
               </div>
             ))}
             {shortRows.map((id) => {
