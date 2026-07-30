@@ -64,7 +64,8 @@ describe('hasCollectionData (join-wipe guard)', () => {
 function state(): SliceState {
   return {
     counts: { 'MEX-1': 2 }, swaps: [], edition: 'latam' as const, trackCC: true,
-    albumName: 'Active', locked: false, firstStickerAt: 10, activityDays: ['2026-07-01'],
+    albumName: 'Active', albumTypeId: 'other-type', locked: false, firstStickerAt: 10,
+    activityDays: ['2026-07-01'],
     completedOn: null, unlockedAchievements: {}, albumLayout: 'pages' as const,
     activeAlbumId: 'A',
     albums: [
@@ -81,6 +82,13 @@ describe('reconstructActive / allAlbums', () => {
     expect(a.albumName).toBe('Active');       // top-level, not 'stale-A'
     expect(a.counts).toEqual({ 'MEX-1': 2 });
     expect(a.albumLayout).toBe('pages');      // per-album layout is carried into the synced slice
+  });
+  it('carries the active album\'s collection type, so it does not come back as the default one', () => {
+    // Dropping albumTypeId let the receiving device backfill ACTIVE_ALBUM_TYPE_ID, silently
+    // turning an active album of any other collection into a default-type album — sticker
+    // layout and all. Parked albums were fine: they ship their stored snapshot whole.
+    expect(reconstructActive(state()).albumTypeId).toBe('other-type');
+    expect(sliceCloudPayload(state(), new Set(['A'])).albums[0].albumTypeId).toBe('other-type');
   });
   it('allAlbums refreshes the active entry and keeps the rest', () => {
     const all = allAlbums(state());

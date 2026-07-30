@@ -1,7 +1,7 @@
 import type { AlbumGroup, Counts, Edition, Swap } from '../types';
 // Type-only imports (erased at build) — keeps this module free of the store's
 // runtime (localStorage/zustand), so it's importable in a plain Node test env.
-import type { AlbumSnapshot, Theme, AlbumLayout } from '../store/collectionStore';
+import type { ActiveMirror, AlbumSnapshot, Theme, AlbumLayout } from '../store/collectionStore';
 import { PAYLOAD_V, type AlbumPayload, type CollectionPayload, type ChannelPayload, isAlbumPayload, isCollectionPayload } from './payload';
 
 /**
@@ -16,6 +16,8 @@ export interface SyncPayload {
   edition: Edition;
   trackCC: boolean;
   albumName: string;
+  /** Collection type of the active album — without it the receiver backfills its own default. */
+  albumTypeId: string;
   locked: boolean;
   firstStickerAt?: number;
   activityDays: string[];
@@ -30,18 +32,23 @@ export interface SyncPayload {
 }
 
 /** The read-only slice of collection state the slicers need. */
-export interface SliceState {
-  counts: Counts; swaps: Swap[]; edition: Edition; trackCC: boolean; albumName: string;
-  locked: boolean; firstStickerAt?: number; activityDays: string[]; completedOn: string | null;
-  unlockedAchievements: Record<string, number>; albumLayout: AlbumLayout;
-  albums: AlbumSnapshot[]; activeAlbumId: string;
+export interface SliceState extends ActiveMirror {
+  albums: AlbumSnapshot[];
   groups?: AlbumGroup[];
 }
 
-/** Build the active album's snapshot from the live top-level fields. */
-export function reconstructActive(s: SliceState): AlbumSnapshot {
+/**
+ * Build the active album's snapshot from the live top-level fields.
+ *
+ * The single reconstruction: the store re-exports this as `snapshotActive` for parking
+ * an album on switch/create. Two copies drifted once already — the sync one forgot
+ * `albumTypeId`, so an active album of a non-default collection synced with no type and
+ * came back as the default one, sticker layout included.
+ */
+export function reconstructActive(s: ActiveMirror): AlbumSnapshot {
   return {
-    id: s.activeAlbumId, albumName: s.albumName, counts: s.counts, swaps: s.swaps,
+    id: s.activeAlbumId, albumName: s.albumName, albumTypeId: s.albumTypeId,
+    counts: s.counts, swaps: s.swaps,
     edition: s.edition, trackCC: s.trackCC, locked: s.locked, firstStickerAt: s.firstStickerAt,
     activityDays: s.activityDays, completedOn: s.completedOn, unlockedAchievements: s.unlockedAchievements,
     albumLayout: s.albumLayout,

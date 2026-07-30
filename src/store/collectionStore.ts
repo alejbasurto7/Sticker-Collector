@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { AlbumGroup, Counts, Edition, Swap } from '../types';
 import type { CollectionPayload } from '../sync/payload';
+import { reconstructActive } from '../sync/serialize';
 import { album, applyAlbumLayout, DEFAULT_EDITION, DEFAULT_TRACK_CC } from '../data/sampleAlbum';
 import { ACTIVE_ALBUM_TYPE_ID, typeById } from '../data/albumTypes';
 import { computeReservations, settleSwapCounts, reverseSettlement } from '../utils/swap';
@@ -261,24 +262,14 @@ export type ActiveMirror = Pick<
   | 'unlockedAchievements'
 >;
 
-/** Capture the active album's live top-level fields as a parkable snapshot. */
-function snapshotActive(s: ActiveMirror): AlbumSnapshot {
-  return {
-    id: s.activeAlbumId,
-    albumName: s.albumName,
-    albumTypeId: s.albumTypeId,
-    counts: s.counts,
-    swaps: s.swaps,
-    edition: s.edition,
-    trackCC: s.trackCC,
-    locked: s.locked,
-    albumLayout: s.albumLayout,
-    firstStickerAt: s.firstStickerAt,
-    activityDays: s.activityDays,
-    completedOn: s.completedOn,
-    unlockedAchievements: s.unlockedAchievements,
-  };
-}
+/**
+ * Capture the active album's live top-level fields as a parkable snapshot.
+ *
+ * Shared with the sync layer rather than duplicated: the two copies drifted once (the
+ * sync one dropped `albumTypeId`, so an active album of a non-default collection synced
+ * without its type and returned as a default-type album).
+ */
+const snapshotActive = reconstructActive;
 
 /** Spread a parked album's data back onto the top-level (active) fields. */
 function loadSnapshot(a: AlbumSnapshot) {
