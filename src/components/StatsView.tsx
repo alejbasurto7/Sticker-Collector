@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useCollection } from '../store/collectionStore';
 import { computeStats, computeAchievements, displayPct } from '../utils/stats';
+import { countClosedSwaps } from '../utils/swap';
 import { shareNodeAsImage } from '../utils/share';
 import ProgressRing from './ProgressRing';
 import ProgressBar from './ProgressBar';
@@ -16,6 +17,8 @@ type PageFilter = 'all' | 'incomplete' | 'complete';
 export default function StatsView() {
   const counts = useCollection((s) => s.counts);
   const swaps = useCollection((s) => s.swaps);
+  const groups = useCollection((s) => s.groups);
+  const activeAlbumId = useCollection((s) => s.activeAlbumId);
   const albumName = useCollection((s) => s.albumName);
   const albumTypeId = useCollection((s) => s.albumTypeId);
   const firstStickerAt = useCollection((s) => s.firstStickerAt);
@@ -27,7 +30,12 @@ export default function StatsView() {
     () => computeStats(counts, { activityDays, completedOn }),
     [counts, activityDays, completedOn],
   );
-  const closedSwaps = useMemo(() => swaps.filter((s) => s.status === 'closed').length, [swaps]);
+  // Solo swaps plus the group's combined ones this album took part in — a combined swap
+  // is settled on the group, so counting only `swaps` never advanced a trade achievement.
+  const closedSwaps = useMemo(
+    () => countClosedSwaps(activeAlbumId, swaps, groups),
+    [activeAlbumId, swaps, groups],
+  );
   const achievements = useMemo(
     () => computeAchievements(stats, { closedSwaps, firstStickerAt, activityDays, now: Date.now() }),
     [stats, closedSwaps, firstStickerAt, activityDays],

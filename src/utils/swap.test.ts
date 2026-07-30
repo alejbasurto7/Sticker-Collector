@@ -5,11 +5,12 @@ import {
   computeCandidates,
   computeReservations,
   computeConflicts,
+  countClosedSwaps,
   totalGiving,
 } from './swap';
 import { parseExport } from './import';
 import type { ParsedList } from './import';
-import type { Swap } from '../types';
+import type { AlbumGroup, Swap } from '../types';
 
 describe('settleSwapCounts', () => {
   it('decrements a given spare and increments a received sticker', () => {
@@ -178,5 +179,57 @@ describe('reverseSettlement', () => {
   it('clamps to zero on naive reversal', () => {
     const swap = baseSwap({ giving: [], receiving: ['B'] });
     expect(reverseSettlement({ B: 0 }, swap)).toEqual({ B: 0 });
+  });
+});
+
+describe('countClosedSwaps', () => {
+  const group = (over: Partial<AlbumGroup>): AlbumGroup =>
+    ({ id: 'g1', name: 'Kids', memberIds: ['A', 'B'], swaps: [], ...over });
+  /** A concluded combined swap that moved a copy in each listed album. */
+  const combined = (id: string, settledByAlbum: Record<string, Record<string, number>>): Swap =>
+    baseSwap({ id, status: 'closed', settledByAlbum });
+
+  it('counts the album\'s own closed solo swaps', () => {
+    const swaps = [baseSwap({ id: 's1' }), baseSwap({ id: 's2', status: 'open' })];
+    expect(countClosedSwaps('A', swaps, [])).toBe(1);
+  });
+
+  it('counts a concluded combined swap that moved one of the album\'s copies', () => {
+    // The bug: closedSwaps only ever saw the active album's solo swaps, so concluding a
+    // combined swap never advanced a swap-count achievement, however many stickers moved.
+    const groups = [group({ swaps: [combined('c1', { A: { 'MEX-9': -1 }, B: { 'MEX-3': 1 } })] })];
+    expect(countClosedSwaps('A', [], groups)).toBe(1);
+  });
+
+  it('counts a combined swap once, not once per member album this device holds', () => {
+    // A combined swap is one swap of the GROUP. Counting it per participating album would
+    // inflate the total on a device that happens to hold several members.
+    const groups = [group({ swaps: [combined('c1', { A: { 'MEX-9': -1 }, B: { 'MEX-9': 1 } })] })];
+    expect(countClosedSwaps('A', [], groups)).toBe(1);
+  });
+
+  it('ignores a combined swap the album took no part in', () => {
+    const groups = [group({ swaps: [combined('c1', { B: { 'MEX-3': 1 } })] })];
+    expect(countClosedSwaps('A', [], groups)).toBe(0);
+  });
+
+  it('ignores an open combined swap', () => {
+    const groups = [group({ swaps: [baseSwap({ id: 'c1', status: 'open' })] })];
+    expect(countClosedSwaps('A', [], groups)).toBe(0);
+  });
+
+  it('ignores a combined swap whose gives were all clamped away (nothing changed hands)', () => {
+    // closeCombinedSwap stores the deltas that actually landed, so a fully clamped
+    // settlement leaves an empty map — no copies moved, no swap to the album's credit.
+    const groups = [group({ swaps: [combined('c1', {})] })];
+    expect(countClosedSwaps('A', [], groups)).toBe(0);
+  });
+
+  it('adds solo and combined swaps across several groups', () => {
+    const groups = [
+      group({ id: 'g1', swaps: [combined('c1', { A: { 'MEX-1': 1 } })] }),
+      group({ id: 'g2', memberIds: ['A', 'C'], swaps: [combined('c2', { A: { 'MEX-2': 1 } })] }),
+    ];
+    expect(countClosedSwaps('A', [baseSwap({ id: 's1' })], groups)).toBe(3);
   });
 });

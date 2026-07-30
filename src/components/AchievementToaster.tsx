@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useCollection } from '../store/collectionStore';
 import { computeStats, computeAchievements, type Achievement } from '../utils/stats';
+import { countClosedSwaps } from '../utils/swap';
 import { badgeFor } from '../data/achievementBadges';
 import { fireConfetti } from '../utils/confetti';
 
@@ -39,6 +40,7 @@ type BannerItem =
 export default function AchievementToaster() {
   const counts = useCollection((s) => s.counts);
   const swaps = useCollection((s) => s.swaps);
+  const groups = useCollection((s) => s.groups);
   const firstStickerAt = useCollection((s) => s.firstStickerAt);
   const activityDays = useCollection((s) => s.activityDays);
   const completedOn = useCollection((s) => s.completedOn);
@@ -51,7 +53,12 @@ export default function AchievementToaster() {
     () => computeStats(counts, { activityDays, completedOn }),
     [counts, activityDays, completedOn],
   );
-  const closedSwaps = useMemo(() => swaps.filter((s) => s.status === 'closed').length, [swaps]);
+  // Solo swaps plus the group's combined ones this album took part in — see StatsView,
+  // which must count trades the same way or the two disagree about what is unlocked.
+  const closedSwaps = useMemo(
+    () => countClosedSwaps(activeAlbumId, swaps, groups),
+    [activeAlbumId, swaps, groups],
+  );
   const achievements = useMemo(
     () => computeAchievements(stats, { closedSwaps, firstStickerAt, activityDays, now: Date.now() }),
     [stats, closedSwaps, firstStickerAt, activityDays],

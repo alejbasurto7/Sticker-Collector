@@ -1,4 +1,4 @@
-import type { Counts, Swap } from '../types';
+import type { AlbumGroup, Counts, Swap } from '../types';
 import type { ParsedList } from './import';
 
 /**
@@ -224,4 +224,30 @@ export function computeConflicts(swaps: Swap[], counts: Counts): ConflictSets {
   }
 
   return { giving, receiving, giveSwapCounts: giveCounts, recvSwapCounts: recvCounts };
+}
+
+/**
+ * How many swaps an album has concluded — what the trading achievements count.
+ *
+ * Its own settled solo swaps, plus the combined swaps of any group it belongs to. A
+ * combined swap belongs to the GROUP, not to each member, so it counts once here
+ * however many of that group's albums this device happens to hold — crediting it per
+ * participating album would inflate the total.
+ *
+ * "Took part" means the settlement really moved one of this album's copies:
+ * `settledByAlbum` records the deltas that actually landed, so an album that gave and
+ * received nothing (or whose give was clamped away) is a bystander, not a trader.
+ */
+export function countClosedSwaps(albumId: string, swaps: Swap[], groups: AlbumGroup[]): number {
+  const solo = swaps.filter((sw) => sw.status === 'closed').length;
+  const combined = groups.reduce(
+    (n, g) =>
+      n +
+      g.swaps.filter(
+        (sw) =>
+          sw.status === 'closed' && Object.keys(sw.settledByAlbum?.[albumId] ?? {}).length > 0,
+      ).length,
+    0,
+  );
+  return solo + combined;
 }
