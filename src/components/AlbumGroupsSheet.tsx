@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { AlbumSnapshot } from '../store/collectionStore';
 import { useCollection, orderAlbums } from '../store/collectionStore';
+import { useLiveAlbums } from '../store/useLiveAlbums';
 import { useSyncMeta } from '../store/syncStore';
 import { forcedReadOnly, MODE_BADGE } from '../sync/albumMode';
 import { useAlbumMode, useResolvedAlbumName } from '../sync/useAlbumMode';
@@ -19,7 +20,9 @@ interface Props {
  * members to run a combined swap — so Save is gated on that.
  */
 export default function AlbumGroupsSheet({ onClose }: Props) {
-  const albums = useCollection((s) => s.albums);
+  // Live list: the member picker shows each album's progress, and the current album's
+  // parked snapshot lags edits made while it is active.
+  const albums = useLiveAlbums();
   const albumOrder = useCollection((s) => s.albumOrder);
   const groups = useCollection((s) => s.groups);
   const createGroup = useCollection((s) => s.createGroup);

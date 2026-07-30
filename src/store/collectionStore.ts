@@ -249,8 +249,20 @@ function newId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/**
+ * The top-level fields that mirror the active album. Narrower than `CollectionState` so a
+ * component can assemble one from individual store subscriptions (see `useLiveAlbums`)
+ * without faking the actions half of the store.
+ */
+export type ActiveMirror = Pick<
+  CollectionState,
+  | 'activeAlbumId' | 'albumName' | 'albumTypeId' | 'counts' | 'swaps' | 'edition' | 'trackCC'
+  | 'locked' | 'albumLayout' | 'firstStickerAt' | 'activityDays' | 'completedOn'
+  | 'unlockedAchievements'
+>;
+
 /** Capture the active album's live top-level fields as a parkable snapshot. */
-function snapshotActive(s: CollectionState): AlbumSnapshot {
+function snapshotActive(s: ActiveMirror): AlbumSnapshot {
   return {
     id: s.activeAlbumId,
     albumName: s.albumName,
@@ -302,6 +314,26 @@ export function orderAlbums(albums: AlbumSnapshot[], order?: string[]): AlbumSna
     .sort((x, y) => rank.get(x.id)! - rank.get(y.id)!);
   const rest = albums.filter((a) => !rank.has(a.id)); // preserves natural order
   return [...listed, ...rest];
+}
+
+/**
+ * The album list with the active album's entry rebuilt from the live top-level fields.
+ *
+ * `albums` parks the active album only on switch/create, so its stored entry is stale for
+ * the whole time that album is current — every edit lands at the top level instead (see
+ * `applyAlbumDeltas`, which deliberately skips the active album's parked copy). Anything
+ * that shows per-album data for the WHOLE list must read it through here, or the current
+ * album renders its pre-edit state: the bug that showed a group swap's received sticker on
+ * every album card except the one the user was standing in.
+ *
+ * Replaces in place and never appends: while the collection is empty (`activeAlbumId: ''`,
+ * `albums: []`) there is no active album to reconstruct, and inventing one would hide the
+ * collection picker that App.tsx gates on an empty list.
+ */
+export function liveAlbums(s: ActiveMirror & { albums: AlbumSnapshot[] }): AlbumSnapshot[] {
+  if (!s.activeAlbumId || !s.albums.some((a) => a.id === s.activeAlbumId)) return s.albums;
+  const active = snapshotActive(s);
+  return s.albums.map((a) => (a.id === active.id ? active : a));
 }
 
 /**

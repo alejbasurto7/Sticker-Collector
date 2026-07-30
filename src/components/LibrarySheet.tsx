@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef } from 'react';
 import type { PointerEvent as ReactPointerEvent, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useCollection, orderAlbums } from '../store/collectionStore';
+import { useLiveAlbums } from '../store/useLiveAlbums';
 import { useSyncMeta } from '../store/syncStore';
 import AlbumCard from './AlbumCard';
 import { isSyncConfigured } from '../lib/supabase';
@@ -18,7 +19,9 @@ interface Props {
 }
 
 export default function LibrarySheet({ onClose, onManageAlbum, onOpenCloudSync, onOpenGroups }: Props) {
-  const albums = useCollection((s) => s.albums);
+  // Live list, not `s.albums`: the current album's parked snapshot lags every edit made
+  // while it is active, so its card would show pre-edit progress.
+  const albums = useLiveAlbums();
   const albumOrder = useCollection((s) => s.albumOrder);
   const activeAlbumId = useCollection((s) => s.activeAlbumId);
   const albumTypeId = useCollection((s) => s.albumTypeId);

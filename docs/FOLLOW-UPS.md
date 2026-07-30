@@ -42,3 +42,27 @@ album gets stamped "completed".
 
 **Minimal fix:** make `withActivity` take the album layout it should measure against, then apply
 it per touched album inside `applyAlbumDeltas`'s parked branch.
+
+---
+
+## 3. The sync payload drops the active album's collection type
+
+**Severity:** latent — only one collection type is registered today (`2026-fwc`), so the
+fallback happens to pick the right one. It bites the day a second type ships.
+
+**Where:** [serialize.ts:`reconstructActive`](../src/sync/serialize.ts) and the `SliceState`
+type above it — neither carries `albumTypeId`.
+
+`reconstructActive` rebuilds the active album from the live top-level fields for `allAlbums`,
+which feeds every outgoing payload. It copies twelve fields but not `albumTypeId`, so the
+active album always syncs with its type undefined. On the receiving device both
+`loadSnapshot` and `onRehydrateStorage` backfill `?? ACTIVE_ALBUM_TYPE_ID` — meaning an
+active album of any non-default collection silently comes back as the default one, and its
+sticker layout with it. Parked albums are unaffected: they ship their stored snapshot whole.
+
+Found while tracing why the library card of the current album showed pre-swap progress
+(fixed via `liveAlbums`, which is the store-side equivalent and does carry `albumTypeId`).
+
+**Minimal fix:** add `albumTypeId` to `SliceState` and to the object `reconstructActive`
+returns. Consider folding the two reconstructions together so they cannot drift again —
+`snapshotActive` in the store is now the more complete of the two.

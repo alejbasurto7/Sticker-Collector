@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useCollection, orderAlbums } from './collectionStore';
+import { useCollection, orderAlbums, liveAlbums } from './collectionStore';
 import { ALBUM_TYPES, ACTIVE_ALBUM_TYPE_ID } from '../data/albumTypes';
 
 const snap = (id: string, over = {}) => ({ id, albumName: id, counts: {}, swaps: [], edition: 'latam' as const, trackCC: true, locked: false, activityDays: [], completedOn: null, unlockedAchievements: {}, ...over });
@@ -506,5 +506,44 @@ describe('applyMergedCollection adopts groups', () => {
       { kind: 'collection', v: 1, albums: [snap('A')] } as any, new Set(['S']),
     );
     expect(useCollection.getState().groups).toEqual([]);
+  });
+});
+
+describe('liveAlbums', () => {
+  it('reports the active album from the live top-level fields, not its parked snapshot', () => {
+    useCollection.getState().addOne('MEX-2');
+    const active = liveAlbums(useCollection.getState()).find((a) => a.id === 'A')!;
+    expect(active.counts).toEqual({ 'MEX-1': 1, 'MEX-2': 1 });
+  });
+
+  it('reflects a combined settlement in the ACTIVE album, as it already does in parked ones', () => {
+    // The reported bug: closing a group swap where every member gained a copy left the
+    // library card of the CURRENT album showing its pre-swap total, while the parked
+    // members updated. applyAlbumDeltas writes the active album's delta to top-level
+    // `counts` only, so anything reading `albums` directly shows stale progress.
+    useCollection.setState({
+      counts: {}, activeAlbumId: 'A', groups: [],
+      albums: [snap('A'), snap('B'), snap('C')],
+    } as any, false);
+    const gid = useCollection.getState().createGroup('Kids', ['A', 'B', 'C']);
+    const sid = useCollection.getState().createCombinedSwap(gid, {
+      name: 'c', theirNeeds: [], theirSwaps: [], giving: [], receiving: ['MEX-3'],
+    });
+    useCollection.getState().closeCombinedSwap(gid, sid, {
+      givenIds: [], receivedIds: ['MEX-3'],
+      settledByAlbum: { A: { 'MEX-3': 1 }, B: { 'MEX-3': 1 }, C: { 'MEX-3': 1 } },
+    });
+    const list = liveAlbums(useCollection.getState());
+    expect(list.map((a) => a.counts['MEX-3'])).toEqual([1, 1, 1]);
+  });
+
+  it('leaves parked albums exactly as stored', () => {
+    const before = useCollection.getState().albums.find((a) => a.id === 'S')!;
+    expect(liveAlbums(useCollection.getState()).find((a) => a.id === 'S')).toBe(before);
+  });
+
+  it('invents no album while the collection is empty (album-less first run)', () => {
+    useCollection.setState({ activeAlbumId: '', albums: [] } as any, false);
+    expect(liveAlbums(useCollection.getState())).toEqual([]);
   });
 });
